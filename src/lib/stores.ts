@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const splashScreenVisible = writable(true);
 
 // TTS Settings
-export type LanguageCode = 'en-NG'; // | 'ha-NG' | 'yo-NG';
+export type LanguageCode = 'en-NG' | 'en-GB'; // | 'ha-NG' | 'yo-NG';
 
 export interface VoiceOption {
     name: string; // Azure Voice ID (Required)
@@ -25,6 +25,12 @@ export const NIGERIAN_VOICES: Record<LanguageCode, VoiceOption[]> = {
     'en-NG': [
         { name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne (Female)' },
         { name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo (Male)' }
+    ],
+    'en-GB': [
+        { name: 'en-GB-BellaNeural', ssmlGender: 'FEMALE', displayName: 'Bella (Female)' },
+        { name: 'en-GB-AdaDragonHDNeural', ssmlGender: 'FEMALE', displayName: 'Ada Dragon HD (Female)' },
+        { name: 'en-GB-EthanNeural', ssmlGender: 'MALE', displayName: 'Ethan (Male)' },
+        { name: 'en-GB-NoahNeural', ssmlGender: 'MALE', displayName: 'Noah (Male)' }
     ],
     'ha-NG': [
         { name: 'ha-NG-AminaNeural', ssmlGender: 'FEMALE', displayName: 'Amina (Female)' },
