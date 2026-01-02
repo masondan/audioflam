@@ -1,8 +1,0 @@
-cat > requirements.txt << 'EOF'
-gradio==4.26.0
-TTS==0.24.2
-torch
-torchaudio
-scipy
-numpy
-EOF
