@@ -73,7 +73,8 @@
       
       if (!res.ok) {
         const err = await res.json();
-        throw new Error(err.error || 'Failed to generate');
+        const details = err.details ? `: ${err.details}` : '';
+        throw new Error(`${err.error || 'Failed to generate'}${details}`);
       }
       
       const data = await res.json();

@@ -75,6 +75,8 @@ async function handleReplicate(text: string, speakerUrl: string, origin: string)
 		? speakerUrl 
 		: `${origin}${speakerUrl}`;
 
+	console.log('Replicate request:', { text: text.slice(0, 50), speakerUrl: absoluteSpeakerUrl });
+
 	// Create prediction
 	const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
 		method: 'POST',
@@ -96,7 +98,7 @@ async function handleReplicate(text: string, speakerUrl: string, origin: string)
 	if (!createResponse.ok) {
 		const errorText = await createResponse.text();
 		console.error('Replicate create error:', createResponse.status, errorText);
-		return json({ error: 'Replicate creation failed' }, { status: createResponse.status });
+		return json({ error: 'Replicate creation failed', details: errorText, status: createResponse.status }, { status: createResponse.status });
 	}
 
 	const prediction = await createResponse.json();
