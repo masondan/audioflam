@@ -22,7 +22,8 @@ export const POST: RequestHandler = async ({ request, url }) => {
 
 	} catch (error) {
 		console.error('Server Error:', error);
-		return json({ error: 'Internal Server Error' }, { status: 500 });
+		const message = error instanceof Error ? error.message : 'Unknown error';
+		return json({ error: 'Internal Server Error', details: message }, { status: 500 });
 	}
 };
 
