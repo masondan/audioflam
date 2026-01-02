@@ -21,3 +21,14 @@ Thumbs.db
 # Vite
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Debug files (local testing only)
+debug-*.js
+*_voices.json
+
+# Old backend attempts
+audioflam-tts-backend/
+
+# Test samples (keep local, don't deploy)
+test-audio-samples/
+info/test-voice.mp3

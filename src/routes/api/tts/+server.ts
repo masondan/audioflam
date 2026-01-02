@@ -1,83 +1,146 @@
-import { AZURE_SPEECH_KEY, AZURE_SPEECH_REGION } from '$env/static/private';
+import { env } from '$env/dynamic/private';
 import { json } from '@sveltejs/kit';
 import type { RequestHandler } from './$types';
-import * as sdk from 'microsoft-cognitiveservices-speech-sdk';
 
-export const POST: RequestHandler = async ({ request }) => {
+export const POST: RequestHandler = async ({ request, url }) => {
 	try {
-		const { text, ssml, voiceName } = await request.json();
+		const { text, voiceName, provider, speakerUrl } = await request.json();
 
-		if (!text && !ssml) {
-			return json({ error: 'Text or SSML is required' }, { status: 400 });
+		if (!text) {
+			return json({ error: 'Text is required' }, { status: 400 });
 		}
 		if (!voiceName) {
-			return json({ error: 'Voice Name is required' }, { status: 400 });
+			return json({ error: 'Voice name is required' }, { status: 400 });
 		}
 
-		if (!AZURE_SPEECH_KEY || !AZURE_SPEECH_REGION) {
-			console.error('AZURE credentials missing');
-			return json({ error: 'Server configuration error' }, { status: 500 });
+		// Route to appropriate provider
+		if (provider === 'replicate') {
+			return await handleReplicate(text, speakerUrl, url.origin);
+		} else {
+			return await handleYarnGPT(text, voiceName);
 		}
-
-		const speechConfig = sdk.SpeechConfig.fromSubscription(AZURE_SPEECH_KEY, AZURE_SPEECH_REGION);
-		speechConfig.speechSynthesisVoiceName = voiceName;
-		speechConfig.speechSynthesisOutputFormat = sdk.SpeechSynthesisOutputFormat.Audio16Khz32KBitRateMonoMp3;
-
-		const synthesizer = new sdk.SpeechSynthesizer(speechConfig);
-
-		return new Promise((resolve) => {
-			if (ssml) {
-				const ssmlWithVoice = ssml.replace(
-					'<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US">',
-					`<speak version="1.0" xmlns="http://www.w3.org/2001/10/synthesis" xml:lang="en-US"><voice name="${voiceName}">`
-				).replace('</speak>', '</voice></speak>');
-
-				synthesizer.speakSsmlAsync(
-					ssmlWithVoice,
-					(result) => {
-						if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-							const audioBuffer = result.audioData;
-							const base64Audio = Buffer.from(audioBuffer).toString('base64');
-							synthesizer.close();
-							resolve(json({ audioContent: base64Audio }));
-						} else {
-							console.error('SSML synthesis failed:', result.errorDetails);
-							synthesizer.close();
-							resolve(json({ error: 'Synthesis failed', details: result.errorDetails }, { status: 500 }));
-						}
-					},
-					(err) => {
-						console.error('SDK Error:', err);
-						synthesizer.close();
-						resolve(json({ error: 'SDK Error' }, { status: 500 }));
-					}
-				);
-			} else {
-				synthesizer.speakTextAsync(
-					text,
-					(result) => {
-						if (result.reason === sdk.ResultReason.SynthesizingAudioCompleted) {
-							const audioBuffer = result.audioData;
-							const base64Audio = Buffer.from(audioBuffer).toString('base64');
-							synthesizer.close();
-							resolve(json({ audioContent: base64Audio }));
-						} else {
-							console.error('Speech synthesis failed:', result.errorDetails);
-							synthesizer.close();
-							resolve(json({ error: 'Synthesis failed', details: result.errorDetails }, { status: 500 }));
-						}
-					},
-					(err) => {
-						console.error('SDK Error:', err);
-						synthesizer.close();
-						resolve(json({ error: 'SDK Error' }, { status: 500 }));
-					}
-				);
-			}
-		});
 
 	} catch (error) {
 		console.error('Server Error:', error);
 		return json({ error: 'Internal Server Error' }, { status: 500 });
 	}
 };
+
+async function handleYarnGPT(text: string, voiceName: string) {
+	const YARNGPT_API_KEY = env.YARNGPT_API_KEY;
+	if (!YARNGPT_API_KEY) {
+		console.error('YARNGPT_API_KEY missing');
+		return json({ error: 'YarnGPT API key not configured' }, { status: 500 });
+	}
+
+	const trimmedText = text.slice(0, 2000);
+
+	const response = await fetch('https://yarngpt.ai/api/v1/tts', {
+		method: 'POST',
+		headers: {
+			'Authorization': `Bearer ${YARNGPT_API_KEY}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({
+			text: trimmedText,
+			voice: voiceName,
+			response_format: 'mp3'
+		})
+	});
+
+	if (!response.ok) {
+		const errorText = await response.text();
+		console.error('YarnGPT API error:', response.status, errorText);
+		return json(
+			{ error: 'YarnGPT generation failed', details: errorText },
+			{ status: response.status }
+		);
+	}
+
+	const audioBuffer = await response.arrayBuffer();
+	const base64Audio = Buffer.from(audioBuffer).toString('base64');
+
+	return json({ audioContent: base64Audio });
+}
+
+async function handleReplicate(text: string, speakerUrl: string, origin: string) {
+	const REPLICATE_API_TOKEN = env.REPLICATE_API_TOKEN;
+	if (!REPLICATE_API_TOKEN) {
+		console.error('REPLICATE_API_TOKEN missing');
+		return json({ error: 'Replicate API token not configured' }, { status: 500 });
+	}
+
+	// If speakerUrl is a relative path, make it absolute
+	const absoluteSpeakerUrl = speakerUrl.startsWith('http') 
+		? speakerUrl 
+		: `${origin}${speakerUrl}`;
+
+	// Create prediction
+	const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
+		method: 'POST',
+		headers: {
+			'Authorization': `Bearer ${REPLICATE_API_TOKEN}`,
+			'Content-Type': 'application/json'
+		},
+		body: JSON.stringify({
+			version: '684bc3855b37866c0c65add2ff39c78f3dea3f4ff103a436465326e0f438d55e',
+			input: {
+				text: text.slice(0, 2000),
+				speaker: absoluteSpeakerUrl,
+				language: 'en',
+				cleanup_voice: false
+			}
+		})
+	});
+
+	if (!createResponse.ok) {
+		const errorText = await createResponse.text();
+		console.error('Replicate create error:', createResponse.status, errorText);
+		return json({ error: 'Replicate creation failed' }, { status: createResponse.status });
+	}
+
+	const prediction = await createResponse.json();
+	
+	// Poll for completion (max 90 seconds)
+	const maxAttempts = 45;
+	let attempts = 0;
+	let result = prediction;
+
+	while (result.status !== 'succeeded' && result.status !== 'failed' && attempts < maxAttempts) {
+		await new Promise(resolve => setTimeout(resolve, 2000));
+		
+		const pollResponse = await fetch(`https://api.replicate.com/v1/predictions/${prediction.id}`, {
+			headers: {
+				'Authorization': `Bearer ${REPLICATE_API_TOKEN}`
+			}
+		});
+		
+		if (!pollResponse.ok) {
+			console.error('Replicate poll error:', pollResponse.status);
+			return json({ error: 'Replicate polling failed' }, { status: pollResponse.status });
+		}
+		
+		result = await pollResponse.json();
+		attempts++;
+	}
+
+	if (result.status === 'failed') {
+		console.error('Replicate generation failed:', result.error);
+		return json({ error: 'Replicate generation failed', details: result.error }, { status: 500 });
+	}
+
+	if (result.status !== 'succeeded') {
+		return json({ error: 'Replicate timeout - generation took too long' }, { status: 504 });
+	}
+
+	// Fetch the audio from the output URL
+	const audioResponse = await fetch(result.output);
+	if (!audioResponse.ok) {
+		return json({ error: 'Failed to fetch generated audio' }, { status: 500 });
+	}
+
+	const audioBuffer = await audioResponse.arrayBuffer();
+	const base64Audio = Buffer.from(audioBuffer).toString('base64');
+
+	return json({ audioContent: base64Audio, format: 'wav' });
+}

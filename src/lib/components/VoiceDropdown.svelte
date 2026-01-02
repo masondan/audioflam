@@ -15,7 +15,7 @@
   let dropdownRef: HTMLDivElement;
   let audioElement: HTMLAudioElement | null = null;
 
-  const PREVIEW_TEXT = "Comment is free, but facts are sacred.";
+  const PREVIEW_TEXT = "Hello, my name is a Nigerian journalist.";
 
   function toggle() {
     isOpen = !isOpen;
@@ -69,6 +69,7 @@
     } catch (err) {
       console.error('Preview error:', err);
       playingVoice = null;
+      alert('Preview failed - check console for details');
     }
   }
 
@@ -127,7 +128,10 @@
               role="option"
               aria-selected={voice.name === value?.name}
             >
-              <span>{voice.displayName}</span>
+              <span class="voice-name">{voice.displayName}</span>
+              {#if voice.provider === 'replicate'}
+                <span class="speed-badge">⚡</span>
+              {/if}
             </button>
             <button
               type="button"
@@ -285,5 +289,14 @@
     height: 1px;
     background-color: var(--color-border);
     margin: 0 var(--spacing-md);
+  }
+
+  .voice-name {
+    flex: 1;
+  }
+
+  .speed-badge {
+    font-size: 12px;
+    margin-left: 4px;
   }
 </style>
