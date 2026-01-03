@@ -59,7 +59,7 @@ async function handleYarnGPT(text: string, voiceName: string) {
 	}
 
 	const audioBuffer = await response.arrayBuffer();
-	const base64Audio = Buffer.from(audioBuffer).toString('base64');
+	const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
 	return json({ audioContent: base64Audio });
 }
@@ -143,7 +143,7 @@ async function handleReplicate(text: string, speakerUrl: string, origin: string)
 	}
 
 	const audioBuffer = await audioResponse.arrayBuffer();
-	const base64Audio = Buffer.from(audioBuffer).toString('base64');
+	const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
 
 	return json({ audioContent: base64Audio, format: 'wav' });
 }
