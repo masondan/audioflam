@@ -63,9 +63,8 @@ async function handleAzure(text: string, voiceName: string) {
 	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 	console.log('SSML:', ssml);
 
-	// Try the cognitive.microsoft.com endpoint for newer Azure AI Services resources
 	const response = await fetch(
-		`https://${AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/texttospeech/v1`,
+		`https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
 		{
 			method: 'POST',
 			headers: {
