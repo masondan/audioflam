@@ -56,7 +56,7 @@ async function handleAzure(text: string, voiceName: string) {
 	const trimmedText = text.slice(0, 2000);
 	const escapedText = escapeXml(trimmedText);
 
-	const ssml = `<speak version='1.0' xml:lang='en-NG'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
+	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-NG'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 	console.log('SSML:', ssml);
 
 	const response = await fetch(
