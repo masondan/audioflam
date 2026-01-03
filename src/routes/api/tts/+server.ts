@@ -40,7 +40,13 @@ async function handleAzure(text: string, voiceName: string) {
 	const AZURE_SPEECH_KEY = env.AZURE_SPEECH_KEY;
 	const AZURE_SPEECH_REGION = env.AZURE_SPEECH_REGION || 'eastus';
 
-	console.log('Azure TTS request:', { voiceName, region: AZURE_SPEECH_REGION, textLength: text.length });
+	console.log('Azure TTS request:', { 
+		voiceName, 
+		region: AZURE_SPEECH_REGION, 
+		textLength: text.length,
+		keyPresent: !!AZURE_SPEECH_KEY,
+		keyLength: AZURE_SPEECH_KEY?.length || 0
+	});
 
 	if (!AZURE_SPEECH_KEY) {
 		console.error('AZURE_SPEECH_KEY missing');
