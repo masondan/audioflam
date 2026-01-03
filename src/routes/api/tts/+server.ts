@@ -27,6 +27,15 @@ export const POST: RequestHandler = async ({ request }) => {
 	}
 };
 
+function escapeXml(text: string): string {
+	return text
+		.replace(/&/g, '&amp;')
+		.replace(/</g, '&lt;')
+		.replace(/>/g, '&gt;')
+		.replace(/"/g, '&quot;')
+		.replace(/'/g, '&apos;');
+}
+
 async function handleAzure(text: string, voiceName: string) {
 	const AZURE_SPEECH_KEY = env.AZURE_SPEECH_KEY;
 	const AZURE_SPEECH_REGION = env.AZURE_SPEECH_REGION || 'eastus';
@@ -37,12 +46,9 @@ async function handleAzure(text: string, voiceName: string) {
 	}
 
 	const trimmedText = text.slice(0, 2000);
+	const escapedText = escapeXml(trimmedText);
 
-	const ssml = `<speak version='1.0' xml:lang='en-NG'>
-		<voice name='${voiceName}'>
-			${trimmedText}
-		</voice>
-	</speak>`;
+	const ssml = `<speak version='1.0' xml:lang='en-NG'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 
 	const response = await fetch(
 		`https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
