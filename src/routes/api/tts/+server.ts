@@ -77,7 +77,13 @@ async function handleAzure(text: string, voiceName: string) {
 	}
 
 	const audioBuffer = await response.arrayBuffer();
-	const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+	const uint8Array = new Uint8Array(audioBuffer);
+	let binaryString = '';
+	const chunkSize = 8192;
+	for (let i = 0; i < uint8Array.length; i += chunkSize) {
+		binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
+	}
+	const base64Audio = btoa(binaryString);
 
 	return json({ audioContent: base64Audio, format: 'mp3' });
 }
@@ -114,7 +120,13 @@ async function handleYarnGPT(text: string, voiceName: string) {
 	}
 
 	const audioBuffer = await response.arrayBuffer();
-	const base64Audio = btoa(String.fromCharCode(...new Uint8Array(audioBuffer)));
+	const uint8Array = new Uint8Array(audioBuffer);
+	let binaryString = '';
+	const chunkSize = 8192;
+	for (let i = 0; i < uint8Array.length; i += chunkSize) {
+		binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
+	}
+	const base64Audio = btoa(binaryString);
 
 	return json({ audioContent: base64Audio });
 }
