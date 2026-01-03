@@ -52,7 +52,7 @@ async function handleAzure(text: string, voiceName: string) {
 	const langCode = langMatch ? langMatch[1] : 'en-US';
 	
 	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
-	const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+	const endpoint = `https://${AZURE_SPEECH_REGION}.api.cognitive.microsoft.com/cognitiveservices/v1`;
 
 	const response = await fetch(endpoint, {
 		method: 'POST',
@@ -60,7 +60,7 @@ async function handleAzure(text: string, voiceName: string) {
 			'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
 			'Content-Type': 'application/ssml+xml',
 			'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-			// 'Host': `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`
+			'Host': `${AZURE_SPEECH_REGION}.api.cognitive.microsoft.com`
 		},
 		body: ssml
 	});
