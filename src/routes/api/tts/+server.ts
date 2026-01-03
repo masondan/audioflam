@@ -75,8 +75,12 @@ async function handleAzure(text: string, voiceName: string) {
 	const trimmedText = text.slice(0, 2000);
 	const escapedText = escapeXml(trimmedText);
 
-	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='en-NG'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
-	console.log('SSML:', ssml);
+	// Use voice's language code from voice name (e.g., en-NG-AbeoNeural -> en-NG)
+	const langMatch = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
+	const langCode = langMatch ? langMatch[1] : 'en-US';
+	
+	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
+	console.log('SSML:', ssml, 'langCode:', langCode);
 
 	const response = await fetch(
 		`https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
