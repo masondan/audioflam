@@ -40,16 +40,7 @@ async function handleAzure(text: string, voiceName: string) {
 	const AZURE_SPEECH_KEY = env.AZURE_SPEECH_KEY?.trim();
 	const AZURE_SPEECH_REGION = env.AZURE_SPEECH_REGION?.trim() || 'eastus';
 
-	console.log('Azure TTS request:', { 
-		voiceName, 
-		region: AZURE_SPEECH_REGION, 
-		textLength: text.length,
-		keyPresent: !!AZURE_SPEECH_KEY,
-		keyLength: AZURE_SPEECH_KEY?.length || 0
-	});
-
 	if (!AZURE_SPEECH_KEY) {
-		console.error('AZURE_SPEECH_KEY missing');
 		return json({ error: 'Azure Speech key not configured' }, { status: 500 });
 	}
 
@@ -62,28 +53,17 @@ async function handleAzure(text: string, voiceName: string) {
 	
 	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 	const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
-	console.log('SSML:', ssml);
-	console.log('Endpoint:', endpoint);
-	console.log('Key prefix:', AZURE_SPEECH_KEY.substring(0, 8));
 
-	const headers = {
-		'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
-		'Content-Type': 'application/ssml+xml',
-		'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
-		'User-Agent': 'audioflam/1.0',
-		'Host': `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`
-	};
-	console.log('Request headers:', Object.keys(headers));
-	console.log('Body length:', ssml.length);
-	console.log('Body preview:', ssml.substring(0, 100));
-	
 	const response = await fetch(endpoint, {
 		method: 'POST',
-		headers,
+		headers: {
+			'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
+			'Content-Type': 'application/ssml+xml',
+			'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+			'Host': `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`
+		},
 		body: ssml
 	});
-	
-	console.log('Response status:', response.status);
 
 	if (!response.ok) {
 		const errorText = await response.text();

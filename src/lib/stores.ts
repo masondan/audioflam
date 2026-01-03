@@ -38,7 +38,6 @@ export const YARNGPT_VOICES: VoiceOption[] = [
 export const AZURE_VOICES: VoiceOption[] = [
 	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo', description: 'Azure Nigerian male', provider: 'azure' },
 	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne', description: 'Azure Nigerian female', provider: 'azure' },
-	{ name: 'en-US-JennyNeural', ssmlGender: 'FEMALE', displayName: 'Jenny (US)', description: 'Test US voice', provider: 'azure' },
 ];
 
 // Combined voices for the UI
