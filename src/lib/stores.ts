@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const splashScreenVisible = writable(true);
 
 // TTS Provider Types
-export type TTSProvider = 'yarngpt' | 'replicate';
+export type TTSProvider = 'yarngpt' | 'azure';
 
 export interface VoiceOption {
 	name: string;
@@ -12,7 +12,6 @@ export interface VoiceOption {
 	displayName: string;
 	description: string;
 	provider: TTSProvider;
-	speakerUrl?: string; // For Replicate voice cloning
 }
 
 // YarnGPT Nigerian Voices (native, slower ~30s)
@@ -35,27 +34,19 @@ export const YARNGPT_VOICES: VoiceOption[] = [
 	{ name: 'Adam', ssmlGender: 'MALE', displayName: 'Adam', description: 'Deep, clear', provider: 'yarngpt' }
 ];
 
-// Replicate XTTS-v2 Voices (cloned, faster ~7s)
-// Add your Nigerian voice samples to static/voices/ and reference them here
-
-export const REPLICATE_VOICES: VoiceOption[] = [
-  { 
-    name: 'osas', 
-    ssmlGender: 'FEMALE', 
-    displayName: 'Osas', 
-    description: 'Cloned Nigerian voice', 
-    provider: 'replicate',
-    speakerUrl: '/voices/test-voice.mp3'
-  },
+// Azure TTS Nigerian English Voices
+export const AZURE_VOICES: VoiceOption[] = [
+	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo', description: 'Azure Nigerian male', provider: 'azure' },
+	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne', description: 'Azure Nigerian female', provider: 'azure' },
 ];
 
 // Combined voices for the UI
 export const ALL_VOICES: VoiceOption[] = [
-	...YARNGPT_VOICES,
-	...REPLICATE_VOICES
+	...AZURE_VOICES,
+	...YARNGPT_VOICES
 ];
 
-export const selectedVoice = writable<VoiceOption>(YARNGPT_VOICES[0]);
+export const selectedVoice = writable<VoiceOption>(AZURE_VOICES[0]);
 export const textInput = writable('');
 
 // Audio State

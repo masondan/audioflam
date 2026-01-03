@@ -66,8 +66,7 @@
         body: JSON.stringify({
           text: $textInput.trim(),
           voiceName: voice.name,
-          provider: voice.provider,
-          speakerUrl: voice.speakerUrl
+          provider: voice.provider
         })
       });
       
@@ -126,7 +125,8 @@
   }
 
   function getProviderBadge(provider: string): string {
-    return provider === 'replicate' ? '⚡ Fast' : '🇳🇬 Native';
+    if (provider === 'azure') return '☁️ Azure';
+    return '🇳🇬 Native';
   }
 </script>
 
@@ -145,7 +145,7 @@
       />
       <div class="voice-meta">
         <span class="voice-description">{$selectedVoice?.description}</span>
-        <span class="provider-badge" class:fast={$selectedVoice?.provider === 'replicate'}>
+        <span class="provider-badge" class:azure={$selectedVoice?.provider === 'azure'}>
           {getProviderBadge($selectedVoice?.provider)}
         </span>
       </div>
@@ -232,7 +232,11 @@
 
         {#if loading}
           <p class="loading-hint">
-            {$selectedVoice?.provider === 'replicate' ? 'Generating (~7 seconds)...' : 'Generating (~30 seconds)...'}
+            {#if $selectedVoice?.provider === 'azure'}
+              Generating (~3 seconds)...
+            {:else}
+              Generating (~30 seconds)...
+            {/if}
           </p>
         {/if}
 
@@ -299,9 +303,9 @@
     font-weight: 500;
   }
 
-  .provider-badge.fast {
-    background: #dcfce7;
-    color: #166534;
+  .provider-badge.azure {
+    background: #dbeafe;
+    color: #1e40af;
   }
 
   .text-section {
