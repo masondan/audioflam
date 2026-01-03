@@ -40,6 +40,8 @@ async function handleAzure(text: string, voiceName: string) {
 	const AZURE_SPEECH_KEY = env.AZURE_SPEECH_KEY;
 	const AZURE_SPEECH_REGION = env.AZURE_SPEECH_REGION || 'eastus';
 
+	console.log('Azure TTS request:', { voiceName, region: AZURE_SPEECH_REGION, textLength: text.length });
+
 	if (!AZURE_SPEECH_KEY) {
 		console.error('AZURE_SPEECH_KEY missing');
 		return json({ error: 'Azure Speech key not configured' }, { status: 500 });
@@ -49,6 +51,7 @@ async function handleAzure(text: string, voiceName: string) {
 	const escapedText = escapeXml(trimmedText);
 
 	const ssml = `<speak version='1.0' xml:lang='en-NG'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
+	console.log('SSML:', ssml);
 
 	const response = await fetch(
 		`https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`,
