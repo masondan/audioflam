@@ -72,8 +72,8 @@ async function handleAzure(text: string, voiceName: string) {
 		response.headers.forEach((value, key) => { headers[key] = value; });
 		console.error('Azure TTS error:', response.status, errorText, headers);
 		return json(
-			{ error: 'Azure TTS generation failed', status: response.status, details: errorText, headers },
-			{ status: 400 }
+			{ error: 'Azure TTS generation failed', status: response.status, details: errorText, ssml: ssml },
+			{ status: response.status }
 		);
 	}
 
