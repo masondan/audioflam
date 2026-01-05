@@ -129,7 +129,7 @@
               aria-selected={voice.name === value?.name}
             >
               <span class="voice-name">{voice.displayName}</span>
-              {#if voice.provider === 'replicate'}
+              {#if voice.provider === 'azure'}
                 <span class="speed-badge">⚡</span>
               {/if}
             </button>

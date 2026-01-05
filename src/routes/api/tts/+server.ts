@@ -47,31 +47,57 @@ async function handleAzure(text: string, voiceName: string) {
 	const trimmedText = text.slice(0, 2000);
 	const escapedText = escapeXml(trimmedText);
 
-	// Use voice's language code from voice name (e.g., en-NG-AbeoNeural -> en-NG)
 	const langMatch = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
 	const langCode = langMatch ? langMatch[1] : 'en-US';
 	
 	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
-	// Use the Speech-specific TTS endpoint (not generic Cognitive Services)
 	const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
+
+	// DEBUG: Log everything to diagnose Cloudflare vs local differences
+	console.log('[AZURE DEBUG] endpoint:', JSON.stringify(endpoint));
+	console.log('[AZURE DEBUG] region:', JSON.stringify(AZURE_SPEECH_REGION));
+	console.log('[AZURE DEBUG] region chars:', Array.from(AZURE_SPEECH_REGION).map(c => c.charCodeAt(0)));
+	console.log('[AZURE DEBUG] key length:', AZURE_SPEECH_KEY.length);
+	console.log('[AZURE DEBUG] ssml length:', ssml.length);
+	console.log('[AZURE DEBUG] ssml:', ssml.slice(0, 300));
 
 	const response = await fetch(endpoint, {
 		method: 'POST',
 		headers: {
 			'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
-			'Content-Type': 'application/ssml+xml',
-			'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3'
+			'Content-Type': 'application/ssml+xml; charset=utf-8',
+			'X-Microsoft-OutputFormat': 'audio-16khz-128kbitrate-mono-mp3',
+			'User-Agent': 'audioflam-cloudflare/1.0'
 		},
 		body: ssml
 	});
 
+	const rawHeaders: Record<string, string> = {};
+	response.headers.forEach((value, key) => { rawHeaders[key] = value; });
+	console.log('[AZURE DEBUG] response status:', response.status);
+	console.log('[AZURE DEBUG] response headers:', JSON.stringify(rawHeaders));
+
 	if (!response.ok) {
-		const errorText = await response.text();
-		const headers: Record<string, string> = {};
-		response.headers.forEach((value, key) => { headers[key] = value; });
-		console.error('Azure TTS error:', response.status, errorText, headers);
+		let errorText = '';
+		try {
+			errorText = await response.text();
+		} catch (e) {
+			console.log('[AZURE DEBUG] failed to read error body:', e);
+		}
+		console.error('Azure TTS error:', response.status, errorText, rawHeaders);
 		return json(
-			{ error: 'Azure TTS generation failed', status: response.status, details: errorText, ssml: ssml },
+			{ 
+				error: 'Azure TTS generation failed', 
+				status: response.status, 
+				details: errorText, 
+				azureHeaders: rawHeaders,
+				debugInfo: {
+					endpoint,
+					regionCharCodes: Array.from(AZURE_SPEECH_REGION).map(c => c.charCodeAt(0)),
+					keyLength: AZURE_SPEECH_KEY.length,
+					ssmlSample: ssml.slice(0, 200)
+				}
+			},
 			{ status: response.status }
 		);
 	}
