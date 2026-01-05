@@ -9,10 +9,10 @@
   let errorMsg = $state<string | null>(null);
   let editorRef: HTMLDivElement;
   
-  let currentTime = $state(0);
   let duration = $state(0);
   let isPlaying = $state(false);
-  let audioElement: HTMLAudioElement | null = null;
+  let audioElement = $state<HTMLAudioElement | null>(null);
+  let lastGeneratedText = $state('');
 
   $effect(() => {
     hasTextInput = $textInput.trim().length > 0;
@@ -20,22 +20,45 @@
 
   function handleVoiceChange(voice: VoiceOption) {
     selectedVoice.set(voice);
-    // Reset audio when voice changes
     if (audioUrl) {
       audioUrl = null;
       audioElement = null;
       isPlaying = false;
+      lastGeneratedText = '';
     }
   }
 
   function handleEditorInput() {
     if (editorRef) {
-      textInput.set(editorRef.innerText);
+      const newText = editorRef.innerText;
+      textInput.set(newText);
+      
+      if (audioUrl && newText.trim() !== lastGeneratedText) {
+        audioUrl = null;
+        audioElement = null;
+        isPlaying = false;
+        lastGeneratedText = '';
+      }
     }
   }
 
   function handleEditorFocus() {
-    hasTextInput = true;
+    if (isPlaying && audioElement) {
+      audioElement.pause();
+      isPlaying = false;
+    }
+  }
+
+  function skipBackward() {
+    if (audioElement) {
+      audioElement.currentTime = Math.max(0, audioElement.currentTime - 5);
+    }
+  }
+
+  function skipForward() {
+    if (audioElement) {
+      audioElement.currentTime = Math.min(duration, audioElement.currentTime + 5);
+    }
   }
 
   async function generateAndPlay() {
@@ -97,14 +120,11 @@
       audioElement.addEventListener('loadedmetadata', () => {
         duration = audioElement?.duration || 0;
       });
-      audioElement.addEventListener('timeupdate', () => {
-        currentTime = audioElement?.currentTime || 0;
-      });
       audioElement.addEventListener('ended', () => {
         isPlaying = false;
-        currentTime = 0;
       });
       
+      lastGeneratedText = $textInput.trim();
       audioElement.play();
       isPlaying = true;
       
@@ -116,20 +136,6 @@
     }
   }
 
-  function handleProgressClick(event: MouseEvent) {
-    if (!audioElement || !duration) return;
-    const target = event.currentTarget as HTMLDivElement;
-    const rect = target.getBoundingClientRect();
-    const percent = (event.clientX - rect.left) / rect.width;
-    audioElement.currentTime = percent * duration;
-  }
-
-  function formatTime(seconds: number): string {
-    const mins = Math.floor(seconds / 60);
-    const secs = Math.floor(seconds % 60);
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  }
-
   function clearText() {
     textInput.set('');
     if (editorRef) {
@@ -139,8 +145,8 @@
     audioUrl = null;
     audioElement = null;
     isPlaying = false;
-    currentTime = 0;
     duration = 0;
+    lastGeneratedText = '';
   }
 
 </script>
@@ -178,71 +184,66 @@
         aria-multiline="true"
         aria-labelledby="text-label"
       ></div>
-      {#if hasTextInput}
-        <button type="button" class="clear-btn" onclick={clearText}>Clear text</button>
-      {/if}
+      <button 
+        type="button" 
+        class="clear-btn" 
+        class:inactive={!hasTextInput}
+        onclick={clearText}
+        disabled={!hasTextInput}
+      >Clear text</button>
     </div>
 
-    {#if hasTextInput}
-      <div class="controls-section">
-        {#if errorMsg}
-          <p class="error-msg">{errorMsg}</p>
-        {/if}
+    <div class="controls-section">
+      {#if errorMsg}
+        <p class="error-msg">{errorMsg}</p>
+      {/if}
 
-        <div class="player-row">
-          <button 
-            type="button" 
-            class="play-btn" 
-            onclick={generateAndPlay}
-            disabled={loading || !$textInput.trim() || $textInput.length > 4000}
-          >
-            {#if loading}
-              <div class="spinner"></div>
-            {:else if isPlaying}
-              <img src="/icons/icon-pause-fill.svg" alt="Pause" />
-            {:else}
-              <img src="/icons/icon-play.svg" alt="Play" />
-            {/if}
-          </button>
-          
-          <div 
-            class="progress-container" 
-            onclick={handleProgressClick}
-            onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') handleProgressClick(e as unknown as MouseEvent); }}
-            role="slider"
-            tabindex="0"
-            aria-label="Audio progress"
-            aria-valuemin={0}
-            aria-valuemax={duration}
-            aria-valuenow={currentTime}
-          >
-            <div class="progress-bar">
-              <div 
-                class="progress-fill" 
-                style="width: {duration ? (currentTime / duration) * 100 : 0}%"
-              ></div>
-            </div>
-            {#if duration > 0}
-              <span class="time-display">{formatTime(currentTime)} / {formatTime(duration)}</span>
-            {/if}
-          </div>
-        </div>
+      <div class="player-row">
+        <button 
+          type="button" 
+          class="skip-btn" 
+          onclick={skipBackward}
+          disabled={!audioElement}
+          aria-label="Skip back 5 seconds"
+        >
+          <img src="/icons/icon-back-five.svg" alt="Back 5s" />
+        </button>
 
-        {#if loading}
-          <p class="loading-hint">
-            {#if $selectedVoice?.provider === 'azure'}
-              Generating (~3 seconds)...
-            {:else}
-              Generating (~30 seconds)...
-            {/if}
-          </p>
-        {/if}
+        <button 
+          type="button" 
+          class="play-btn" 
+          class:active={hasTextInput && !loading && !isPlaying}
+          class:loading={loading}
+          class:playing={isPlaying}
+          onclick={generateAndPlay}
+          disabled={!hasTextInput || $textInput.length > 4000}
+        >
+          {#if isPlaying || loading}
+            <img src="/icons/icon-pause-fill.svg" alt="Pause" class="play-icon" />
+          {:else}
+            <img src="/icons/icon-play-fill.svg" alt="Play" class="play-icon" />
+          {/if}
+        </button>
 
-        {#if audioUrl}
-          <a href={audioUrl} download="audioflam-story.mp3" class="download-link">Download Audio</a>
-        {/if}
+        <button 
+          type="button" 
+          class="skip-btn" 
+          onclick={skipForward}
+          disabled={!audioElement}
+          aria-label="Skip forward 5 seconds"
+        >
+          <img src="/icons/icon-forward-five.svg" alt="Forward 5s" />
+        </button>
       </div>
-    {/if}
+
+      {#if loading && $selectedVoice?.provider === 'yarngpt'}
+        <p class="loading-hint">Generating. This could take a minute<span class="loading-dots"></span></p>
+      {/if}
+
+      {#if audioUrl}
+        <a href={audioUrl} download="audioflam-story.mp3" class="download-link">Download Audio</a>
+      {/if}
+    </div>
   </main>
 </div>
 
@@ -326,31 +327,6 @@
     border-color: var(--color-primary);
   }
 
-  .intro-section {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-md);
-    padding: var(--spacing-md) 0;
-  }
-
-  .intro-step {
-    display: flex;
-    align-items: flex-start;
-    gap: var(--spacing-sm);
-  }
-
-  .step-icon {
-    width: 24px;
-    height: 24px;
-    flex-shrink: 0;
-  }
-
-  .intro-step p {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    line-height: 1.5;
-  }
-
   .controls-section {
     display: flex;
     flex-direction: column;
@@ -375,90 +351,148 @@
     transition: color var(--transition-fast);
   }
 
-  .clear-btn:hover {
+  .clear-btn:hover:not(:disabled) {
     color: var(--color-primary);
+  }
+
+  .clear-btn.inactive {
+    color: #999999;
+    cursor: default;
   }
 
   .loading-hint {
     text-align: center;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    font-style: italic;
+    color: #999999;
+  }
+
+  .loading-dots::after {
+    content: '';
+    animation: dots 1.5s steps(4, end) infinite;
+  }
+
+  @keyframes dots {
+    0%, 20% { content: ''; }
+    40% { content: '.'; }
+    60% { content: '..'; }
+    80%, 100% { content: '...'; }
   }
 
   .player-row {
     display: flex;
     align-items: center;
-    gap: var(--spacing-md);
+    justify-content: center;
+    gap: var(--spacing-lg);
+  }
+
+  .skip-btn {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    transition: all var(--transition-fast);
+  }
+
+  .skip-btn img {
+    width: 32px;
+    height: 32px;
+    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    transition: filter var(--transition-fast);
+  }
+
+  .skip-btn:hover:not(:disabled) img {
+    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+  }
+
+  .skip-btn:disabled {
+    cursor: default;
+  }
+
+  .skip-btn:disabled img {
+    opacity: 0.4;
   }
 
   .play-btn {
-    width: 48px;
-    height: 48px;
+    width: 50px;
+    height: 50px;
     display: flex;
     align-items: center;
     justify-content: center;
     background: var(--color-white);
-    border: 2px solid var(--color-border);
+    border: 3px solid #999999 !important;
     border-radius: 50%;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: border-color var(--transition-fast);
     flex-shrink: 0;
+    position: relative;
+    overflow: visible;
   }
 
-  .play-btn:hover:not(:disabled) {
-    border-color: var(--color-primary);
+  .play-btn .play-icon {
+    width: 40px;
+    height: 40px;
+    filter: brightness(0) saturate(100%) invert(60%);
+    transition: filter var(--transition-fast);
+    position: relative;
+    z-index: 2;
   }
 
-  .play-btn:disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
+  .play-btn.active {
+    border-color: var(--color-primary) !important;
   }
 
-  .play-btn img {
-    width: 24px;
-    height: 24px;
+  .play-btn.active .play-icon {
+    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
   }
 
-  .spinner {
-    width: 20px;
-    height: 20px;
-    border: 2px solid var(--color-border);
-    border-top-color: var(--color-primary);
+  .play-btn.loading {
+    border-color: transparent !important;
+    background: transparent;
+  }
+
+  .play-btn.loading::before {
+    content: '';
+    position: absolute;
+    inset: -3px;
     border-radius: 50%;
-    animation: spin 0.8s linear infinite;
+    background: conic-gradient(from 0deg, var(--color-primary), var(--color-lavender-veil), var(--color-primary));
+    animation: spinner-rotate 1s linear infinite;
+    z-index: 0;
   }
 
-  @keyframes spin {
+  .play-btn.loading::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 50%;
+    background: var(--color-white);
+    z-index: 1;
+  }
+
+  .play-btn.loading .play-icon,
+  .play-btn.playing .play-icon {
+    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+  }
+
+  .play-btn.playing {
+    border-color: var(--color-primary) !important;
+  }
+
+  @keyframes spinner-rotate {
+    from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
 
-  .progress-container {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 4px;
-    cursor: pointer;
+  .play-btn:disabled {
+    cursor: not-allowed;
   }
 
-  .progress-bar {
-    height: 6px;
-    background: var(--color-border);
-    border-radius: var(--radius-full);
-    overflow: hidden;
-  }
 
-  .progress-fill {
-    height: 100%;
-    background: var(--color-primary);
-    border-radius: var(--radius-full);
-    transition: width 0.1s linear;
-  }
-
-  .time-display {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-  }
 
   .download-link {
     display: block;
