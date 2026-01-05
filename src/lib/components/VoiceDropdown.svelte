@@ -15,7 +15,10 @@
   let dropdownRef: HTMLDivElement;
   let audioElement: HTMLAudioElement | null = null;
 
-  const PREVIEW_TEXT = "Hello, my name is a Nigerian journalist.";
+  function getPreviewFilename(voice: VoiceOption): string {
+    const baseName = voice.displayName.split(' ')[0].split('(')[0].toLowerCase();
+    return `/voices/${baseName}.mp3`;
+  }
 
   function toggle() {
     isOpen = !isOpen;
@@ -26,7 +29,7 @@
     isOpen = false;
   }
 
-  async function previewVoice(event: MouseEvent, voice: VoiceOption) {
+  function previewVoice(event: MouseEvent, voice: VoiceOption) {
     event.stopPropagation();
     
     if (playingVoice === voice.name) {
@@ -37,40 +40,19 @@
     stopPreview();
     playingVoice = voice.name;
 
-    try {
-      const res = await fetch('/api/tts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          text: PREVIEW_TEXT,
-          voiceName: voice.name
-        })
-      });
-
-      if (!res.ok) {
-        throw new Error('Preview failed');
-      }
-
-      const data = await res.json();
-      const byteCharacters = atob(data.audioContent);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: 'audio/mp3' });
-      const audioUrl = URL.createObjectURL(blob);
-
-      audioElement = new Audio(audioUrl);
-      audioElement.onended = () => {
-        playingVoice = null;
-      };
-      audioElement.play();
-    } catch (err) {
-      console.error('Preview error:', err);
+    const previewUrl = getPreviewFilename(voice);
+    audioElement = new Audio(previewUrl);
+    
+    audioElement.onended = () => {
       playingVoice = null;
-      alert('Preview failed - check console for details');
-    }
+    };
+    
+    audioElement.onerror = () => {
+      console.error('Preview error: Failed to load', previewUrl);
+      playingVoice = null;
+    };
+    
+    audioElement.play();
   }
 
   function stopPreview() {
