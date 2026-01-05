@@ -889,7 +889,7 @@
     align-items: center;
     justify-content: center;
     background: var(--color-white);
-    border: 3px solid #999999 !important;
+    border: 3px solid #777777 !important;
     border-radius: 50%;
     cursor: pointer;
     transition: border-color var(--transition-fast);
