@@ -60,22 +60,15 @@
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
-      // On mobile, open in new tab instead of triggering download dialog
-      const isMobile = /iPhone|iPad|Android|webOS|BlackBerry|Windows Phone/i.test(navigator.userAgent);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${filename}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
       
-      if (isMobile) {
-        window.open(blobUrl, '_blank');
-      } else {
-        const a = document.createElement('a');
-        a.href = blobUrl;
-        a.download = `${filename}.mp3`;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-      }
-      
-      // Clean up after a short delay on desktop, keep for mobile
-      setTimeout(() => URL.revokeObjectURL(blobUrl), isMobile ? 2000 : 100);
+      // Clean up after a short delay
+      setTimeout(() => URL.revokeObjectURL(blobUrl), 100);
     } catch (error) {
       console.error('Download failed:', error);
     }
