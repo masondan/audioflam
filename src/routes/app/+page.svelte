@@ -24,6 +24,42 @@
   
   let audioPlaylist = $state<string[]>([]);
   let currentTrackIndex = $state(0);
+  
+  let showDownloadModal = $state(false);
+  let downloadFilename = $state('');
+
+  function generateDefaultFilename(): string {
+    const now = new Date();
+    const day = String(now.getDate()).padStart(2, '0');
+    const month = String(now.getMonth() + 1).padStart(2, '0');
+    const year = String(now.getFullYear()).slice(-2);
+    const hours = String(now.getHours()).padStart(2, '0');
+    const minutes = String(now.getMinutes()).padStart(2, '0');
+    return `audioflam-${day}${month}${year}-${hours}${minutes}`;
+  }
+
+  function openDownloadModal() {
+    downloadFilename = generateDefaultFilename();
+    showDownloadModal = true;
+  }
+
+  function closeDownloadModal() {
+    showDownloadModal = false;
+  }
+
+  function confirmDownload() {
+    if (!audioUrl) return;
+    
+    const filename = downloadFilename.trim() || generateDefaultFilename();
+    const a = document.createElement('a');
+    a.href = audioUrl;
+    a.download = `${filename}.mp3`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    
+    showDownloadModal = false;
+  }
 
   function getFlagForVoice(voice: VoiceOption): string {
     if (voice.provider === 'azure') {
@@ -494,10 +530,6 @@
         <p class="loading-hint">Generating. This could take a minute<span class="loading-dots"></span></p>
       {/if}
 
-      {#if audioUrl}
-        <a href={audioUrl} download="audioflam-story.mp3" class="download-link">Download Audio</a>
-      {/if}
-
       <div class="two-speaker-section">
         <div class="two-speaker-toggle-row">
           <span class="two-speaker-label">Two speakers</span>
@@ -612,9 +644,44 @@
           </div>
         {/if}
       </div>
+
+      <button
+        type="button"
+        class="download-btn"
+        class:enabled={!!audioUrl}
+        disabled={!audioUrl}
+        onclick={openDownloadModal}
+      >
+        Download Audio
+      </button>
     </div>
   </main>
 </div>
+
+{#if showDownloadModal}
+  <div class="modal-overlay" role="presentation" onclick={closeDownloadModal} onkeydown={(e) => e.key === 'Escape' && closeDownloadModal()}>
+    <div class="modal-content" role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1" onclick={(e) => e.stopPropagation()} onkeydown={(e) => e.stopPropagation()}>
+      <h2 id="modal-title" class="modal-title">Download Audio</h2>
+      
+      <label class="modal-label" for="filename-input">Filename</label>
+      <div class="filename-input-row">
+        <input
+          id="filename-input"
+          type="text"
+          class="filename-input"
+          bind:value={downloadFilename}
+          placeholder="audioflam-050126-1234"
+        />
+        <span class="filename-extension">.mp3</span>
+      </div>
+
+      <div class="modal-actions">
+        <button type="button" class="modal-btn cancel" onclick={closeDownloadModal}>Cancel</button>
+        <button type="button" class="modal-btn confirm" onclick={confirmDownload}>Download</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .app-container {
@@ -876,17 +943,127 @@
 
 
 
-  .download-link {
+  .download-btn {
     display: block;
-    text-align: center;
-    color: var(--color-text-primary);
-    font-weight: 600;
-    text-decoration: none;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: none;
+    border-radius: var(--radius-md);
+    background: #999999;
+    color: var(--color-white);
     font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: not-allowed;
+    transition: background var(--transition-fast);
   }
 
-  .download-link:hover {
-    color: var(--color-primary);
+  .download-btn.enabled {
+    background: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .download-btn.enabled:hover {
+    background: #4a1d9e;
+  }
+
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--spacing-md);
+  }
+
+  .modal-content {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    width: 100%;
+    max-width: 320px;
+    box-shadow: var(--shadow-lg);
+  }
+
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0 0 var(--spacing-md) 0;
+    text-align: center;
+  }
+
+  .modal-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .filename-input-row {
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .filename-input {
+    flex: 1;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-base);
+    outline: none;
+  }
+
+  .filename-input:focus {
+    box-shadow: none;
+  }
+
+  .filename-extension {
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: var(--color-app-bg);
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
+    border-left: 1px solid var(--color-border);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .modal-btn {
+    flex: 1;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: 600;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+  }
+
+  .modal-btn.cancel {
+    background: var(--color-white);
+    border: 1px solid var(--color-border);
+    color: var(--color-text-primary);
+  }
+
+  .modal-btn.cancel:hover {
+    background: var(--color-app-bg);
+  }
+
+  .modal-btn.confirm {
+    background: var(--color-primary);
+    border: none;
+    color: var(--color-white);
+  }
+
+  .modal-btn.confirm:hover {
+    background: #4a1d9e;
   }
 
   .two-speaker-section {
