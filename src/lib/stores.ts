@@ -16,28 +16,24 @@ export interface VoiceOption {
 
 // YarnGPT Nigerian Voices (native, slower ~30s)
 export const YARNGPT_VOICES: VoiceOption[] = [
-	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Melodic, gentle', provider: 'yarngpt' },
-	{ name: 'Chinenye', ssmlGender: 'FEMALE', displayName: 'Chinenye', description: 'Engaging, warm', provider: 'yarngpt' },
-	{ name: 'Jude', ssmlGender: 'MALE', displayName: 'Jude', description: 'Warm, confident', provider: 'yarngpt' },
-	{ name: 'Emma', ssmlGender: 'MALE', displayName: 'Emma', description: 'Authoritative, deep', provider: 'yarngpt' },
-	{ name: 'Umar', ssmlGender: 'MALE', displayName: 'Umar', description: 'Calm, smooth', provider: 'yarngpt' },
-	{ name: 'Zainab', ssmlGender: 'FEMALE', displayName: 'Zainab', description: 'Soothing, gentle', provider: 'yarngpt' },
-	{ name: 'Osagie', ssmlGender: 'MALE', displayName: 'Osagie', description: 'Smooth, calm', provider: 'yarngpt' },
-	{ name: 'Remi', ssmlGender: 'FEMALE', displayName: 'Remi', description: 'Melodious, warm', provider: 'yarngpt' },
-	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo', description: 'Upbeat, energetic', provider: 'yarngpt' },
-	{ name: 'Regina', ssmlGender: 'FEMALE', displayName: 'Regina', description: 'Mature, warm', provider: 'yarngpt' },
-	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Rich, reassuring', provider: 'yarngpt' },
-	{ name: 'Wura', ssmlGender: 'FEMALE', displayName: 'Wura', description: 'Young, sweet', provider: 'yarngpt' },
-	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora', description: 'Warm, engaging', provider: 'yarngpt' },
-	{ name: 'Nonso', ssmlGender: 'MALE', displayName: 'Nonso', description: 'Bold, resonant', provider: 'yarngpt' },
-	{ name: 'Mary', ssmlGender: 'FEMALE', displayName: 'Mary', description: 'Energetic, youthful', provider: 'yarngpt' },
-	{ name: 'Adam', ssmlGender: 'MALE', displayName: 'Adam', description: 'Deep, clear', provider: 'yarngpt' }
+	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Nigerian, melodic', provider: 'yarngpt' },
+	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo', description: 'Nigerian, upbeat', provider: 'yarngpt' },
+	{ name: 'Regina', ssmlGender: 'FEMALE', displayName: 'Regina', description: 'Nigerian, mature', provider: 'yarngpt' },
+	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Nigerian, reassuring', provider: 'yarngpt' }
 ];
 
-// Azure TTS Nigerian English Voices
+// Azure TTS Voices (Nigerian + British English)
 export const AZURE_VOICES: VoiceOption[] = [
-	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo', description: 'Azure Nigerian male', provider: 'azure' },
-	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne', description: 'Azure Nigerian female', provider: 'azure' },
+	// Nigerian English
+	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo (Nigerian)', description: 'Azure Nigerian male', provider: 'azure' },
+	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne (Nigerian)', description: 'Azure Nigerian female', provider: 'azure' },
+	// British English
+	{ name: 'en-GB-RyanNeural', ssmlGender: 'MALE', displayName: 'Ryan', description: 'British male', provider: 'azure' },
+	{ name: 'en-GB-AbbiNeural', ssmlGender: 'FEMALE', displayName: 'Abbi', description: 'British female', provider: 'azure' },
+	{ name: 'en-GB-BellaNeural', ssmlGender: 'FEMALE', displayName: 'Bella', description: 'British female', provider: 'azure' },
+	{ name: 'en-GB-HollieNeural', ssmlGender: 'FEMALE', displayName: 'Hollie', description: 'British female', provider: 'azure' },
+	{ name: 'en-GB-OliverNeural', ssmlGender: 'MALE', displayName: 'Oliver', description: 'British male', provider: 'azure' },
+	{ name: 'en-GB-SoniaNeural', ssmlGender: 'FEMALE', displayName: 'Sonia', description: 'British female', provider: 'azure' },
 ];
 
 // Combined voices for the UI

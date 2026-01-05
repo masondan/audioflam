@@ -1,8 +1,14 @@
 # AudioFlam
 
 **Purpose:** Technical reference for AI agents working on AudioFlam.  
-**Status:** Production  
+**Status:** Production (UI/UX Improvement Phase)  
 **Updated:** January 2026
+
+---
+
+## Project Phase
+
+**Current:** UI/UX Improvement - Enhancing user experience and visual polish after Cloudflare Pages deployment.
 
 ---
 
@@ -67,15 +73,29 @@ static/
 ## TTS Providers
 
 ### Azure Speech (recommended)
-- **Voices:** `en-NG-AbeoNeural` (male), `en-NG-EzinneNeural` (female)
 - **Speed:** ~3 seconds
 - **Auth:** Subscription key via `Ocp-Apim-Subscription-Key` header
 - **Critical:** Must include `Host` header in Cloudflare Workers
+- **Nigerian English Voices:**
+  - `en-NG-AbeoNeural` (male)
+  - `en-NG-EzinneNeural` (female)
+- **British English Voices:**
+  - `en-GB-OllieNeural` (male)
+  - `en-GB-RyanNeural` (male)
+  - `en-GB-AbbiNeural` (female)
+  - `en-GB-BellaNeural` (female)
+  - `en-GB-HollieNeural` (female)
+  - `en-GB-OliverNeural` (male)
+  - `en-GB-SoniaNeural` (female)
 
 ### YarnGPT
-- **Voices:** 16 native Nigerian voices (Idera, Chinenye, Jude, etc.)
+- **Voices:** 4 native Nigerian voices
+  - Female: Idera, Regina
+  - Male: Tayo, Femi
 - **Speed:** ~30 seconds
 - **Auth:** Bearer token
+- **Endpoint:** `https://yarngpt.ai/api/v1/tts`
+- **Format:** MP3
 
 ---
 
@@ -118,13 +138,52 @@ YARNGPT_API_KEY=<YarnGPT API key>
 
 ## Design System
 
+### Color Tokens
+
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-primary` | `#5422b0` | Buttons, active states |
+| `--color-primary` / `--color-indigo-bloom` | `#5422b0` | Buttons, active states |
 | `--color-lavender-veil` | `#f0e6f7` | Highlights |
 | `--color-text-primary` | `#333333` | Body text |
 | `--color-text-secondary` | `#777777` | Hints, labels |
-| `--color-white` | `#ffffff` | Cards |
+| `--color-white` / `--color-surface` | `#ffffff` | Cards, surfaces |
+| `--color-app-bg` / `--color-background` | `#efefef` | App background |
+| `--color-border` | `#e0e0e0` | Light borders |
+| `--color-border-dark` | `#777777` | Dark borders |
+
+### Typography & Spacing
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--font-family-base` | Inter, sans-serif | All text |
+| `--font-size-xs` | 0.75rem | Small labels |
+| `--font-size-sm` | 0.875rem | Helper text |
+| `--font-size-base` | 1rem | Body text |
+| `--font-size-lg` | 1.125rem | Headings |
+
+### Spacing & Layout
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--spacing-xs` | 4px | Tight spacing |
+| `--spacing-sm` | 8px | Compact spacing |
+| `--spacing-md` | 16px | Default spacing |
+| `--spacing-lg` | 24px | Generous spacing |
+| `--spacing-xl` | 32px | Extra large spacing |
+| `--radius-sm` | 4px | Small corners |
+| `--radius-md` | 8px | Default corners |
+| `--radius-lg` | 12px | Larger corners |
+| `--radius-full` | 9999px | Pill shape |
+
+### Effects
+
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--shadow-sm` | 0 1px 2px 0 rgb(0 0 0 / 0.05) | Subtle elevation |
+| `--shadow-md` | 0 4px 6px -1px rgb(0 0 0 / 0.1) | Standard elevation |
+| `--shadow-lg` | 0 10px 15px -3px rgb(0 0 0 / 0.1) | High elevation |
+| `--transition-fast` | 150ms ease | UI animations |
+| `--transition-normal` | 200ms ease | Standard transitions |
 
 **Typography:** Inter (Google Fonts)
 
