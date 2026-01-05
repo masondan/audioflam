@@ -60,6 +60,12 @@
     try {
       const voice = $selectedVoice;
       
+      if (!voice) {
+        errorMsg = 'First select a voice and try again';
+        loading = false;
+        return;
+      }
+      
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -124,6 +130,18 @@
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
+  function clearText() {
+    textInput.set('');
+    if (editorRef) {
+      editorRef.innerText = '';
+    }
+    hasTextInput = false;
+    audioUrl = null;
+    audioElement = null;
+    isPlaying = false;
+    currentTime = 0;
+    duration = 0;
+  }
 
 </script>
 
@@ -160,24 +178,12 @@
         aria-multiline="true"
         aria-labelledby="text-label"
       ></div>
+      {#if hasTextInput}
+        <button type="button" class="clear-btn" onclick={clearText}>Clear text</button>
+      {/if}
     </div>
 
-    {#if !hasTextInput}
-      <div class="intro-section">
-        <div class="intro-step">
-          <img src="/icons/icon-one.svg" alt="1" class="step-icon" />
-          <p>Choose a Nigerian voice (Native or Fast clone)</p>
-        </div>
-        <div class="intro-step">
-          <img src="/icons/icon-two.svg" alt="2" class="step-icon" />
-          <p>Paste or type your script (max 4000 characters)</p>
-        </div>
-        <div class="intro-step">
-          <img src="/icons/icon-three.svg" alt="3" class="step-icon" />
-          <p>Generate, play, and download your audio</p>
-        </div>
-      </div>
-    {:else}
+    {#if hasTextInput}
       <div class="controls-section">
         {#if errorMsg}
           <p class="error-msg">{errorMsg}</p>
@@ -352,9 +358,25 @@
   }
 
   .error-msg {
-    color: #dc2626;
+    color: var(--color-primary);
     text-align: center;
     font-size: var(--font-size-sm);
+  }
+
+  .clear-btn {
+    align-self: flex-end;
+    padding: 0;
+    font-size: var(--font-size-sm);
+    color: #777777;
+    background: none;
+    border: none;
+    cursor: pointer;
+    text-decoration: none;
+    transition: color var(--transition-fast);
+  }
+
+  .clear-btn:hover {
+    color: var(--color-primary);
   }
 
   .loading-hint {
