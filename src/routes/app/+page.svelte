@@ -47,16 +47,26 @@
     showDownloadModal = false;
   }
 
-  function confirmDownload() {
+  async function confirmDownload() {
     if (!audioUrl) return;
     
-    const filename = downloadFilename.trim() || generateDefaultFilename();
-    const a = document.createElement('a');
-    a.href = audioUrl;
-    a.download = `${filename}.mp3`;
-    document.body.appendChild(a);
-    a.click();
-    document.body.removeChild(a);
+    try {
+      const filename = downloadFilename.trim() || generateDefaultFilename();
+      const response = await fetch(audioUrl);
+      const blob = await response.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = `${filename}.mp3`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      
+      URL.revokeObjectURL(blobUrl);
+    } catch (error) {
+      console.error('Download failed:', error);
+    }
     
     showDownloadModal = false;
   }
@@ -652,7 +662,7 @@
         disabled={!audioUrl}
         onclick={openDownloadModal}
       >
-        Download Audio
+        Download
       </button>
     </div>
   </main>
