@@ -1258,8 +1258,9 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
     z-index: 100;
-    max-height: 200px;
+    max-height: 60vh;
     overflow-y: auto;
+    overscroll-behavior: contain;
   }
 
   .speaker-option-row {
