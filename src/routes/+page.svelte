@@ -791,6 +791,10 @@
     transition: border-color var(--transition-fast);
     resize: vertical;
     overflow: auto;
+    background-image: linear-gradient(135deg, transparent 50%, var(--color-text-secondary) 50%);
+    background-repeat: no-repeat;
+    background-position: bottom 4px right 4px;
+    background-size: 20px 20px;
   }
 
   .text-editor:focus {
