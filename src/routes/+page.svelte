@@ -1,11 +1,8 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ALL_VOICES, selectedVoice, textInput, splashScreenVisible } from '$lib/stores';
+  import { ALL_VOICES, selectedVoice, textInput } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
-
-  // Splash screen
-  let splashVisible = $state(true);
 
   // App state
   let hasTextInput = $state(false);
@@ -33,13 +30,7 @@
   let showDownloadModal = $state(false);
   let downloadFilename = $state('');
 
-  onMount(() => {
-    // Auto-hide splash screen after 2.5 seconds
-    setTimeout(() => {
-      splashVisible = false;
-      splashScreenVisible.set(false);
-    }, 2500);
-  });
+
 
   function generateDefaultFilename(): string {
     const now = new Date();
@@ -466,14 +457,6 @@
   }
 </script>
 
-{#if splashVisible}
-  <div class="splash-container" class:fading-out={!splashVisible}>
-    <div class="logo-wrapper">
-      <img src="/icons/logotype-audioflam-white-trs.png" alt="AudioFlam" class="logotype-splash" />
-    </div>
-  </div>
-{/if}
-
 <div class="app-container">
   <header class="app-header">
     <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
@@ -722,48 +705,6 @@
 {/if}
 
 <style>
-  .splash-container {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100vw;
-    height: 100vh;
-    background-color: var(--color-indigo-bloom);
-    display: flex;
-    justify-content: center;
-    align-items: center;
-    z-index: 9999;
-    color: white;
-    transition: opacity 0.5s ease-in-out;
-  }
-
-  .fading-out {
-    opacity: 0;
-    pointer-events: none;
-  }
-
-  .logo-wrapper {
-    text-align: center;
-    animation: fadeInUp 1s ease-out;
-  }
-
-  .logotype-splash {
-    width: 70%;
-    max-width: 336px;
-    height: auto;
-  }
-
-  @keyframes fadeInUp {
-    from {
-      opacity: 0;
-      transform: translateY(20px);
-    }
-    to {
-      opacity: 1;
-      transform: translateY(0);
-    }
-  }
-
   .app-container {
     max-width: 480px;
     margin: 0 auto;
