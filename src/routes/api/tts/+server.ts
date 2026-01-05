@@ -44,7 +44,7 @@ async function handleAzure(text: string, voiceName: string) {
 		return json({ error: 'Azure Speech key not configured' }, { status: 500 });
 	}
 
-	const trimmedText = text.slice(0, 2000);
+	const trimmedText = text.slice(0, 4000);
 	const escapedText = escapeXml(trimmedText);
 
 	const langMatch = voiceName.match(/^([a-z]{2}-[A-Z]{2})/);
@@ -92,7 +92,7 @@ async function handleYarnGPT(text: string, voiceName: string) {
 		return json({ error: 'YarnGPT API key not configured' }, { status: 500 });
 	}
 
-	const trimmedText = text.slice(0, 2000);
+	const trimmedText = text.slice(0, 4000);
 
 	const response = await fetch('https://yarngpt.ai/api/v1/tts', {
 		method: 'POST',

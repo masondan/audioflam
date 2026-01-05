@@ -146,27 +146,20 @@
     <div class="text-section">
       <div class="text-header">
         <span class="text-label" id="text-label">Text</span>
-        <span class="char-count" class:warning={$textInput.length > 1800}>
-          {$textInput.length}/2000
+        <span class="char-count" class:warning={$textInput.length > 3200}>
+          {$textInput.length}/4000
         </span>
       </div>
-      <div class="text-editor-wrapper">
-        <div 
-          class="text-editor"
-          contenteditable="true"
-          bind:this={editorRef}
-          oninput={handleEditorInput}
-          onfocus={handleEditorFocus}
-          role="textbox"
-          aria-multiline="true"
-          aria-labelledby="text-label"
-        ></div>
-        <div class="expand-marker">
-          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path d="M10 6L10 10H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
-          </svg>
-        </div>
-      </div>
+      <div 
+        class="text-editor"
+        contenteditable="true"
+        bind:this={editorRef}
+        oninput={handleEditorInput}
+        onfocus={handleEditorFocus}
+        role="textbox"
+        aria-multiline="true"
+        aria-labelledby="text-label"
+      ></div>
     </div>
 
     {#if !hasTextInput}
@@ -177,7 +170,7 @@
         </div>
         <div class="intro-step">
           <img src="/icons/icon-two.svg" alt="2" class="step-icon" />
-          <p>Paste or type your script (max 2000 characters)</p>
+          <p>Paste or type your script (max 4000 characters)</p>
         </div>
         <div class="intro-step">
           <img src="/icons/icon-three.svg" alt="3" class="step-icon" />
@@ -195,7 +188,7 @@
             type="button" 
             class="play-btn" 
             onclick={generateAndPlay}
-            disabled={loading || !$textInput.trim() || $textInput.length > 2000}
+            disabled={loading || !$textInput.trim() || $textInput.length > 4000}
           >
             {#if loading}
               <div class="spinner"></div>
@@ -288,10 +281,6 @@
     gap: var(--spacing-xs);
   }
 
-  .text-editor-wrapper {
-    position: relative;
-  }
-
   .text-header {
     display: flex;
     justify-content: space-between;
@@ -323,24 +312,12 @@
     line-height: 1.6;
     outline: none;
     transition: border-color var(--transition-fast);
+    resize: vertical;
+    overflow: auto;
   }
 
   .text-editor:focus {
     border-color: var(--color-primary);
-  }
-
-  .expand-marker {
-    position: absolute;
-    bottom: 6px;
-    right: 6px;
-    width: 20px;
-    height: 20px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    color: var(--color-border-dark);
-    pointer-events: none;
-    opacity: 0.5;
   }
 
   .intro-section {
