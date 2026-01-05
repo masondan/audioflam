@@ -53,14 +53,6 @@ async function handleAzure(text: string, voiceName: string) {
 	const ssml = `<speak version='1.0' xmlns='http://www.w3.org/2001/10/synthesis' xml:lang='${langCode}'><voice name='${voiceName}'>${escapedText}</voice></speak>`;
 	const endpoint = `https://${AZURE_SPEECH_REGION}.tts.speech.microsoft.com/cognitiveservices/v1`;
 
-	// DEBUG: Log everything to diagnose Cloudflare vs local differences
-	console.log('[AZURE DEBUG] endpoint:', JSON.stringify(endpoint));
-	console.log('[AZURE DEBUG] region:', JSON.stringify(AZURE_SPEECH_REGION));
-	console.log('[AZURE DEBUG] region chars:', Array.from(AZURE_SPEECH_REGION).map(c => c.charCodeAt(0)));
-	console.log('[AZURE DEBUG] key length:', AZURE_SPEECH_KEY.length);
-	console.log('[AZURE DEBUG] ssml length:', ssml.length);
-	console.log('[AZURE DEBUG] ssml:', ssml.slice(0, 300));
-
 	const response = await fetch(endpoint, {
 		method: 'POST',
 		headers: {
@@ -72,32 +64,11 @@ async function handleAzure(text: string, voiceName: string) {
 		body: ssml
 	});
 
-	const rawHeaders: Record<string, string> = {};
-	response.headers.forEach((value, key) => { rawHeaders[key] = value; });
-	console.log('[AZURE DEBUG] response status:', response.status);
-	console.log('[AZURE DEBUG] response headers:', JSON.stringify(rawHeaders));
-
 	if (!response.ok) {
-		let errorText = '';
-		try {
-			errorText = await response.text();
-		} catch (e) {
-			console.log('[AZURE DEBUG] failed to read error body:', e);
-		}
-		console.error('Azure TTS error:', response.status, errorText, rawHeaders);
+		const errorText = await response.text();
+		console.error('Azure TTS error:', response.status, errorText);
 		return json(
-			{ 
-				error: 'Azure TTS generation failed', 
-				status: response.status, 
-				details: errorText, 
-				azureHeaders: rawHeaders,
-				debugInfo: {
-					endpoint,
-					regionCharCodes: Array.from(AZURE_SPEECH_REGION).map(c => c.charCodeAt(0)),
-					keyLength: AZURE_SPEECH_KEY.length,
-					ssmlSample: ssml.slice(0, 200)
-				}
-			},
+			{ error: 'Azure TTS generation failed', status: response.status, details: errorText },
 			{ status: response.status }
 		);
 	}
