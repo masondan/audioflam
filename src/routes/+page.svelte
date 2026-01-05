@@ -471,7 +471,6 @@
     <div class="logo-wrapper">
       <img src="/icons/logo-audioflam-maskable.png" alt="AudioFlam Logo" class="logo" />
       <h1 class="brand-name">AudioFlam</h1>
-      <p class="tagline">Your voice. Your story.</p>
     </div>
   </div>
 {/if}
@@ -760,13 +759,7 @@
   .brand-name {
     font-size: 2.5rem;
     font-weight: 700;
-    margin-bottom: var(--spacing-xs);
     letter-spacing: -0.02em;
-  }
-
-  .tagline {
-    font-size: 1.1rem;
-    opacity: 0.8;
   }
 
   @keyframes fadeInUp {
