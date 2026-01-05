@@ -1,0 +1,40 @@
+{
+  "name": "AudioFlam",
+  "short_name": "AudioFlam",
+  "description": "A free, mobile-first text-to-voice app to support AI training for journalists and content creators.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait-primary",
+  "background_color": "#ffffff",
+  "theme_color": "#5422b0",
+  "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/icons/audioflam-share.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "wide"
+    },
+    {
+      "src": "/icons/audioflam-share.png",
+      "sizes": "1200x630",
+      "type": "image/png",
+      "form_factor": "narrow"
+    }
+  ],
+  "icons": [
+    {
+      "src": "/icons/audioflam-any.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/logo-audioflam-maskable.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

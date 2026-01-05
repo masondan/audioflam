@@ -469,8 +469,7 @@
 {#if splashVisible}
   <div class="splash-container" class:fading-out={!splashVisible}>
     <div class="logo-wrapper">
-      <img src="/icons/logo-audioflam-maskable.png" alt="AudioFlam Logo" class="logo" />
-      <h1 class="brand-name">AudioFlam</h1>
+      <img src="/icons/logotype-audioflam-white-trs.png" alt="AudioFlam" class="logotype-splash" />
     </div>
   </div>
 {/if}
@@ -748,18 +747,10 @@
     animation: fadeInUp 1s ease-out;
   }
 
-  .logo {
-    width: 120px;
-    height: 120px;
-    margin-bottom: var(--spacing-md);
-    border-radius: var(--radius-lg);
-    box-shadow: var(--shadow-lg);
-  }
-
-  .brand-name {
-    font-size: 2.5rem;
-    font-weight: 700;
-    letter-spacing: -0.02em;
+  .logotype-splash {
+    width: 70%;
+    max-width: 336px;
+    height: auto;
   }
 
   @keyframes fadeInUp {
