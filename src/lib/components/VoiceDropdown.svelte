@@ -9,6 +9,15 @@
   }
 
   let { label, voices, value, onchange }: Props = $props();
+
+  function getFlagForVoice(voice: VoiceOption): string {
+    if (voice.provider === 'azure') {
+      if (voice.name.startsWith('en-NG')) return '🇳🇬';
+      if (voice.name.startsWith('en-GB')) return '🇬🇧';
+    }
+    if (voice.provider === 'yarngpt') return '🇳🇬';
+    return '';
+  }
   
   let isOpen = $state(false);
   let playingVoice = $state<string | null>(null);
@@ -89,7 +98,7 @@
     aria-expanded={isOpen}
     aria-haspopup="listbox"
   >
-    <span class="dropdown-value">{value?.displayName || 'Select voice'}</span>
+    <span class="dropdown-value" class:placeholder={!value}>{value ? `${getFlagForVoice(value)} ${value.displayName}` : 'Select voice'}</span>
     <img 
       src={isOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'} 
       alt="" 
@@ -110,7 +119,7 @@
               role="option"
               aria-selected={voice.name === value?.name}
             >
-              <span class="voice-name">{voice.displayName}</span>
+              <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
               {#if voice.provider === 'azure'}
                 <span class="speed-badge">⚡</span>
               {/if}
@@ -181,10 +190,15 @@
     text-align: left;
   }
 
+  .dropdown-value.placeholder {
+    color: var(--color-text-secondary);
+  }
+
   .dropdown-icon {
     width: 20px;
     height: 20px;
     flex-shrink: 0;
+    filter: invert(0.43);
   }
 
   .dropdown-menu {
@@ -254,17 +268,14 @@
     transition: background-color var(--transition-fast);
   }
 
-  .preview-btn:hover {
-    background-color: var(--color-lavender-veil);
-  }
-
   .preview-icon {
     width: 24px;
     height: 24px;
+    filter: invert(0.54) sepia(0.5) hue-rotate(248deg);
   }
 
   .preview-btn.playing .preview-icon {
-    filter: none;
+    filter: invert(0.32) sepia(0.6) hue-rotate(248deg) saturate(1.5);
   }
 
   .dropdown-separator {
@@ -275,10 +286,20 @@
 
   .voice-name {
     flex: 1;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
+  .flag {
+    display: inline-block;
+    width: 20px;
+    text-align: center;
   }
 
   .speed-badge {
     font-size: 12px;
     margin-left: 4px;
   }
+
 </style>

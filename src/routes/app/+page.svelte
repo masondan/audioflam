@@ -124,10 +124,7 @@
     return `${mins}:${secs.toString().padStart(2, '0')}`;
   }
 
-  function getProviderBadge(provider: string): string {
-    if (provider === 'azure') return '☁️ Azure';
-    return '🇳🇬 Native';
-  }
+
 </script>
 
 <div class="app-container">
@@ -143,31 +140,33 @@
         value={$selectedVoice}
         onchange={handleVoiceChange}
       />
-      <div class="voice-meta">
-        <span class="voice-description">{$selectedVoice?.description}</span>
-        <span class="provider-badge" class:azure={$selectedVoice?.provider === 'azure'}>
-          {getProviderBadge($selectedVoice?.provider)}
-        </span>
-      </div>
+
     </div>
 
     <div class="text-section">
       <div class="text-header">
-        <span class="text-label" id="text-label">Script</span>
+        <span class="text-label" id="text-label">Text</span>
         <span class="char-count" class:warning={$textInput.length > 1800}>
           {$textInput.length}/2000
         </span>
       </div>
-      <div 
-        class="text-editor"
-        contenteditable="true"
-        bind:this={editorRef}
-        oninput={handleEditorInput}
-        onfocus={handleEditorFocus}
-        role="textbox"
-        aria-multiline="true"
-        aria-labelledby="text-label"
-      ></div>
+      <div class="text-editor-wrapper">
+        <div 
+          class="text-editor"
+          contenteditable="true"
+          bind:this={editorRef}
+          oninput={handleEditorInput}
+          onfocus={handleEditorFocus}
+          role="textbox"
+          aria-multiline="true"
+          aria-labelledby="text-label"
+        ></div>
+        <div class="expand-marker">
+          <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M10 6L10 10H6" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+          </svg>
+        </div>
+      </div>
     </div>
 
     {#if !hasTextInput}
@@ -281,37 +280,16 @@
     gap: var(--spacing-xs);
   }
 
-  .voice-meta {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 0 2px;
-  }
 
-  .voice-description {
-    font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
-    font-style: italic;
-  }
-
-  .provider-badge {
-    font-size: var(--font-size-xs);
-    padding: 2px 8px;
-    border-radius: var(--radius-full);
-    background: var(--color-lavender-veil);
-    color: var(--color-primary);
-    font-weight: 500;
-  }
-
-  .provider-badge.azure {
-    background: #dbeafe;
-    color: #1e40af;
-  }
 
   .text-section {
     display: flex;
     flex-direction: column;
     gap: var(--spacing-xs);
+  }
+
+  .text-editor-wrapper {
+    position: relative;
   }
 
   .text-header {
@@ -349,6 +327,20 @@
 
   .text-editor:focus {
     border-color: var(--color-primary);
+  }
+
+  .expand-marker {
+    position: absolute;
+    bottom: 6px;
+    right: 6px;
+    width: 20px;
+    height: 20px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: var(--color-border-dark);
+    pointer-events: none;
+    opacity: 0.5;
   }
 
   .intro-section {
