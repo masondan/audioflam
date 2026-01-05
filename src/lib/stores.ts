@@ -29,11 +29,9 @@ export const AZURE_VOICES: VoiceOption[] = [
 	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne (Nigerian)', description: 'Azure Nigerian female', provider: 'azure' },
 	// British English
 	{ name: 'en-GB-RyanNeural', ssmlGender: 'MALE', displayName: 'Ryan', description: 'British male', provider: 'azure' },
-	{ name: 'en-GB-AbbiNeural', ssmlGender: 'FEMALE', displayName: 'Abbi', description: 'British female', provider: 'azure' },
 	{ name: 'en-GB-BellaNeural', ssmlGender: 'FEMALE', displayName: 'Bella', description: 'British female', provider: 'azure' },
 	{ name: 'en-GB-HollieNeural', ssmlGender: 'FEMALE', displayName: 'Hollie', description: 'British female', provider: 'azure' },
 	{ name: 'en-GB-OliverNeural', ssmlGender: 'MALE', displayName: 'Oliver', description: 'British male', provider: 'azure' },
-	{ name: 'en-GB-SoniaNeural', ssmlGender: 'FEMALE', displayName: 'Sonia', description: 'British female', provider: 'azure' },
 ];
 
 // Combined voices for the UI
