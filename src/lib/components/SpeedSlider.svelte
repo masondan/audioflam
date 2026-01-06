@@ -101,6 +101,9 @@
     appearance: none;
     cursor: pointer;
     transition: background var(--transition-fast);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
   }
 
   .speed-slider:disabled {
@@ -118,6 +121,8 @@
     cursor: pointer;
     transition: background var(--transition-fast), box-shadow var(--transition-fast);
     transform: translateY(calc((var(--slider-height) - var(--thumb-size)) / 2));
+    -webkit-tap-highlight-color: transparent;
+    border: none;
   }
 
   .speed-slider::-webkit-slider-thumb:hover:not(:disabled) {
