@@ -153,6 +153,32 @@
     invalidateAudio();
   }
 
+  function toggleSpeaker1Dropdown() {
+    speaker1Open = !speaker1Open;
+    if (speaker1Open) {
+      speaker2Open = false;
+      setTimeout(() => {
+        const dropdown = document.querySelector('[data-speaker="1"]');
+        if (dropdown) {
+          dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 0);
+    }
+  }
+
+  function toggleSpeaker2Dropdown() {
+    speaker2Open = !speaker2Open;
+    if (speaker2Open) {
+      speaker1Open = false;
+      setTimeout(() => {
+        const dropdown = document.querySelector('[data-speaker="2"]');
+        if (dropdown) {
+          dropdown.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        }
+      }, 0);
+    }
+  }
+
   function handleSpeaker2Change(voice: VoiceOption) {
     speaker2 = voice;
     speaker2Open = false;
@@ -562,11 +588,11 @@
         {#if twoSpeakerMode}
           <div class="two-speaker-divider"></div>
           <div class="speaker-dropdowns-row">
-            <div class="speaker-dropdown">
+            <div class="speaker-dropdown" data-speaker="1">
               <button
                 type="button"
                 class="speaker-dropdown-btn"
-                onclick={() => { speaker1Open = !speaker1Open; speaker2Open = false; }}
+                onclick={toggleSpeaker1Dropdown}
               >
                 <span>{speaker1 ? `1: ${getFlagForVoice(speaker1)} ${speaker1.displayName}` : 'Speaker 1'}</span>
                 <img
@@ -609,12 +635,12 @@
               {/if}
             </div>
 
-            <div class="speaker-dropdown">
-              <button
-                type="button"
-                class="speaker-dropdown-btn"
-                onclick={() => { speaker2Open = !speaker2Open; speaker1Open = false; }}
-              >
+            <div class="speaker-dropdown" data-speaker="2">
+               <button
+                 type="button"
+                 class="speaker-dropdown-btn"
+                 onclick={toggleSpeaker2Dropdown}
+               >
                 <span>{speaker2 ? `2: ${getFlagForVoice(speaker2)} ${speaker2.displayName}` : 'Speaker 2'}</span>
                 <img
                   src={speaker2Open ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
@@ -1146,6 +1172,7 @@
   .speaker-dropdown {
     flex: 1;
     position: relative;
+    scroll-margin-bottom: 320px;
   }
 
   .speaker-dropdown-btn {
@@ -1183,7 +1210,7 @@
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
     z-index: 100;
-    max-height: 60vh;
+    max-height: 300px;
     overflow-y: auto;
     overscroll-behavior: contain;
   }
