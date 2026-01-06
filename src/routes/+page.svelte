@@ -3,6 +3,8 @@
   import { ALL_VOICES, selectedVoice, textInput } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
+  import SpeedSlider from '$lib/components/SpeedSlider.svelte';
+  import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
 
   // App state
   let hasTextInput = $state(false);
@@ -26,11 +28,17 @@
   let speakerPreviewPlaying = $state<string | null>(null);
   let speakerPreviewAudio: HTMLAudioElement | null = null;
   
-  let audioPlaylist = $state<string[]>([]);
+  let audioPlaylist = $state<PlaylistSegment[]>([]);
   let currentTrackIndex = $state(0);
+  
+  let singleSpeakerSpeed = $state(1.0);
+  let speaker1Speed = $state(1.0);
+  let speaker2Speed = $state(1.0);
   
   let showDownloadModal = $state(false);
   let downloadFilename = $state('');
+  
+  let showSpeedBlockModal = $state(false);
 
 
 
@@ -125,6 +133,37 @@
     speakerPreviewPlaying = null;
   }
 
+  function handleSingleSpeakerSpeedChange(speed: number) {
+    if (audioUrl === null) {
+      showSpeedBlockModal = true;
+      return;
+    }
+    singleSpeakerSpeed = speed;
+    if (audioElement) {
+      audioElement.playbackRate = speed;
+    }
+  }
+
+  function handleSpeaker1SpeedChange(speed: number) {
+    if (audioUrl === null) {
+      showSpeedBlockModal = true;
+      return;
+    }
+    speaker1Speed = speed;
+  }
+
+  function handleSpeaker2SpeedChange(speed: number) {
+    if (audioUrl === null) {
+      showSpeedBlockModal = true;
+      return;
+    }
+    speaker2Speed = speed;
+  }
+
+  function closeSpeeedBlockModal() {
+    showSpeedBlockModal = false;
+  }
+
   $effect(() => {
     hasTextInput = $textInput.trim().length > 0;
   });
@@ -142,6 +181,9 @@
       lastGeneratedText = '';
       audioPlaylist = [];
       currentTrackIndex = 0;
+      singleSpeakerSpeed = 1.0;
+      speaker1Speed = 1.0;
+      speaker2Speed = 1.0;
     }
   }
 
@@ -269,8 +311,13 @@
     return segments;
   }
 
+  interface PlaylistSegment {
+    url: string;
+    speaker: 'speaker1' | 'speaker2';
+  }
+
   interface TwoSpeakerResult {
-    urls: string[];
+    segments: PlaylistSegment[];
     mergedUrl: string;
     totalDuration: number;
   }
@@ -288,17 +335,17 @@
   }
 
   async function generateTwoSpeakerAudio(signal: AbortSignal): Promise<TwoSpeakerResult | null> {
-    const segments = parseDialogue($textInput.trim());
+    const dialogueSegments = parseDialogue($textInput.trim());
     
-    if (segments.length === 0) {
+    if (dialogueSegments.length === 0) {
       errorMsg = 'No dialogue segments found. Use format: Speaker: text';
       return null;
     }
 
-    const urls: string[] = [];
+    const segments: PlaylistSegment[] = [];
     const audioChunks: Uint8Array[] = [];
     
-    for (const segment of segments) {
+    for (const segment of dialogueSegments) {
       const res = await fetch('/api/tts', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -323,9 +370,17 @@
       }
       audioChunks.push(byteNumbers);
       const blob = new Blob([byteNumbers], { type: 'audio/mp3' });
-      urls.push(URL.createObjectURL(blob));
+      const url = URL.createObjectURL(blob);
+      
+      // Determine speaker
+      const isSpeaker1 = segment.voice === speaker1;
+      segments.push({
+        url,
+        speaker: isSpeaker1 ? 'speaker1' : 'speaker2'
+      });
     }
     
+    const urls = segments.map(s => s.url);
     const durations = await Promise.all(urls.map(url => getAudioDuration(url)));
     const totalDuration = durations.reduce((acc, d) => acc + d, 0);
     
@@ -339,13 +394,18 @@
     const mergedBlob = new Blob([merged], { type: 'audio/mp3' });
     const mergedUrl = URL.createObjectURL(mergedBlob);
     
-    return { urls, mergedUrl, totalDuration };
+    return { segments, mergedUrl, totalDuration };
   }
 
   function playNextTrack() {
     if (currentTrackIndex < audioPlaylist.length) {
-      const url = audioPlaylist[currentTrackIndex];
-      audioElement = new Audio(url);
+      const segment = audioPlaylist[currentTrackIndex];
+      audioElement = new Audio(segment.url);
+      
+      // Apply speed based on speaker
+      const speed = segment.speaker === 'speaker1' ? speaker1Speed : speaker2Speed;
+      audioElement.playbackRate = speed;
+      
       audioElement.addEventListener('ended', () => {
         currentTrackIndex++;
         if (currentTrackIndex < audioPlaylist.length) {
@@ -409,7 +469,7 @@
           return;
         }
         
-        audioPlaylist = result.urls;
+        audioPlaylist = result.segments;
         audioUrl = result.mergedUrl;
         duration = result.totalDuration;
         currentTrackIndex = 0;
@@ -453,15 +513,16 @@
         const blob = new Blob([byteArray], { type: mimeType });
         
         audioUrl = URL.createObjectURL(blob);
-        
+         
         audioElement = new Audio(audioUrl);
+        audioElement.playbackRate = singleSpeakerSpeed;
         audioElement.addEventListener('loadedmetadata', () => {
           duration = audioElement?.duration || 0;
         });
         audioElement.addEventListener('ended', () => {
           isPlaying = false;
         });
-        
+         
         lastGeneratedText = $textInput.trim();
         audioElement.play();
         isPlaying = true;
@@ -491,6 +552,9 @@
     isPlaying = false;
     duration = 0;
     lastGeneratedText = '';
+    singleSpeakerSpeed = 1.0;
+    speaker1Speed = 1.0;
+    speaker2Speed = 1.0;
   }
 </script>
 
@@ -586,6 +650,20 @@
 
       {#if loading && $selectedVoice?.provider === 'yarngpt'}
         <p class="loading-hint">Generating. This could take a minute<span class="loading-dots"></span></p>
+      {/if}
+
+      {#if !twoSpeakerMode}
+        <div class="speed-control-box">
+          <div class="speed-control-row">
+            <span class="speed-label-text">Speed</span>
+            <SpeedSlider
+              speed={singleSpeakerSpeed}
+              isActive={audioUrl !== null}
+              onSpeedChange={handleSingleSpeakerSpeedChange}
+              size="large"
+            />
+          </div>
+        </div>
       {/if}
 
       <div class="two-speaker-section">
@@ -700,6 +778,26 @@
               {/if}
             </div>
           </div>
+
+          {#if twoSpeakerMode}
+            <div class="speaker-speeds-section">
+              <span class="speaker-speeds-label">Speed</span>
+              <div class="speaker-speeds-row">
+                <SpeedSlider
+                  speed={speaker1Speed}
+                  isActive={audioUrl !== null}
+                  onSpeedChange={handleSpeaker1SpeedChange}
+                  size="small"
+                />
+                <SpeedSlider
+                  speed={speaker2Speed}
+                  isActive={audioUrl !== null}
+                  onSpeedChange={handleSpeaker2SpeedChange}
+                  size="small"
+                />
+              </div>
+            </div>
+          {/if}
         {/if}
       </div>
 
@@ -715,6 +813,8 @@
     </div>
   </main>
 </div>
+
+<SpeedBlockModal isOpen={showSpeedBlockModal} onDismiss={closeSpeeedBlockModal} />
 
 {#if showDownloadModal}
   <div class="modal-overlay" role="presentation" onclick={closeDownloadModal} onkeydown={(e) => e.key === 'Escape' && closeDownloadModal()}>
@@ -1305,5 +1405,52 @@
 
   .speaker-preview-btn.playing .speaker-preview-icon {
     filter: invert(0.32) sepia(0.6) hue-rotate(248deg) saturate(1.5);
+  }
+
+  .speed-control-box {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    padding: var(--spacing-md);
+    background: var(--color-white);
+    margin-top: var(--spacing-md);
+  }
+
+  .speed-control-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .speed-label-text {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    min-width: 45px;
+    white-space: nowrap;
+  }
+
+  .speed-control-row :global(> :last-child) {
+    flex: 1;
+  }
+
+  .speaker-speeds-section {
+    margin-top: var(--spacing-md);
+  }
+
+  .speaker-speeds-label {
+    display: block;
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    margin-bottom: var(--spacing-sm);
+  }
+
+  .speaker-speeds-row {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+
+  .speaker-speeds-row :global(> div) {
+    flex: 1;
   }
 </style>
