@@ -26,6 +26,10 @@
   }
 
   function handleMouseDown() {
+    if (!isActive) {
+      onSpeedChange(speed);
+      return;
+    }
     isDragging = true;
   }
 
@@ -34,6 +38,10 @@
   }
 
   function handleTouchStart() {
+    if (!isActive) {
+      onSpeedChange(speed);
+      return;
+    }
     isDragging = true;
   }
 
@@ -50,7 +58,15 @@
 
 <svelte:window on:mouseup={handleMouseUp} on:touchend={handleTouchEnd} />
 
-<div class="speed-slider-container" class:inactive={!isActive} class:size-large={size === 'large'} class:size-small={size === 'small'}>
+<!-- svelte-ignore a11y_no_static_element_interactions -->
+<div
+  class="speed-slider-container"
+  class:inactive={!isActive}
+  class:size-large={size === 'large'}
+  class:size-small={size === 'small'}
+  onmousedown={handleMouseDown}
+  ontouchstart={handleTouchStart}
+>
   <input
     bind:this={sliderRef}
     type="range"
@@ -60,8 +76,6 @@
     value={speed}
     disabled={!isActive}
     oninput={handleInput}
-    onmousedown={handleMouseDown}
-    ontouchstart={handleTouchStart}
     class="speed-slider"
   />
   
