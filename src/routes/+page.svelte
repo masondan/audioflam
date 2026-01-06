@@ -16,6 +16,8 @@
   let audioElement = $state<HTMLAudioElement | null>(null);
   let lastGeneratedText = $state('');
   
+  let generationAbortController = $state<AbortController | null>(null);
+  
   let twoSpeakerMode = $state(false);
   let speaker1 = $state<VoiceOption | null>(null);
   let speaker2 = $state<VoiceOption | null>(null);
@@ -285,7 +287,7 @@
     });
   }
 
-  async function generateTwoSpeakerAudio(): Promise<TwoSpeakerResult | null> {
+  async function generateTwoSpeakerAudio(signal: AbortSignal): Promise<TwoSpeakerResult | null> {
     const segments = parseDialogue($textInput.trim());
     
     if (segments.length === 0) {
@@ -304,7 +306,8 @@
           text: segment.text,
           voiceName: segment.voice.name,
           provider: segment.voice.provider
-        })
+        }),
+        signal
       });
       
       if (!res.ok) {
@@ -359,6 +362,14 @@
   async function generateAndPlay() {
     if (!$textInput.trim()) return;
     
+    // Handle pause during generation
+    if (loading && generationAbortController) {
+      generationAbortController.abort();
+      generationAbortController = null;
+      loading = false;
+      return;
+    }
+    
     if (isPlaying && audioElement) {
       audioElement.pause();
       isPlaying = false;
@@ -382,6 +393,7 @@
     errorMsg = null;
     audioUrl = null;
     audioPlaylist = [];
+    generationAbortController = new AbortController();
     
     try {
       if (twoSpeakerMode) {
@@ -391,7 +403,7 @@
           return;
         }
         
-        const result = await generateTwoSpeakerAudio();
+        const result = await generateTwoSpeakerAudio(generationAbortController.signal);
         if (!result) {
           loading = false;
           return;
@@ -420,7 +432,8 @@
             text: $textInput.trim(),
             voiceName: voice.name,
             provider: voice.provider
-          })
+          }),
+          signal: generationAbortController.signal
         });
         
         if (!res.ok) {
@@ -456,9 +469,14 @@
       
     } catch (err: unknown) {
       console.error(err);
-      errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      if (err instanceof Error && err.name === 'AbortError') {
+        errorMsg = null;
+      } else {
+        errorMsg = err instanceof Error ? err.message : 'Unknown error';
+      }
     } finally {
       loading = false;
+      generationAbortController = null;
     }
   }
 
