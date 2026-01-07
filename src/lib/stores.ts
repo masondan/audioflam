@@ -20,7 +20,7 @@ export const YARNGPT_VOICES: VoiceOption[] = [
 	// Currently installed
 	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Nigerian, melodic', provider: 'yarngpt' },
 	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo', description: 'Nigerian, upbeat', provider: 'yarngpt' },
-	{ name: 'Regina', ssmlGender: 'FEMALE', displayName: 'Regina', description: 'Nigerian, mature', provider: 'yarngpt' },
+	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora', description: 'Warm, engaging', provider: 'yarngpt' },
 	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Nigerian, reassuring', provider: 'yarngpt' },
 	// Additional voices
 	{ name: 'Emma', ssmlGender: 'FEMALE', displayName: 'Emma', description: 'Authoritative, deep', provider: 'yarngpt' },

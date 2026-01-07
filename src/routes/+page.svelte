@@ -1133,9 +1133,6 @@
     background: conic-gradient(from 0deg, var(--color-primary), var(--color-lavender-veil), var(--color-primary));
     animation: spinner-rotate 1s linear infinite;
     z-index: 0;
-    will-change: transform;
-    -webkit-mask-image: radial-gradient(circle, black 45%, transparent 70%);
-    mask-image: radial-gradient(circle, black 45%, transparent 70%);
   }
 
   .play-btn.loading::after {
@@ -1150,12 +1147,10 @@
   .play-btn.loading .play-icon,
   .play-btn.playing .play-icon {
     filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
-    -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
   }
 
   .play-btn.playing {
     border-color: var(--color-primary) !important;
-    background: var(--color-white);
   }
 
   @keyframes spinner-rotate {
