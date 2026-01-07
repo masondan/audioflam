@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ALL_VOICES, selectedVoice, textInput } from '$lib/stores';
+  import { ALL_VOICES, selectedVoice, textInput, audioCache } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
@@ -40,7 +40,24 @@
   
   let showSpeedBlockModal = $state(false);
 
-
+  // ============================================
+  // SETUP PAGE UNLOAD LISTENER - Rollback: Remove this entire block
+  // Auto-clear session cache when user closes tab/navigates away
+  // ============================================
+  onMount(() => {
+    const handleUnload = () => {
+      audioCache.clear();
+    };
+    
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('unload', handleUnload);
+    
+    return () => {
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('unload', handleUnload);
+    };
+  });
+  // ============================================
 
   function generateDefaultFilename(): string {
     const now = new Date();
@@ -485,11 +502,48 @@
           return;
         }
         
+        const textToGenerate = $textInput.trim();
+        
+        // ============================================
+        // SESSION CACHE CHECK - Rollback: Remove this block
+        // ============================================
+        let cachedAudio = audioCache.get(textToGenerate, voice.name, voice.provider);
+        
+        if (cachedAudio) {
+          // Cache hit: Use cached audio instead of calling API
+          const byteCharacters = atob(cachedAudio);
+          const byteNumbers = new Array(byteCharacters.length);
+          for (let i = 0; i < byteCharacters.length; i++) {
+            byteNumbers[i] = byteCharacters.charCodeAt(i);
+          }
+          const byteArray = new Uint8Array(byteNumbers);
+          const blob = new Blob([byteArray], { type: 'audio/mp3' });
+          
+          audioUrl = URL.createObjectURL(blob);
+          audioElement = new Audio(audioUrl);
+          audioElement.playbackRate = singleSpeakerSpeed;
+          audioElement.addEventListener('loadedmetadata', () => {
+            duration = audioElement?.duration || 0;
+          });
+          audioElement.addEventListener('ended', () => {
+            isPlaying = false;
+          });
+          
+          lastGeneratedText = textToGenerate;
+          audioElement.play();
+          isPlaying = true;
+          loading = false;
+          return;
+        }
+        // ============================================
+        // END CACHE CHECK
+        // ============================================
+        
         const res = await fetch('/api/tts', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            text: $textInput.trim(),
+            text: textToGenerate,
             voiceName: voice.name,
             provider: voice.provider
           }),
@@ -503,6 +557,13 @@
         }
         
         const data = await res.json();
+        
+        // ============================================
+        // CACHE STORAGE - Rollback: Remove these 2 lines
+        // ============================================
+        audioCache.set(textToGenerate, voice.name, voice.provider, data.audioContent);
+        // ============================================
+        
         const byteCharacters = atob(data.audioContent);
         const byteNumbers = new Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
@@ -523,7 +584,7 @@
           isPlaying = false;
         });
          
-        lastGeneratedText = $textInput.trim();
+        lastGeneratedText = textToGenerate;
         audioElement.play();
         isPlaying = true;
       }
@@ -555,6 +616,12 @@
     singleSpeakerSpeed = 1.0;
     speaker1Speed = 1.0;
     speaker2Speed = 1.0;
+    
+    // ============================================
+    // CLEAR SESSION CACHE - Rollback: Remove this block
+    // ============================================
+    audioCache.clear();
+    // ============================================
   }
 </script>
 
