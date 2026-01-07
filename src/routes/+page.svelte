@@ -267,6 +267,13 @@
     }
   }
 
+  function handleVoiceDropdownOpen() {
+    if (isPlaying && audioElement) {
+      audioElement.pause();
+      isPlaying = false;
+    }
+  }
+
   function skipBackward() {
     if (audioElement) {
       audioElement.currentTime = Math.max(0, audioElement.currentTime - 5);
@@ -637,6 +644,7 @@
         voices={ALL_VOICES}
         value={$selectedVoice}
         onchange={handleVoiceChange}
+        onopen={handleVoiceDropdownOpen}
       />
 
     </div>

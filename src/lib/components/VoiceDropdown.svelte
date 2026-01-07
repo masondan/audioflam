@@ -6,9 +6,10 @@
     voices: VoiceOption[];
     value: VoiceOption | null;
     onchange: (voice: VoiceOption) => void;
+    onopen?: () => void;
   }
 
-  let { label, voices, value, onchange }: Props = $props();
+  let { label, voices, value, onchange, onopen }: Props = $props();
 
   function getFlagForVoice(voice: VoiceOption): string {
     if (voice.provider === 'azure') {
@@ -31,6 +32,9 @@
 
   function toggle() {
     isOpen = !isOpen;
+    if (isOpen && onopen) {
+      onopen();
+    }
   }
 
   function select(voice: VoiceOption) {
