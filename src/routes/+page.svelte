@@ -409,12 +409,12 @@
     for (let i = 0; i < normalizedAudios.length; i++) {
       const audioData = normalizedAudios[i];
       const byteCharacters = atob(audioData.base64Audio);
-      const byteNumbers = new Uint8Array(byteCharacters.length);
+      const byteArray = new Uint8Array(byteCharacters.length);
       for (let j = 0; j < byteCharacters.length; j++) {
-        byteNumbers[j] = byteCharacters.charCodeAt(j);
+        byteArray[j] = byteCharacters.charCodeAt(j);
       }
-      audioChunks.push(byteNumbers);
-      const blob = new Blob([byteNumbers], { type: 'audio/mp3' });
+      audioChunks.push(byteArray);
+      const blob = new Blob([byteArray], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
       segments.push({
@@ -552,22 +552,28 @@
         
         const data = await res.json();
         const byteCharacters = atob(data.audioContent);
-        const byteNumbers = new Array(byteCharacters.length);
+        const byteArray = new Uint8Array(byteCharacters.length);
         for (let i = 0; i < byteCharacters.length; i++) {
-          byteNumbers[i] = byteCharacters.charCodeAt(i);
+          byteArray[i] = byteCharacters.charCodeAt(i);
         }
-        const byteArray = new Uint8Array(byteNumbers);
-        const mimeType = data.format === 'wav' ? 'audio/wav' : 'audio/mp3';
-        const blob = new Blob([byteArray], { type: mimeType });
+        const blob = new Blob([byteArray], { type: 'audio/mp3' });
         
         audioUrl = URL.createObjectURL(blob);
          
         audioElement = new Audio(audioUrl);
         audioElement.playbackRate = singleSpeakerSpeed;
-        audioElement.addEventListener('loadedmetadata', () => {
+        
+        const handleLoadedMetadata = () => {
           duration = audioElement?.duration || 0;
-        });
-        audioElement.addEventListener('ended', () => {
+        };
+        const handleEnded = () => {
+          isPlaying = false;
+        };
+        
+        audioElement.addEventListener('loadedmetadata', handleLoadedMetadata);
+        audioElement.addEventListener('ended', handleEnded);
+        audioElement.addEventListener('error', () => {
+          errorMsg = 'Failed to load audio';
           isPlaying = false;
         });
          

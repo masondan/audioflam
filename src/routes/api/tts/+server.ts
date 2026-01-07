@@ -82,7 +82,7 @@ async function handleAzure(text: string, voiceName: string) {
 	}
 	const base64Audio = btoa(binaryString);
 
-	return json({ audioContent: base64Audio, format: 'mp3' });
+	return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 }
 
 async function handleYarnGPT(text: string, voiceName: string) {
@@ -125,7 +125,7 @@ async function handleYarnGPT(text: string, voiceName: string) {
 	}
 	const base64Audio = btoa(binaryString);
 
-	return json({ audioContent: base64Audio });
+	return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 }
 
 
