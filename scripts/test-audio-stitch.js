@@ -27,7 +27,7 @@ function loadEnv() {
                 process.env[key.trim()] = valueParts.join('=').trim();
             }
         }
-    }
+    } 
 }
 
 loadEnv();
@@ -87,32 +87,26 @@ function concatenateBuffers(buffer1, buffer2) {
 }
 
 /**
- * Stitch audio using ffmpeg with trim + crossfade
- * Trims the end of first clip (removes click artifact) and applies crossfade
+ * Crossfade audio using ffmpeg
+ * Applies a short crossfade to eliminate click artifacts
  */
-async function stitchWithFFmpeg(file1, file2, outputFile, trimEnd = 0.1, crossfadeDuration = 0.05) {
+async function crossfadeWithFFmpeg(file1, file2, outputFile, crossfadeDuration = 0.05) {
     const { exec } = await import('child_process');
     const { promisify } = await import('util');
     const execAsync = promisify(exec);
     
-    // Get duration of first file to calculate trim point
-    const probeCmd = `ffprobe -v error -show_entries format=duration -of csv=p=0 "${file1}"`;
+    // Use ffmpeg's acrossfade filter
+    // -y overwrites output, acrossfade applies crossfade between two audio inputs
+    const cmd = `ffmpeg -y -i "${file1}" -i "${file2}" -filter_complex "acrossfade=d=${crossfadeDuration}:c1=tri:c2=tri" "${outputFile}"`;
     
     try {
-        const { stdout } = await execAsync(probeCmd);
-        const duration = parseFloat(stdout.trim());
-        const trimmedDuration = duration - trimEnd;
-        
-        // Trim end of first file, then crossfade with second
-        // atrim trims to specified duration, acrossfade blends the two
-        const cmd = `ffmpeg -y -i "${file1}" -i "${file2}" -filter_complex "[0:a]atrim=0:${trimmedDuration},asetpts=PTS-STARTPTS[a1];[a1][1:a]acrossfade=d=${crossfadeDuration}:c1=tri:c2=tri" "${outputFile}"`;
-        
         await execAsync(cmd);
-        console.log(`  Trimmed ${trimEnd}s from end of first clip, applied ${crossfadeDuration}s crossfade`);
         return true;
     } catch (error) {
         console.error('FFmpeg error:', error.message);
-        console.log('\nNote: ffmpeg is required. Install with: brew install ffmpeg');
+        console.log('\nNote: ffmpeg is required for crossfade. Install with:');
+        console.log('  macOS: brew install ffmpeg');
+        console.log('  Ubuntu: sudo apt install ffmpeg');
         return false;
     }
 }
@@ -157,12 +151,11 @@ async function main() {
         fs.writeFileSync(stitchedPath, Buffer.from(stitched));
         console.log(`  Saved: 4-stitched-raw.mp3 (${stitched.byteLength} bytes)`);
         
-        console.log('\n--- Stitching with trim + crossfade (ffmpeg) ---');
+        console.log('\n--- Crossfading segments with ffmpeg ---');
         const file1 = path.join(OUTPUT_DIR, '2-sentence-1.mp3');
         const file2 = path.join(OUTPUT_DIR, '3-sentence-2.mp3');
-        const crossfadedPath = path.join(OUTPUT_DIR, '5-stitched-trimmed.mp3');
-        // Trim 100ms from end of first clip (removes click), then 50ms crossfade
-        const success = await stitchWithFFmpeg(file1, file2, crossfadedPath, 0.1, 0.05);
+        const crossfadedPath = path.join(OUTPUT_DIR, '5-stitched-crossfade.mp3');
+        const success = await crossfadeWithFFmpeg(file1, file2, crossfadedPath, 0.05);
         
         if (success) {
             console.log(`  Saved: 5-stitched-crossfade.mp3`);

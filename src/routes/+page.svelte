@@ -349,7 +349,9 @@
 
     const segments: PlaylistSegment[] = [];
     const audioChunks: Uint8Array[] = [];
+    const base64Audios: { base64Audio: string; speaker: 'speaker1' | 'speaker2' }[] = [];
     
+    // Generate audio for all segments
     for (const segment of dialogueSegments) {
       const res = await fetch('/api/tts', {
         method: 'POST',
@@ -368,20 +370,56 @@
       }
       
       const data = await res.json();
-      const byteCharacters = atob(data.audioContent);
+      const isSpeaker1 = segment.voice === speaker1;
+      
+      base64Audios.push({
+        base64Audio: data.audioContent,
+        speaker: isSpeaker1 ? 'speaker1' : 'speaker2'
+      });
+    }
+    
+    // Normalize all audios to match peak levels
+    const normalizeRes = await fetch('/api/normalize', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        audios: base64Audios.map(a => ({
+          base64Audio: a.base64Audio,
+          label: a.speaker
+        }))
+      }),
+      signal
+    });
+
+    if (!normalizeRes.ok) {
+      const err = await normalizeRes.json();
+      console.warn('Audio normalization failed, proceeding without normalization:', err);
+    }
+
+    let normalizedAudios = base64Audios;
+    if (normalizeRes.ok) {
+      const normalizeData = await normalizeRes.json();
+      normalizedAudios = normalizeData.normalizedAudios.map((audio: any, idx: number) => ({
+        base64Audio: audio.base64Audio,
+        speaker: base64Audios[idx].speaker
+      }));
+    }
+
+    // Convert normalized audios to chunks and create segments
+    for (let i = 0; i < normalizedAudios.length; i++) {
+      const audioData = normalizedAudios[i];
+      const byteCharacters = atob(audioData.base64Audio);
       const byteNumbers = new Uint8Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      for (let j = 0; j < byteCharacters.length; j++) {
+        byteNumbers[j] = byteCharacters.charCodeAt(j);
       }
       audioChunks.push(byteNumbers);
       const blob = new Blob([byteNumbers], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
-      // Determine speaker
-      const isSpeaker1 = segment.voice === speaker1;
       segments.push({
         url,
-        speaker: isSpeaker1 ? 'speaker1' : 'speaker2'
+        speaker: audioData.speaker
       });
     }
     
@@ -459,6 +497,11 @@
     audioUrl = null;
     audioPlaylist = [];
     generationAbortController = new AbortController();
+    
+    // Reset speed sliders to 1.0 when generating new audio
+    singleSpeakerSpeed = 1.0;
+    speaker1Speed = 1.0;
+    speaker2Speed = 1.0;
     
     try {
       if (twoSpeakerMode) {

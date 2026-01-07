@@ -24,6 +24,7 @@
 	},
 	"dependencies": {
 		"dotenv": "^17.2.3",
+		"lamejs": "^1.2.1",
 		"microsoft-cognitiveservices-speech-sdk": "^1.47.0",
 		"node-fetch": "^3.3.2"
 	}
