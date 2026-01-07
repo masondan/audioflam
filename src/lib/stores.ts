@@ -15,11 +15,26 @@ export interface VoiceOption {
 }
 
 // YarnGPT Nigerian Voices (native, slower ~30s)
+// All 16 available voices from YarnGPT API
 export const YARNGPT_VOICES: VoiceOption[] = [
+	// Currently installed
 	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Nigerian, melodic', provider: 'yarngpt' },
 	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo', description: 'Nigerian, upbeat', provider: 'yarngpt' },
 	{ name: 'Regina', ssmlGender: 'FEMALE', displayName: 'Regina', description: 'Nigerian, mature', provider: 'yarngpt' },
-	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Nigerian, reassuring', provider: 'yarngpt' }
+	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Nigerian, reassuring', provider: 'yarngpt' },
+	// Additional voices
+	{ name: 'Emma', ssmlGender: 'FEMALE', displayName: 'Emma', description: 'Authoritative, deep', provider: 'yarngpt' },
+	{ name: 'Zainab', ssmlGender: 'FEMALE', displayName: 'Zainab', description: 'Soothing, gentle', provider: 'yarngpt' },
+	{ name: 'Osagie', ssmlGender: 'MALE', displayName: 'Osagie', description: 'Smooth, calm', provider: 'yarngpt' },
+	{ name: 'Wura', ssmlGender: 'FEMALE', displayName: 'Wura', description: 'Young, sweet', provider: 'yarngpt' },
+	{ name: 'Jude', ssmlGender: 'MALE', displayName: 'Jude', description: 'Warm, confident', provider: 'yarngpt' },
+	{ name: 'Chinenye', ssmlGender: 'FEMALE', displayName: 'Chinenye', description: 'Engaging, warm', provider: 'yarngpt' },
+	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora', description: 'Warm, engaging', provider: 'yarngpt' },
+	{ name: 'Umar', ssmlGender: 'MALE', displayName: 'Umar', description: 'Calm, smooth', provider: 'yarngpt' },
+	{ name: 'Mary', ssmlGender: 'FEMALE', displayName: 'Mary', description: 'Energetic, youthful', provider: 'yarngpt' },
+	{ name: 'Nonso', ssmlGender: 'MALE', displayName: 'Nonso', description: 'Bold, resonant', provider: 'yarngpt' },
+	{ name: 'Remi', ssmlGender: 'FEMALE', displayName: 'Remi', description: 'Melodious, warm', provider: 'yarngpt' },
+	{ name: 'Adam', ssmlGender: 'MALE', displayName: 'Adam', description: 'Deep, clear', provider: 'yarngpt' }
 ];
 
 // Azure TTS Voices (Nigerian + British English)

@@ -1085,10 +1085,12 @@
     border: 3px solid #777777 !important;
     border-radius: 50%;
     cursor: pointer;
-    transition: border-color var(--transition-fast);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast);
     flex-shrink: 0;
     position: relative;
     overflow: visible;
+    -webkit-appearance: none;
+    appearance: none;
   }
 
   .play-btn .play-icon {
@@ -1098,14 +1100,18 @@
     transition: filter var(--transition-fast);
     position: relative;
     z-index: 2;
+    display: block;
+    -webkit-filter: brightness(0) saturate(100%) invert(60%);
   }
 
   .play-btn.active {
     border-color: var(--color-primary) !important;
+    background: var(--color-white);
   }
 
   .play-btn.active .play-icon {
     filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
   }
 
   .play-btn.loading {
@@ -1121,6 +1127,9 @@
     background: conic-gradient(from 0deg, var(--color-primary), var(--color-lavender-veil), var(--color-primary));
     animation: spinner-rotate 1s linear infinite;
     z-index: 0;
+    will-change: transform;
+    -webkit-mask-image: radial-gradient(circle, black 45%, transparent 70%);
+    mask-image: radial-gradient(circle, black 45%, transparent 70%);
   }
 
   .play-btn.loading::after {
@@ -1135,10 +1144,12 @@
   .play-btn.loading .play-icon,
   .play-btn.playing .play-icon {
     filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
   }
 
   .play-btn.playing {
     border-color: var(--color-primary) !important;
+    background: var(--color-white);
   }
 
   @keyframes spinner-rotate {
