@@ -14,7 +14,7 @@ export interface VoiceOption {
 	provider: TTSProvider;
 }
 
-// YarnGPT Nigerian Voices (native, slower ~30s)
+// YarnGPT Nigerian Voices (native, slower ~30s) - Adaora, Idera, Tayo, Femi
 export const YARNGPT_VOICES: VoiceOption[] = [
 	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora', description: 'Warm, engaging', provider: 'yarngpt' },
 	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Nigerian, melodic', provider: 'yarngpt' },
