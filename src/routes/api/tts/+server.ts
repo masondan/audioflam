@@ -94,7 +94,7 @@ async function handleYarnGPT(text: string, voiceName: string) {
 
 	const trimmedText = text.slice(0, 4000);
 
-	const response = await fetch('https://yarngpt.ai/api/v1/tts', {
+	const response = await fetch('https://yarngpt.ai/api/v1.1/tts', {
 		method: 'POST',
 		headers: {
 			'Authorization': `Bearer ${YARNGPT_API_KEY}`,

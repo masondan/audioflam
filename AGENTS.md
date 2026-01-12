@@ -94,7 +94,7 @@ static/
   - Male: Tayo, Femi
 - **Speed:** ~30 seconds
 - **Auth:** Bearer token
-- **Endpoint:** `https://yarngpt.ai/api/v1/tts`
+- **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
 
 ---
