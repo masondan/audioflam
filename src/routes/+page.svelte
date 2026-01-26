@@ -5,6 +5,10 @@
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
+  import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
+  import { removeSilence, type SilenceLevel } from '$lib/audioProcessing';
+
+  type SpeedLevel = 'default' | 'lively' | 'fast';
 
   // App state
   let hasTextInput = $state(false);
@@ -17,6 +21,7 @@
   let isPlaying = $state(false);
   let audioElement = $state<HTMLAudioElement | null>(null);
   let lastGeneratedText = $state('');
+  let originalAudioBase64 = $state<string | null>(null);
   
   let generationAbortController = $state<AbortController | null>(null);
   
@@ -34,6 +39,15 @@
   let singleSpeakerSpeed = $state(1.0);
   let speaker1Speed = $state(1.0);
   let speaker2Speed = $state(1.0);
+  
+  let speedLevel = $state<SpeedLevel>('default');
+  let silenceLevel = $state<SilenceLevel>('default');
+  
+  const speedLevelValues: Record<SpeedLevel, number> = {
+    default: 1.0,
+    lively: 1.15,
+    fast: 1.25
+  };
   
   let showDownloadModal = $state(false);
   let downloadFilename = $state('');
@@ -162,6 +176,62 @@
     showSpeedBlockModal = false;
   }
 
+  function handleSpeedLevelChange(level: SpeedLevel) {
+    speedLevel = level;
+    const playbackRate = speedLevelValues[level];
+    singleSpeakerSpeed = playbackRate;
+    if (audioElement) {
+      audioElement.playbackRate = playbackRate;
+    }
+  }
+
+  async function handleSilenceLevelChange(level: SilenceLevel) {
+    const previousLevel = silenceLevel;
+    silenceLevel = level;
+    
+    // If we have original audio and we're in single speaker mode, re-process it
+    if (originalAudioBase64 && !twoSpeakerMode && audioUrl) {
+      loading = true;
+      
+      try {
+        // Process audio client-side using Web Audio API
+        const result = await removeSilence(originalAudioBase64, level);
+        
+        // Clean up old URL
+        if (audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+        }
+        
+        audioUrl = URL.createObjectURL(result.blob);
+        
+        const newAudioElement = new Audio(audioUrl);
+        newAudioElement.playbackRate = singleSpeakerSpeed;
+        
+        newAudioElement.addEventListener('loadedmetadata', () => {
+          duration = newAudioElement.duration || 0;
+        });
+        newAudioElement.addEventListener('ended', () => {
+          isPlaying = false;
+        });
+        newAudioElement.addEventListener('error', () => {
+          errorMsg = 'Failed to load audio';
+          isPlaying = false;
+        });
+        
+        audioElement = newAudioElement;
+      } catch (err) {
+        console.error('Silence processing failed:', err);
+        silenceLevel = previousLevel;
+      } finally {
+        loading = false;
+      }
+    }
+  }
+
+  function handleSpeedSilenceInactiveClick() {
+    showSpeedBlockModal = true;
+  }
+
   $effect(() => {
     hasTextInput = $textInput.trim().length > 0;
   });
@@ -177,11 +247,14 @@
       audioElement = null;
       isPlaying = false;
       lastGeneratedText = '';
+      originalAudioBase64 = null;
       audioPlaylist = [];
       currentTrackIndex = 0;
       singleSpeakerSpeed = 1.0;
       speaker1Speed = 1.0;
       speaker2Speed = 1.0;
+      speedLevel = 'default';
+      silenceLevel = 'default';
     }
   }
 
@@ -405,6 +478,33 @@
       }));
     }
 
+    // Apply silence removal if not default
+    if (silenceLevel !== 'default') {
+      const processedAudios = [];
+      for (const audioData of normalizedAudios) {
+        const silenceRes = await fetch('/api/audio/silence-removal', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            base64Audio: audioData.base64Audio,
+            level: silenceLevel
+          }),
+          signal
+        });
+        
+        if (silenceRes.ok) {
+          const silenceData = await silenceRes.json();
+          processedAudios.push({
+            base64Audio: silenceData.audioContent,
+            speaker: audioData.speaker
+          });
+        } else {
+          processedAudios.push(audioData);
+        }
+      }
+      normalizedAudios = processedAudios;
+    }
+
     // Convert normalized audios to chunks and create segments
     for (let i = 0; i < normalizedAudios.length; i++) {
       const audioData = normalizedAudios[i];
@@ -551,14 +651,16 @@
         }
         
         const data = await res.json();
-        const byteCharacters = atob(data.audioContent);
-        const byteArray = new Uint8Array(byteCharacters.length);
-        for (let i = 0; i < byteCharacters.length; i++) {
-          byteArray[i] = byteCharacters.charCodeAt(i);
-        }
-        const blob = new Blob([byteArray], { type: 'audio/mp3' });
+        let audioContent = data.audioContent;
         
-        audioUrl = URL.createObjectURL(blob);
+        // Store original unprocessed audio for later silence adjustments
+        originalAudioBase64 = audioContent;
+        
+        // Apply silence removal if not default
+        // Process silence removal client-side using Web Audio API
+        const result = await removeSilence(audioContent, silenceLevel);
+        
+        audioUrl = URL.createObjectURL(result.blob);
          
         audioElement = new Audio(audioUrl);
         audioElement.playbackRate = singleSpeakerSpeed;
@@ -606,9 +708,12 @@
     isPlaying = false;
     duration = 0;
     lastGeneratedText = '';
+    originalAudioBase64 = null;
     singleSpeakerSpeed = 1.0;
     speaker1Speed = 1.0;
     speaker2Speed = 1.0;
+    speedLevel = 'default';
+    silenceLevel = 'default';
   }
 </script>
 
@@ -651,13 +756,20 @@
           <span class="text-placeholder">Use : to identify speakers (eg Regina:)</span>
         {/if}
       </div>
-      <button 
-        type="button" 
-        class="clear-btn" 
-        class:inactive={!hasTextInput}
-        onclick={clearText}
-        disabled={!hasTextInput}
-      >Clear text</button>
+      <div class="text-footer">
+        {#if audioUrl && duration > 0}
+          <span class="audio-duration">Audio duration: {duration.toFixed(1)}s</span>
+        {:else}
+          <span class="audio-duration"></span>
+        {/if}
+        <button 
+          type="button" 
+          class="clear-btn" 
+          class:inactive={!hasTextInput}
+          onclick={clearText}
+          disabled={!hasTextInput}
+        >Clear text</button>
+      </div>
     </div>
 
     <div class="controls-section">
@@ -708,17 +820,14 @@
       {/if}
 
       {#if !twoSpeakerMode}
-        <div class="speed-control-box">
-          <div class="speed-control-row">
-            <span class="speed-label-text">Speed</span>
-            <SpeedSlider
-              speed={singleSpeakerSpeed}
-              isActive={audioUrl !== null}
-              onSpeedChange={handleSingleSpeakerSpeedChange}
-              size="large"
-            />
-          </div>
-        </div>
+        <SpeedSilenceControls
+          {speedLevel}
+          {silenceLevel}
+          isActive={audioUrl !== null}
+          onSpeedChange={handleSpeedLevelChange}
+          onSilenceChange={handleSilenceLevelChange}
+          onInactiveClick={handleSpeedSilenceInactiveClick}
+        />
       {/if}
 
       <div class="two-speaker-section">
@@ -1001,8 +1110,18 @@
     font-size: var(--font-size-sm);
   }
 
+  .text-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .audio-duration {
+    font-size: var(--font-size-sm);
+    color: #777777;
+  }
+
   .clear-btn {
-    align-self: flex-end;
     padding: 0;
     font-size: var(--font-size-sm);
     color: #777777;
@@ -1290,7 +1409,7 @@
   .two-speaker-section {
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: var(--spacing-md);
+    padding: 12px var(--spacing-md);
     background: var(--color-white);
   }
 
@@ -1466,32 +1585,6 @@
 
   .speaker-preview-btn.playing .speaker-preview-icon {
     filter: invert(0.32) sepia(0.6) hue-rotate(248deg) saturate(1.5);
-  }
-
-  .speed-control-box {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-md);
-    background: var(--color-white);
-    margin-top: var(--spacing-md);
-  }
-
-  .speed-control-row {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-md);
-  }
-
-  .speed-label-text {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    font-weight: 500;
-    min-width: 45px;
-    white-space: nowrap;
-  }
-
-  .speed-control-row :global(> :last-child) {
-    flex: 1;
   }
 
   .speaker-speeds-section {
