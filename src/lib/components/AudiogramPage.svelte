@@ -4,6 +4,7 @@
   import CompositionCanvas from './CompositionCanvas.svelte';
   import WaveformPanel from './WaveformPanel.svelte';
   import TitlePanel from './TitlePanel.svelte';
+  import LightEffectPanel from './LightEffectPanel.svelte';
   import type { WaveformStyle } from './WaveformPanel.svelte';
   import type { TitleFont, TitleStyle } from './TitlePanel.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
@@ -16,7 +17,7 @@
     getFrequencyData,
     drawLiveWaveform
   } from '$lib/utils/recording';
-  import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition } from '$lib/utils/compositor';
+  import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition, LightEffectConfig } from '$lib/utils/compositor';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
@@ -96,6 +97,12 @@
     height: 0.15
   });
 
+  // Light effect state
+  let lightOpacity = $state(0.5);
+  let lightSpeed = $state(0.5);
+  let lightPhase = $state(0);
+  let lightAnimationId: number | null = null;
+
   // Recording state
   let recordingPhase = $state<RecordingPhase>('idle');
   let countdownNumber = $state(3);
@@ -137,6 +144,44 @@
       isEditing: !isPlaying
     } : null
   );
+
+  let lightConfig = $derived<LightEffectConfig | null>(
+    lightActive ? {
+      enabled: true,
+      opacity: lightOpacity,
+      speed: lightSpeed,
+      phase: lightPhase
+    } : null
+  );
+
+  function startLightAnimation() {
+    if (lightAnimationId !== null) return;
+    
+    function animate() {
+      lightPhase = lightPhase + 1;
+      lightAnimationId = requestAnimationFrame(animate);
+    }
+    lightAnimationId = requestAnimationFrame(animate);
+  }
+
+  function stopLightAnimation() {
+    if (lightAnimationId !== null) {
+      cancelAnimationFrame(lightAnimationId);
+      lightAnimationId = null;
+    }
+  }
+
+  $effect(() => {
+    if (lightActive) {
+      startLightAnimation();
+    } else {
+      stopLightAnimation();
+    }
+    
+    return () => {
+      stopLightAnimation();
+    };
+  });
 
   function handleImageUploadClick() {
     const input = document.createElement('input');
@@ -934,6 +979,7 @@
         loading={imageLoading}
         waveformConfig={waveformConfig}
         titleConfig={titleConfig}
+        lightConfig={lightConfig}
         isPlaying={isPlaying}
         onWaveformPositionChange={handleWaveformPositionChange}
         onWaveformClick={handleWaveformOverlayClick}
@@ -1170,7 +1216,12 @@
       onToggle={(active) => handlePanelToggle('light', active)}
       onOpenChange={(open) => handlePanelOpenChange('light', open)}
     >
-      <p class="panel-placeholder">Light effect options coming soon</p>
+      <LightEffectPanel
+        opacity={lightOpacity}
+        speed={lightSpeed}
+        onOpacityChange={(opacity) => lightOpacity = opacity}
+        onSpeedChange={(speed) => lightSpeed = speed}
+      />
     </TogglePanel>
   </div>
 
@@ -1498,13 +1549,6 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-sm);
-  }
-
-  .panel-placeholder {
-    font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
-    text-align: center;
-    padding: var(--spacing-md);
   }
 
   .download-btn {

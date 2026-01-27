@@ -36,15 +36,17 @@ export interface TitleConfig {
   isEditing?: boolean;
 }
 
+export interface LightEffectConfig {
+  enabled: boolean;
+  opacity: number;
+  speed: number;
+  phase: number;
+}
+
 export interface LayerConfig {
   waveform?: WaveformConfig;
   title?: TitleConfig;
-  lightEffect?: {
-    enabled: boolean;
-    opacity: number;
-    speed: number;
-    phase: number;
-  };
+  lightEffect?: LightEffectConfig;
 }
 
 export function calculateCanvasDimensions(
@@ -85,6 +87,10 @@ export function renderFrame(
   } else {
     ctx.fillStyle = '#1a1a1a';
     ctx.fillRect(0, 0, canvas.width, canvas.height);
+  }
+
+  if (layers.lightEffect?.enabled) {
+    renderLightEffectLayer(ctx, canvas, layers.lightEffect);
   }
 
   if (layers.waveform?.enabled) {
@@ -423,4 +429,116 @@ export function renderTitleLayer(
   }
 
   ctx.restore();
+}
+
+export function renderLightEffectLayer(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  config: LightEffectConfig
+): void {
+  const { opacity, speed, phase } = config;
+  
+  if (opacity <= 0) return;
+
+  ctx.save();
+  ctx.globalAlpha = opacity * 1.8;
+
+  const bokehCircles = generateBokehPositions(canvas.width, canvas.height, phase, speed);
+
+  for (const circle of bokehCircles) {
+    const gradient = ctx.createRadialGradient(
+      circle.x, circle.y, 0,
+      circle.x, circle.y, circle.radius
+    );
+    
+    gradient.addColorStop(0, circle.color);
+    gradient.addColorStop(0.5, circle.color.replace(/[\d.]+\)$/, `${circle.opacity * 0.5})`));
+    gradient.addColorStop(1, 'rgba(255, 255, 255, 0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.beginPath();
+    ctx.arc(circle.x, circle.y, circle.radius, 0, Math.PI * 2);
+    ctx.fill();
+  }
+
+  ctx.restore();
+}
+
+interface BokehCircle {
+  x: number;
+  y: number;
+  radius: number;
+  color: string;
+  opacity: number;
+}
+
+function generateBokehPositions(
+  width: number,
+  height: number,
+  phase: number,
+  speed: number
+): BokehCircle[] {
+  const circles: BokehCircle[] = [];
+  const baseCount = 16;
+  
+  const bokehColors = [
+    { r: 255, g: 248, b: 200 },  // Warm cream
+    { r: 255, g: 220, b: 180 },  // Peach
+    { r: 255, g: 200, b: 150 },  // Light orange
+    { r: 255, g: 180, b: 180 },  // Soft pink
+    { r: 220, g: 200, b: 255 },  // Soft lavender
+    { r: 200, g: 230, b: 255 },  // Light blue
+    { r: 255, g: 240, b: 220 },  // Warm white
+    { r: 255, g: 210, b: 160 },  // Amber
+    { r: 240, g: 220, b: 200 },  // Beige
+    { r: 255, g: 190, b: 200 },  // Rose
+  ];
+
+  for (let i = 0; i < baseCount; i++) {
+    const seed = i * 7.31;
+    const animOffset = phase * speed * 0.025;
+    
+    const edgeIndex = i % 4;
+    let baseX: number, baseY: number;
+    
+    switch (edgeIndex) {
+      case 0: // Top edge
+        baseX = (Math.sin(seed) * 0.5 + 0.5) * width;
+        baseY = Math.sin(seed * 1.3 + animOffset) * height * 0.2 + height * 0.05;
+        break;
+      case 1: // Right edge
+        baseX = width - Math.sin(seed * 0.9) * width * 0.2 - width * 0.05;
+        baseY = (Math.sin(seed * 1.7) * 0.5 + 0.5) * height;
+        break;
+      case 2: // Bottom edge
+        baseX = (Math.cos(seed * 1.1) * 0.5 + 0.5) * width;
+        baseY = height - Math.sin(seed * 0.8 + animOffset * 0.7) * height * 0.2 - height * 0.05;
+        break;
+      default: // Left edge
+        baseX = Math.sin(seed * 1.2) * width * 0.2 + width * 0.05;
+        baseY = (Math.cos(seed * 0.7) * 0.5 + 0.5) * height;
+        break;
+    }
+    
+    const wobbleX = Math.sin(animOffset + seed) * 25;
+    const wobbleY = Math.cos(animOffset * 0.8 + seed * 1.3) * 20;
+    
+    const minDimension = Math.min(width, height);
+    const sizeVariation = 0.08 + Math.abs(Math.sin(seed * 2.1)) * 0.12;
+    const radius = minDimension * sizeVariation;
+    
+    const colorIndex = i % bokehColors.length;
+    const c = bokehColors[colorIndex];
+    const baseOpacity = 0.6 + Math.sin(seed * 3.2) * 0.25;
+    
+    circles.push({
+      x: baseX + wobbleX,
+      y: baseY + wobbleY,
+      radius,
+      color: `rgba(${c.r}, ${c.g}, ${c.b}, ${baseOpacity})`,
+      opacity: baseOpacity
+    });
+  }
+
+  return circles;
 }

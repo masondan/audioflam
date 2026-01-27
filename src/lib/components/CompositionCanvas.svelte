@@ -1,12 +1,13 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { loadImage, renderFrame, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition } from '$lib/utils/compositor';
+  import { loadImage, renderFrame, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig } from '$lib/utils/compositor';
 
   interface Props {
     imageUrl: string | null;
     loading?: boolean;
     waveformConfig?: WaveformConfig | null;
     titleConfig?: TitleConfig | null;
+    lightConfig?: LightEffectConfig | null;
     isPlaying?: boolean;
     onWaveformPositionChange?: (position: WaveformPosition) => void;
     onWaveformClick?: () => void;
@@ -19,6 +20,7 @@
     loading = false, 
     waveformConfig = null,
     titleConfig = null,
+    lightConfig = null,
     isPlaying = false,
     onWaveformPositionChange,
     onWaveformClick,
@@ -65,6 +67,10 @@
     if (!ctx || !canvas) return;
     
     const layers: LayerConfig = {};
+    
+    if (lightConfig) {
+      layers.lightEffect = lightConfig;
+    }
     
     if (waveformConfig) {
       layers.waveform = {
