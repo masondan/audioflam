@@ -5,6 +5,24 @@
 
 ---
 
+## Design Assets & References
+
+**CRITICAL:** Before starting implementation, review all visuals in the `info/` folder:
+
+- **Header/Navigation:** `promptflam.png` (button styling reference)
+- **Audiogram Page Layout:** `audiogram-home.png`
+- **Image Operations:** `image.png`, `resize.png`
+- **Audio Import:** `import-audio.png`, `audio-record1.png`, `audio-record2.png`
+- **Waveform Panel:** `waveform1.png`, `waveform2.png`, `colordrawer.png`
+- **Title Panel:** `title.png`
+- **Light Effect:** `light.png`
+
+**Also review the design.md document for design vision and approach**
+
+**Icons Required:** 22 total (listed in `icon-*.svg` references throughout design guide)
+
+AI agent coders MUST review these visuals at the start of each step.
+
 ## Technical Architecture
 
 | Component | Technology |

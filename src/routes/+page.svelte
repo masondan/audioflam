@@ -6,6 +6,7 @@
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
+  import AudiogramPage from '$lib/components/AudiogramPage.svelte';
   import { removeSilence, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
@@ -1003,9 +1004,7 @@
       </button>
     </div>
     {:else}
-    <div class="audiogram-placeholder">
-      <p class="placeholder-text">Audiogram creator coming soon</p>
-    </div>
+      <AudiogramPage />
     {/if}
   </main>
 </div>
@@ -1093,18 +1092,6 @@
 
   .nav-tab-btn.active .nav-tab-icon {
     filter: brightness(0) invert(1);
-  }
-
-  .audiogram-placeholder {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 300px;
-  }
-
-  .placeholder-text {
-    color: var(--color-text-secondary);
-    font-size: var(--font-size-base);
   }
 
   .main-content {
