@@ -1,620 +1,632 @@
-# AudioFlam Enhanced Features Roadmap
+# AudioFlam Audiogram Implementation Roadmap
 
-**Status:** Planning Phase  
-**Objective:** Extend AudioFlam from basic TTS to professional audiogram creation with waveform visualization, silence removal, and subtitle support.
-
----
-
-## Overview
-
-This roadmap outlines modular feature additions to AudioFlam, grouped by core functionality and optional enhancements. Each module is self-contained and can be implemented, tested, and amended independently.
-
-**Key Principles:**
-- Simplicity first (avoid feature creep)
-- Educational use (Africa-focused device compatibility)
-- Zero additional hosting costs where possible
-- Modular architecture (decisions on design/templates can be deferred)
+**Status:** Ready for Implementation  
+**Objective:** Add audiogram creation to AudioFlam - combine image, audio, waveform, title, and effects into downloadable MP4.
 
 ---
 
-## Core Modules (MVP Phase)
+## Technical Architecture
 
-### Module 1: Silence Removal (Server-Side FFmpeg)
+| Component | Technology |
+|-----------|------------|
+| Composition | Single `<canvas>` element (image + waveform + title + effects) |
+| Audio Visualization | Web Audio API `AnalyserNode` for real-time frequency data |
+| Recording | `MediaRecorder` API for microphone capture |
+| Video Export | FFmpeg.wasm (~300KB) for MP4 encoding |
+| Color Picker | Custom Svelte HSB picker (hue slider + saturation/brightness field) |
+| Image Cropping | Canvas API with touch/mouse gesture handling |
 
-**Objective:** Remove/compress silences in TTS-generated audio post-generation.
+---
 
-**Technology:** FFmpeg running on Cloudflare Workers  
-**Approach:** Server-side processing, client-side triggering
+## Implementation Steps
+
+### Step 1: Header Navigation & Page Structure
+
+**Objective:** Add TTS/Audiogram toggle to header; restructure page for conditional rendering.
+
+**Design Reference:** `promptflam.png` - circular icon buttons with active/inactive states
 
 **Implementation:**
 
-1. **Create new API endpoint:** `POST /api/audio/silence-removal`
-   - Input: Base64-encoded MP3 audio
-   - Parameters: 
-     - `silenceThreshold`: -40dB (default)
-     - `minSilenceDuration`: 500ms (default)
-     - `compressionMode`: 'remove' | 'compress' (default: 'compress')
-   - Output: Base64-encoded processed MP3
-
-2. **FFmpeg filter chain:**
-   ```bash
-   ffmpeg -i input.mp3 \
-     -af "silenceremove=start_periods=1:start_duration=1:start_threshold=-40dB:
-           detection=peak,aformat=dblp,areverse,silenceremove=start_periods=1:
-           start_duration=1:start_threshold=-40dB:detection=peak,areverse" \
-     output.mp3
-   ```
-
-3. **Update TTS workflow:**
-   - After TTS generation, optionally call silence-removal endpoint
-   - Add UI toggle: "Remove silences" checkbox
-   - Show processing status (progress indicator)
-
-4. **Testing checklist:**
-   - [ ] Process 1-minute audio without timeout
-   - [ ] Verify audio quality post-processing
-   - [ ] Test on slow connections (show spinner, not freeze)
-   - [ ] Confirm Cloudflare Workers can handle FFmpeg (worker size constraints)
-   - [ ] Test with both Azure and YarnGPT audio
-
-5. **Fallback strategy:**
-   - If Cloudflare Workers too constrained, delegate to external service (analyze cost)
-   - Document decision in code comments
-
-**Status:** ✅ Implemented (January 2026)  
-**Dependencies:** None (independent module)
-
----
-
-### Module 2: Waveform Preview (Client-Side Wavesurfer.js)
-
-**Objective:** Display animated waveform during audio playback and export.
-
-**Technology:** Wavesurfer.js (client-side Web Audio API)  
-**Approach:** Real-time visualization of audio frequency data
-
-**Implementation:**
-
-1. **Install and configure Wavesurfer.js**
-   - Add to `package.json`: `wavesurfer.js`
-   - Create new component: `src/lib/components/WaveformPreview.svelte`
-
-2. **WaveformPreview component:**
-   ```svelte
-   <script>
-     import WaveSurfer from 'wavesurfer.js';
-     
-     export let audioBlob;
-     export let isPlaying = false;
-     
-     // Initialize wavesurfer with:
-     // - Container: <div id="waveform"></div>
-     // - Height: 100px (responsive)
-     // - Color: --color-primary (#5422b0)
-     // - Progress color: --color-lavender-veil (#f0e6f7)
-     // - Format: "bars" or "wave" (configurable)
-   </script>
+1. **Update `+page.svelte` header:**
+   - Reduce AudioFlam logo size slightly, align LEFT
+   - Add two circular nav buttons aligned RIGHT:
+     - TTS button (`icon-tts.svg`) - active by default
+     - Audiogram button (`icon-audiogram.svg`)
    
-   <div id="waveform" class="waveform-container"></div>
-   ```
+2. **Button states:**
+   - Inactive: transparent background, `#777777` icon, 1px grey border
+   - Active: `#5422b0` solid fill, white icon, no border
 
-3. **Integrate into app flow:**
-   - After TTS generation, display waveform preview
-   - Show play/pause button over waveform
-   - Display duration and current time
-   - Option to preview before proceeding to composition
+3. **Page state:**
+   - Add `activeTab: 'tts' | 'audiogram'` state
+   - Wrap existing TTS content in `{#if activeTab === 'tts'}`
+   - Add placeholder `{#if activeTab === 'audiogram'}` block
 
-4. **Styling:**
-   - Use existing CSS variables (--color-primary, --color-lavender-veil)
-   - Responsive width (mobile-first)
-   - Optional dark theme variant
+**Files to modify:**
+- `src/routes/+page.svelte` (header + conditional structure)
+- `src/app.css` (nav button styles)
 
-5. **Testing checklist:**
-   - [ ] Waveform renders on first load
-   - [ ] Play/pause syncs with audio
-   - [ ] Responsive on mobile (small screens)
-   - [ ] Performance on older devices (test on 2GB RAM Android)
-   - [ ] No lag when scrubbing timeline
-
-**Status:** Ready for implementation  
-**Dependencies:** None (independent module)
+**Test criteria:**
+- [ ] Logo smaller and left-aligned
+- [ ] Both nav buttons visible, TTS active by default
+- [ ] Clicking Audiogram shows placeholder, clicking TTS returns to TTS
+- [ ] Active/inactive button states correct
 
 ---
 
-### Module 3: Audio → Image → MP4 Composition (Cloudflare Stream)
+### Step 2: Audiogram Page Shell
 
-**Objective:** Combine audio, static image, and overlays into MP4 video for download.
+**Objective:** Build the audiogram page layout with all placeholder components.
 
-**Technology:** Cloudflare Stream with 30-minute auto-delete  
-**Approach:** Server-side video composition
+**Design Reference:** `audiogram-home.png`
 
 **Implementation:**
 
-1. **Create new API endpoint:** `POST /api/video/compose`
-   - Input:
-     - `audioUrl`: Base64 or URL to final audio
-     - `imageUrl`: Base64 or URL to background image
-     - `duration`: Video duration (seconds)
-     - `overlays`: Array of text/graphic overlays (see Module 4)
-     - `effects`: Object with bokeh, waveform, stinger settings
-   - Output: Download link to MP4 (signed URL, expires in 30 min)
+1. **Create audiogram container** with vertical layout:
+   - Image upload box (dotted border + `icon-upload.svg`)
+   - Audio upload box (dotted border + `icon-upload.svg`)
+   - Playback controls row
+   - Three toggle panels (Waveform, Title, Light effect)
+   - Download button (disabled state)
 
-2. **Cloudflare Stream integration:**
-   - Store API token in env: `CLOUDFLARE_STREAM_TOKEN`
-   - Use `@cloudflare/stream` SDK
-   - Set auto-delete: Metadata field `expiresAt: +30 minutes`
-   - Documentation: https://developers.cloudflare.com/api/operations/stream-list-videos
+2. **Playback controls row:**
+   - Start again button (`icon-start-again.svg`) - disabled initially
+   - Skip back 5s (`icon-back-five.svg`)
+   - Play/Stop button (`icon-play-fill.svg`)
+   - Skip forward 5s (`icon-forward-five.svg`)
+   - Microphone button (`icon-mic.svg`)
 
-3. **Video composition pipeline:**
-   - Create temporary MP4 skeleton (image frame, audio track)
-   - Apply overlays (see Module 4)
-   - Apply visual effects (see Module 5: Bokeh)
-   - Add waveform visualization (see Module 6)
-   - Add subtitle track if enabled (see Optional Module: Subtitles)
-   - Upload to Stream, get signed download URL
+3. **Toggle panels:**
+   - Reuse pattern from `SpeedSilenceControls.svelte`
+   - Each has: chevron (expand/collapse), label, toggle switch
+   - Only one panel open at a time (auto-close others)
 
-4. **Workflow integration:**
-   - After silence removal, present preview
-   - User selects image, bokeh style, text overlays
-   - Click "Generate Audiogram"
-   - API processes (show progress: image load → audio sync → composition)
-   - Return download link + option to share (Stream direct link)
+**Files to create:**
+- `src/lib/components/AudiogramPage.svelte`
+- `src/lib/components/TogglePanel.svelte` (reusable)
 
-5. **Testing checklist:**
-   - [ ] Upload 1-minute video to Stream successfully
-   - [ ] Auto-delete fires after 30 minutes
-   - [ ] Download link remains valid for full duration
-   - [ ] Video quality acceptable (bitrate: 1080p @ 5Mbps)
-   - [ ] Works across device types (web, mobile, tablet)
-   - [ ] Large files (5+ min) don't timeout
+**Files to modify:**
+- `src/routes/+page.svelte` (import and render AudiogramPage)
 
-6. **Cost monitoring:**
-   - Log bytes stored per day
-   - Alert if approaching unexpected usage
-   - Document actual costs monthly
-
-**Status:** Ready for investigation  
-**Dependencies:** Module 1 (Silence Removal), Module 2 (Waveform), Module 4 (Text Overlays)
+**Test criteria:**
+- [ ] All UI elements visible and positioned correctly
+- [ ] Toggle panels open/close with chevron animation
+- [ ] Only one panel open at a time
+- [ ] Buttons show correct disabled/enabled states
 
 ---
 
-### Module 4: Text Overlays (Question/Title Templates)
+### Step 3: Image Upload & Display
 
-**Objective:** Add customizable text overlays to images (titles, questions, speaker labels).
+**Objective:** Implement image upload with file picker and drag-drop.
 
-**Technology:** Canvas text rendering (client-side composition) or FFmpeg text filter (server-side)  
-**Approach:** TBD during investigation
+**Design Reference:** `image.png`
 
 **Implementation:**
 
-1. **Design text overlay system:**
-   - Overlay types:
-     - `title`: Top of image, question/hook text
-     - `speaker_label`: Bottom-left/right, speaker name (for multi-speaker)
-     - `timestamp`: Optional timestamp overlay
-   - Properties:
-     - Position (x, y coordinates or preset: top-left, center, bottom)
-     - Font size (responsive)
-     - Color (CSS color or preset: white, indigo-bloom, lavender)
-     - Font (Inter, system font)
-     - Opacity (0-100%)
-     - Background (none, semi-transparent box)
+1. **Upload zone:**
+   - Click triggers file picker (accept: `image/*`)
+   - Drag-drop support for desktop
+   - Resize uploaded image: max 1080px (vertical/square) or 1920px (horizontal)
 
-2. **Text overlay component:** `src/lib/components/TextOverlayEditor.svelte`
-   - Text input field
-   - Position selector (grid: 9 positions)
-   - Font size slider
-   - Color picker (or preset select)
-   - Preview canvas (show how overlay looks on image)
-   - Delete/clear button
+2. **After upload:**
+   - Replace dotted box with full-width image display
+   - Add "Replace image" (left) and "Resize" (right) text buttons below
 
-3. **Integration points:**
-   - In `src/routes/app/+page.svelte`, add overlay editor before composition
-   - Store overlay config in state
-   - Pass to composition API
+3. **Image state:**
+   - Store as `imageData: { original: Blob, cropped: Blob | null, aspectRatio: 'none' | '9:16' | '1:1' | '16:9' }`
 
-4. **Rendering approach (choose one during investigation):**
-   - **Option A: Client-side Canvas**
-     - Render text on canvas before sending image to composition
-     - Bake text into image bytes
-     - Pros: Simple, predictable
-     - Cons: Text can't be edited after composition
+**Files to create:**
+- `src/lib/components/ImageUpload.svelte`
+
+**Test criteria:**
+- [ ] Can upload image via click
+- [ ] Can upload image via drag-drop (desktop)
+- [ ] Image displays full-width after upload
+- [ ] Replace/Resize buttons appear
+- [ ] Replace button triggers new upload
+
+---
+
+### Step 4: Image Crop Drawer
+
+**Objective:** Full-screen crop drawer with aspect ratio selection and pinch/pan.
+
+**Design Reference:** `resize.png`
+
+**Implementation:**
+
+1. **Drawer UI:**
+   - Full-screen overlay from bottom
+   - "Done" text button (top-right) to close
+   - Image preview at top
+   - Four aspect ratio buttons below: None, 9:16, 1:1, 16:9
+   - Icons: `icon-none.svg`, `icon-vertical.svg`, `icon-square.svg`, `icon-horizontal.svg`
+
+2. **Crop behavior:**
+   - Semi-transparent overlay on cropped areas
+   - Two-finger pinch to zoom
+   - Single finger to pan
+   - "None" = no crop (original ratio)
+
+3. **Button states:**
+   - Active: grey background, white icon/text
+   - Inactive: white background, grey border, grey icon/text
+
+4. **On Done:**
+   - Apply crop via Canvas API
+   - Update `imageData.cropped`
+
+**Files to create:**
+- `src/lib/components/ImageCropDrawer.svelte`
+
+**Test criteria:**
+- [ ] Drawer slides up from bottom
+- [ ] Aspect ratio buttons toggle correctly
+- [ ] Crop overlay shows correctly for each ratio
+- [ ] Pinch-zoom works on mobile
+- [ ] Pan works on mobile and desktop
+- [ ] Done applies crop and closes drawer
+
+---
+
+### Step 5: Audio Import & Waveform Display
+
+**Objective:** Import audio file, decode, display static waveform with trim handles.
+
+**Design Reference:** `import-audio.png`
+
+**Implementation:**
+
+1. **Upload zone:**
+   - Click triggers file picker (accept: `audio/*`)
+   - Drag-drop support for desktop
+
+2. **After upload:**
+   - Decode audio using `AudioContext.decodeAudioData()`
+   - Replace dotted box with:
+     - Solid border container
+     - Static waveform visualization (grey bars)
+     - Left/right trim handles
+   - Duration timestamp below (e.g., "28.9s")
+
+3. **Waveform rendering:**
+   - Extract amplitude data from AudioBuffer
+   - Draw bars to canvas (style: rounded thick bars - waveform option 1)
+   - Grey color (#777777) for static display
+
+4. **Trim handles:**
+   - Draggable left/right boundaries
+   - Light grey overlay outside trim region
+   - Update playback start/end times
+
+5. **Enable controls:**
+   - Play button becomes active
+   - Start again button becomes active
+
+**Files to create:**
+- `src/lib/components/AudioImport.svelte`
+- `src/lib/utils/waveform.ts` (amplitude extraction, drawing functions)
+
+**Test criteria:**
+- [ ] Can upload audio via click and drag-drop
+- [ ] Waveform renders after decode
+- [ ] Duration displays correctly
+- [ ] Trim handles are draggable
+- [ ] Play button activates after import
+
+---
+
+### Step 6: Audio Playback Controls
+
+**Objective:** Implement play/pause, skip forward/back, and start again functionality.
+
+**Implementation:**
+
+1. **Playback using HTML5 Audio or Web Audio API:**
+   - Create `AudioBufferSourceNode` for playback
+   - Respect trim start/end times
+
+2. **Control behavior:**
+   - Play: Start playback, icon changes to `icon-pause-fill.svg`
+   - Pause: Pause playback, icon changes to `icon-play-fill.svg`
+   - Skip back 5s: `currentTime -= 5`
+   - Skip forward 5s: `currentTime += 5`
+   - Start again: Clear audio, reset to upload state
+
+3. **Progress indicator:**
+   - Vertical line overlay on waveform showing current position
+   - Updates at 60fps during playback
+
+**Files to modify:**
+- `src/lib/components/AudioImport.svelte`
+- `src/lib/components/AudiogramPage.svelte`
+
+**Test criteria:**
+- [ ] Play/pause toggles correctly
+- [ ] Skip forward/back moves playhead
+- [ ] Progress line animates during playback
+- [ ] Start again clears audio and resets UI
+- [ ] Respects trim boundaries
+
+---
+
+### Step 7: Audio Recording
+
+**Objective:** Implement microphone recording with countdown and live waveform.
+
+**Design Reference:** `audio-record1.png`, `audio-record2.png`
+
+**Implementation:**
+
+1. **Mic button tap:**
+   - Request microphone permission
+   - Mic icon changes to `icon-mic-fill.svg` (purple)
+   - Audio upload box transforms to solid border with instruction text:
+     "Tap Play to record with three-second countdown. Tap Stop to end recording. Tap refresh to start again."
+
+2. **Recording flow (tap Play):**
+   - 3-second countdown: Play button shows `icon-three.svg`, `icon-two.svg`, `icon-one.svg`
+   - Recording starts: button shows `icon-stop-fill.svg`
+   - Live waveform: Real-time bars from `AnalyserNode` frequency data
+   - Waveform scrolls left as recording progresses (visible window = 50% width)
+
+3. **Stop recording:**
+   - Convert `MediaRecorder` blob to AudioBuffer
+   - Display static waveform with trim handles (same as import)
+   - Button returns to play state
+   - Mic returns to grey state
+
+4. **Start again:**
+   - Clears recording, returns to initial mic-ready state
+
+**Files to create:**
+- `src/lib/utils/recording.ts` (MediaRecorder wrapper, permission handling)
+
+**Files to modify:**
+- `src/lib/components/AudioImport.svelte`
+
+**Test criteria:**
+- [ ] Mic permission requested on tap
+- [ ] Countdown displays 3, 2, 1 correctly
+- [ ] Live waveform animates during recording
+- [ ] Stop converts to static waveform
+- [ ] Start again resets correctly
+
+---
+
+### Step 8: Canvas Composition Layer
+
+**Objective:** Create the main canvas that composites image + overlays for preview and export.
+
+**Implementation:**
+
+1. **Create composition canvas:**
+   - Positioned where image displays
+   - Layers (bottom to top): Image → Waveform → Title → Light effect
+
+2. **Canvas sizing:**
+   - Match cropped image dimensions
+   - Or default 1080x1920 (9:16) if no image
+
+3. **Render pipeline:**
+   - `renderFrame()` function called on each animation frame during playback
+   - Draws all layers in order
+   - Static render when paused
+
+4. **Image layer:**
+   - Draw cropped/resized image as background
+
+**Files to create:**
+- `src/lib/components/CompositionCanvas.svelte`
+- `src/lib/utils/compositor.ts` (layer rendering functions)
+
+**Test criteria:**
+- [ ] Canvas displays uploaded image correctly
+- [ ] Canvas respects crop settings
+- [ ] Canvas updates when image changes
+
+---
+
+### Step 9: Waveform Panel & Styles
+
+**Objective:** Implement waveform toggle panel with style selection and color picker.
+
+**Design Reference:** `waveform1.png`, `waveform2.png`
+
+**Implementation:**
+
+1. **Panel content (when toggle active):**
+   - Three waveform style tiles:
+     - Rounded thick bars (above/below center)
+     - Sharp thin bars (above/below center)
+     - Segmented blocks (bottom-aligned)
+   - Selected tile has purple border
+
+2. **Color options:**
+   - White button (default) - white with grey ring when selected
+   - Rainbow button - opens HSB color picker
+
+3. **Waveform on canvas:**
+   - Positioned near bottom of image (default)
+   - Draggable to reposition
+   - Resize handles (corners + sides) for scaling
+   - Border with handles visible when paused
+   - Border hidden during playback
+
+4. **Live animation:**
+   - During playback, waveform animates from `AnalyserNode` frequency data
+   - Updates at ~30fps
+
+**Files to create:**
+- `src/lib/components/WaveformPanel.svelte`
+- `src/lib/components/ColorPicker.svelte` (HSB picker)
+
+**Files to modify:**
+- `src/lib/utils/waveform.ts` (add three waveform styles)
+- `src/lib/utils/compositor.ts` (waveform layer rendering)
+
+**Test criteria:**
+- [ ] Three waveform styles render correctly
+- [ ] Style selection updates canvas preview
+- [ ] Color picker works (white default + custom colors)
+- [ ] Waveform is draggable and resizable
+- [ ] Waveform animates during playback
+- [ ] Handles hidden during playback, visible when paused
+
+---
+
+### Step 10: Title Panel
+
+**Objective:** Implement title overlay with font and style options.
+
+**Design Reference:** `title.png`
+
+**Implementation:**
+
+1. **Panel content (when toggle active):**
+   - Text input with "Add title" placeholder
+   - Resizable input box (user can add line breaks)
    
-   - **Option B: Server-side FFmpeg**
-     - Send text config + image to composition API
-     - Use FFmpeg `-vf drawtext=...` filter
-     - Pros: Text stays editable in metadata, shareable
-     - Cons: More complex FFmpeg syntax
+2. **Font selection row:**
+   - Three buttons showing "Ag" in each font:
+     - Inter Bold (default)
+     - Roboto Slab
+     - Lora
+   - Selected has purple border
 
-   - **Decision pending:** Investigate both, measure performance/complexity
+3. **Style selection row:**
+   - Two buttons:
+     - Color text on transparent background (default)
+     - White text on color background
+   - Selected has purple border
 
-5. **Multi-speaker label handling:**
-   - For Q&A format, optionally show "Speaker: [name]" before their segment
-   - Auto-position labels at segment start time
-   - Fade in/out with speech
+4. **Color options:**
+   - White button (default)
+   - Rainbow button (opens color picker)
 
-6. **Testing checklist:**
-   - [ ] Text renders correctly on image
-   - [ ] Text is readable on various image backgrounds (light/dark)
-   - [ ] Position controls work intuitively
-   - [ ] Font size scales properly on mobile
-   - [ ] Special characters (Nigerian names) render correctly
-   - [ ] Preview matches final output
+5. **Title on canvas:**
+   - Positioned near top, centered (default)
+   - Draggable to reposition
+   - Resize handles for scaling
+   - Border visible when editing, hidden during playback
 
-**Status:** Ready for design/investigation  
-**Dependencies:** Module 3 (Composition)
+**Files to create:**
+- `src/lib/components/TitlePanel.svelte`
+
+**Files to modify:**
+- `src/app.css` (add Roboto Slab, Lora font imports)
+- `src/lib/utils/compositor.ts` (title layer rendering)
+
+**Test criteria:**
+- [ ] Title input accepts text and line breaks
+- [ ] Font buttons switch between three fonts
+- [ ] Style buttons toggle text/background modes
+- [ ] Color picker works for both modes
+- [ ] Title appears on canvas, is draggable/resizable
 
 ---
 
-### Module 5: Bokeh Effect (Visual Polish)
+### Step 11: Light Effect Panel
 
-**Objective:** Add subtle, animated bokeh effect to static image background for visual interest.
+**Objective:** Implement bokeh light effect overlay with opacity and speed controls.
 
-**Technology:** CSS filters + Canvas/Three.js particle system  
-**Approach:** Client-side rendering during video composition
+**Design Reference:** `light.png`
 
 **Implementation:**
 
-1. **Investigate three bokeh style templates:**
+1. **Panel content (when toggle active):**
+   - Opacity slider (centered default = 50%)
+   - Speed slider (centered default = 50%)
 
-   **Template A: Soft Blur Overlay**
-   - Simple CSS `blur(1-2px)` + `brightness(1.05)` on image
-   - Optional: Semi-transparent colored overlay (lavender tint)
-   - Effort: Minimal (2-3 lines CSS)
-   - Result: Subtle depth, less distraction
-   - Best for: Professional/journalism content
+2. **Effect rendering:**
+   - CSS/canvas animated radial gradients
+   - Multiple soft, blurred circles at frame edges
+   - Gentle movement animation (speed controlled by slider)
+   - Semi-transparent (opacity controlled by slider)
 
-   **Template B: Animated Particle Bokeh**
-   - Use Three.js or Canvas 2D to render 50-100 floating particles
-   - Particles: Semi-transparent circles, slow drift animation
-   - Color: Match design system (lavender, indigo tints)
-   - Opacity: 10-30% (subtle)
-   - Performance: Test on low-end devices
-   - Effort: Medium (100-150 lines)
-   - Result: Professional, motion-based interest
-   - Best for: Social media sharing, dynamic content
+3. **Effect characteristics:**
+   - Concentrated around frame edges (not center)
+   - Does not heavily obscure image, title, or waveform
+   - Warm/neutral color tones
 
-   **Template C: Radial Blur (Depth Effect)**
-   - Gaussian blur increases from center outward (focused on center)
-   - Center remains sharp, edges blur
-   - Creates impression of depth
-   - Effort: Low-Medium (Canvas filter, ~50 lines)
-   - Result: Cinematic feel
-   - Best for: Title slides, intro images
+**Files to create:**
+- `src/lib/components/LightEffectPanel.svelte`
 
-2. **Bokeh implementation flow:**
-   - User selects image in composition step
-   - UI shows three bokeh template previews (small thumbnails)
-   - User selects one (or "none")
-   - Template is applied during video composition
-   - If particles: bake into MP4, don't render in real-time
+**Files to modify:**
+- `src/lib/utils/compositor.ts` (light effect layer rendering)
 
-3. **Component:** `src/lib/components/BokehSelector.svelte`
-   - Three radio buttons or thumbnail cards
-   - Preview pane showing selected style on uploaded image
-   - Intensity slider (if applicable)
-   - Toggle on/off
-
-4. **Integration with composition:**
-   - Pass selected bokeh style to `/api/video/compose`
-   - API applies template before rendering to MP4
-   - Handle in FFmpeg or Canvas pre-processing
-
-5. **Testing checklist:**
-   - [ ] Three templates render correctly
-   - [ ] Performance acceptable on test images
-   - [ ] Bokeh doesn't interfere with text readability
-   - [ ] Effect looks polished (not amateurish)
-   - [ ] Works with various image types (photos, graphics, solid colors)
-   - [ ] Performance on older devices (Template A should be default)
-
-6. **Decision matrix (investigate):**
-   - Which template best suits journalist use case?
-   - Should users be able to customize colors/intensity?
-   - Should bokeh be optional or always enabled?
-   - Template A recommended as default (lowest friction)
-
-**Status:** Ready for investigation (visual exploration)  
-**Dependencies:** Module 3 (Composition)
+**Test criteria:**
+- [ ] Effect visible when toggle active
+- [ ] Opacity slider adjusts transparency
+- [ ] Speed slider adjusts animation speed
+- [ ] Effect concentrated at edges
+- [ ] Effect animates smoothly
 
 ---
 
-## Optional Modules (Phase 2+)
+### Step 12: FFmpeg.wasm Integration
 
-### Optional Module A: Audio Stinger (Intro/Outro Music)
-
-**Objective:** Add short intro/outro music with fade transitions to frame TTS dialogue.
-
-**Technology:** Server-side FFmpeg audio mixing  
-**Approach:** Blend stinger audio with TTS using FFmpeg filter chains
+**Objective:** Set up FFmpeg.wasm for MP4 encoding.
 
 **Implementation:**
 
-1. **Stinger audio source:**
-   - Store 2-3 pre-selected stinger tracks in `static/audio/stingers/`
-   - Stinger specs: 5-10 seconds, MP3, ~128kbps
-   - Options: Uplifting, Professional, Minimal
-   - Investigate: Royalty-free sources (YouTube Audio Library, Free Music Archive)
+1. **Install FFmpeg.wasm:**
+   - Add `@ffmpeg/ffmpeg` and `@ffmpeg/util` to package.json
+   - Configure for client-side loading
 
-2. **Create new API endpoint:** `POST /api/audio/add-stinger`
-   - Input:
-     - `audioUrl`: Base64 TTS audio
-     - `stingerType`: 'intro' | 'outro' | 'both'
-     - `stingerTemplate`: 'uplifting' | 'professional' | 'minimal'
-     - `fadeOutDuration`: 1000ms (default)
-   - Output: Base64 processed audio with stinger blended
+2. **Create encoding utility:**
+   - Load FFmpeg on demand (lazy load to reduce initial bundle)
+   - Function to encode canvas frames + audio to MP4
 
-3. **Audio mixing logic:**
-   - **Intro:** Stinger (5s) → fade out → TTS begins at 4s overlap (1s fade)
-   - **Outro:** TTS ends → fade out → stinger plays (5s)
-   - **Both:** Intro + TTS + Outro (concatenated with fades)
+3. **Frame capture pipeline:**
+   - Capture canvas frames at 30fps during playback
+   - Store as image sequence
+   - Combine with audio track
 
-4. **FFmpeg filter chain example:**
-   ```bash
-   ffmpeg -i stinger.mp3 -i tts.mp3 \
-     -filter_complex \
-     "[0]afade=t=out:st=4:d=1[stinger]; \
-      [stinger][1]concat=v=0:a=1[out]" \
-     -map "[out]" output.mp3
-   ```
+**Files to create:**
+- `src/lib/utils/ffmpeg.ts` (FFmpeg wrapper, encoding functions)
 
-5. **UI integration:**
-   - Checkbox: "Add intro/outro music"
-   - Dropdown: Select stinger template
-   - Preview: Play 5-second sample before processing
-   - Optional: Volume control for stinger vs. TTS
-
-6. **Testing checklist:**
-   - [ ] Stinger fades smoothly into TTS
-   - [ ] Audio levels balanced (no clipping, no too-quiet stinger)
-   - [ ] Timing accurate (no dead air, no overlap)
-   - [ ] Works with multi-speaker audio (cumulative duration correct)
-   - [ ] Outro plays after final speaker
-
-7. **Investigation points:**
-   - Which stinger templates work best for journalism/education context?
-   - Should users be able to upload custom stingers?
-   - Cost: Can this stay on Cloudflare Workers, or delegate to external service?
-
-**Status:** Optional (investigate after core modules)  
-**Dependencies:** Module 1 (Silence Removal) — stinger is applied pre-silence removal or post
+**Test criteria:**
+- [ ] FFmpeg.wasm loads successfully
+- [ ] Can encode a simple test video
+- [ ] No errors in console
 
 ---
 
-### Optional Module B: Burned-In Subtitles (Whisper + FFmpeg)
+### Step 13: Video Export & Download
 
-**Objective:** Extract word-level timing from TTS audio and burn subtitles into final MP4.
-
-**Technology:** OpenAI Whisper API + FFmpeg text overlay  
-**Approach:** Transcribe audio to get timings, apply as SRT burn during composition
+**Objective:** Implement full export pipeline and download button.
 
 **Implementation:**
 
-1. **Create new API endpoint:** `POST /api/video/add-subtitles`
-   - Input:
-     - `audioUrl`: Base64 audio file
-     - `language`: 'en' (default), future: 'ha', 'yo' (Hausa, Yoruba)
-     - `subtitleStyle`: CSS-like object (font size, color, position)
-   - Output: SRT file content (in-memory, for next step)
+1. **Export flow:**
+   - User taps "Download audiogram" button
+   - Show progress indicator (encoding can take 10-30s)
+   - Capture all canvas frames during audio duration
+   - Encode with FFmpeg.wasm to MP4
+   - Trigger download with filename modal (reuse from TTS)
 
-2. **Whisper integration:**
-   - Call OpenAI Whisper API to transcribe audio
-   - Request word-level timestamps: `timestamp_granularity: 'word'`
-   - Parse response into SRT format:
-     ```
-     1
-     00:00:00,000 --> 00:00:00,450
-     Why
-     
-     2
-     00:00:00,450 --> 00:00:00,750
-     is
-     ```
-   - Cost: ~$0.01-0.03 per video
+2. **Download button states:**
+   - Disabled (grey): No image or audio loaded
+   - Enabled (purple): Ready to export
+   - Loading: Show spinner during encoding
 
-3. **Multi-speaker handling:**
-   - If dialogue script, track speaker names
-   - Format subtitles as: `[Speaker Name]: word`
-   - Or use Whisper's speaker detection (if available in API)
+3. **Filename modal:**
+   - Reuse existing download modal pattern from TTS
+   - Default filename: `audioflam-audiogram-DDMMYY-HHMM.mp4`
 
-4. **Subtitle styling:**
-   - Font: Inter (already available)
-   - Size: 24-28pt (readable on mobile)
-   - Color: White with semi-transparent black background (readability)
-   - Position: Bottom-center (standard)
-   - Customization: Optional (size, color picker)
+**Files to modify:**
+- `src/lib/components/AudiogramPage.svelte`
+- `src/lib/utils/ffmpeg.ts`
 
-5. **FFmpeg burning:**
-   - Use `-vf subtitles=subs.srt` filter
-   - Apply during composition (Module 3)
-   - Specify subtitle style in filter:
-     ```
-     subtitles=subs.srt:force_style='FontSize=24,FontName=Inter,
-     PrimaryColour=&Hffffff&,OutlineColour=&H000000&,Outline=2'
-     ```
-
-6. **Workflow integration:**
-   - Optional toggle: "Add subtitles" (disabled by default)
-   - Show Whisper transcription preview for user review
-   - Allow minor edits to subtitle text (e.g., correct names)
-   - Click "Generate" → subtitles burned into final MP4
-
-7. **Testing checklist:**
-   - [ ] Whisper transcription accurate (especially Nigerian names)
-   - [ ] Word timing sync with audio (no lag, no early subtitles)
-   - [ ] Multi-speaker labeling works
-   - [ ] Subtitles readable on various video backgrounds
-   - [ ] No performance impact on composition (FFmpeg handles it)
-   - [ ] Subtitle position doesn't overlap with other overlays
-
-8. **Investigation points:**
-   - Should subtitles be opt-in or default?
-   - Can Whisper be run locally on Cloudflare Workers, or must use API?
-   - Future: Support transcription in Hausa/Yoruba (requires Whisper training)
-   - Cost tracking: Monitor Whisper API usage monthly
-
-**Status:** Optional (investigate after core modules + stinger)  
-**Dependencies:** Module 3 (Composition), Whisper API token in env
+**Test criteria:**
+- [ ] Download button enables when image + audio present
+- [ ] Progress indicator shows during export
+- [ ] MP4 file downloads successfully
+- [ ] Video plays correctly (image + animated waveform + audio sync)
+- [ ] Title and light effect included if enabled
 
 ---
 
-## Implementation Sequence (Suggested)
+### Step 14: Polish & Edge Cases
 
-**Phase 1 (Core Video Pipeline):**
-1. Module 2: Waveform Preview (low friction, visual feedback)
-2. Module 1: Silence Removal (most requested feature)
-3. Module 3: Audio → Image → MP4 Composition (integrates above two)
+**Objective:** Handle edge cases, add loading states, optimize performance.
 
-**Phase 2 (Polish & Features):**
-4. Module 4: Text Overlays (narrative structure)
-5. Module 5: Bokeh Effect (visual interest)
+**Implementation:**
 
-**Phase 3 (Optional Enhancements):**
-6. Optional Module A: Audio Stinger (intro/outro music)
-7. Optional Module B: Subtitles (accessibility + Whisper transcription)
+1. **Loading states:**
+   - Image upload: Show spinner while resizing
+   - Audio decode: Show spinner while processing
+   - Export: Show progress percentage
+
+2. **Error handling:**
+   - Invalid file types: Show error message
+   - Microphone permission denied: Show guidance
+   - Export failure: Show retry option
+
+3. **Performance optimization:**
+   - Throttle waveform rendering to 30fps
+   - Use `OffscreenCanvas` if available
+   - Lazy load FFmpeg.wasm
+
+4. **Mobile optimization:**
+   - Touch gesture handling for crop/resize
+   - Prevent scroll during drag operations
+   - Test on low-end devices
+
+**Test criteria:**
+- [ ] All loading states display correctly
+- [ ] Error messages are helpful
+- [ ] Performance acceptable on mobile
+- [ ] No memory leaks during long sessions
 
 ---
 
-## Architecture Notes
-
-### File Structure (After Implementation)
+## File Structure (After Implementation)
 
 ```
 src/
 ├── routes/
-│   ├── app/
-│   │   └── +page.svelte          ← Main editor (updated with new controls)
+│   ├── +page.svelte              # Header + tab switching (TTS/Audiogram)
+│   ├── +layout.svelte            # Unchanged
 │   └── api/
-│       ├── tts/
-│       │   └── +server.ts        ← Existing TTS endpoint
-│       ├── audio/
-│       │   ├── silence-removal/
-│       │   │   └── +server.ts    ← NEW: Module 1
-│       │   └── add-stinger/
-│       │       └── +server.ts    ← NEW: Optional Module A
-│       └── video/
-│           ├── compose/
-│           │   └── +server.ts    ← NEW: Module 3
-│           └── add-subtitles/
-│               └── +server.ts    ← NEW: Optional Module B
+│       └── tts/                  # Existing TTS API
 ├── lib/
 │   ├── components/
-│   │   ├── WaveformPreview.svelte      ← NEW: Module 2
-│   │   ├── TextOverlayEditor.svelte    ← NEW: Module 4
-│   │   ├── BokehSelector.svelte        ← NEW: Module 5
-│   │   └── SpeakerDialog.svelte        ← Existing
-│   ├── stores.ts                      ← Update with new state (overlays, bokeh, etc.)
+│   │   ├── AudiogramPage.svelte      # Main audiogram container
+│   │   ├── ImageUpload.svelte        # Image upload + display
+│   │   ├── ImageCropDrawer.svelte    # Full-screen crop drawer
+│   │   ├── AudioImport.svelte        # Audio upload/record + waveform
+│   │   ├── CompositionCanvas.svelte  # Main preview/export canvas
+│   │   ├── TogglePanel.svelte        # Reusable toggle panel
+│   │   ├── WaveformPanel.svelte      # Waveform style/color options
+│   │   ├── TitlePanel.svelte         # Title text/font/style options
+│   │   ├── LightEffectPanel.svelte   # Bokeh effect controls
+│   │   ├── ColorPicker.svelte        # HSB color picker
+│   │   └── [existing components]
+│   ├── stores.ts                     # Add audiogram state
 │   └── utils/
-│       ├── ffmpeg.ts                  ← NEW: FFmpeg utilities
-│       ├── cloudflareStream.ts        ← NEW: Stream API wrapper
-│       └── whisper.ts                 ← NEW: Optional Module B
-└── app.css                             ← Update with new component styles
+│       ├── waveform.ts               # Waveform extraction + rendering
+│       ├── recording.ts              # MediaRecorder wrapper
+│       ├── compositor.ts             # Canvas layer composition
+│       └── ffmpeg.ts                 # FFmpeg.wasm wrapper
+└── app.css                           # Add Roboto Slab, Lora fonts
 ```
 
-### Environment Variables (New)
+---
 
-```env
-# Existing
-AZURE_SPEECH_KEY=...
-AZURE_SPEECH_REGION=eastus
-YARNGPT_API_KEY=...
+## Dependencies to Add
 
-# New (for Modules)
-CLOUDFLARE_STREAM_TOKEN=...        # Module 3
-OPENAI_API_KEY=...                 # Optional Module B (Whisper)
+```json
+{
+  "@ffmpeg/ffmpeg": "^0.12.x",
+  "@ffmpeg/util": "^0.12.x"
+}
+```
+
+---
+
+## Google Fonts to Add
+
+```css
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;700&family=Roboto+Slab:wght@400;700&display=swap');
 ```
 
 ---
 
 ## Testing Strategy
 
-### Unit Tests (Per Module)
-- Module 1: Silence removal (verify FFmpeg filters, audio quality)
-- Module 2: Waveform (verify canvas rendering, responsiveness)
-- Module 3: Composition (verify Stream API, file integrity)
-- Modules 4-5: UI components (verify preview accuracy)
+Each step includes test criteria. After each step:
 
-### Integration Tests
-- Full workflow: TTS → Silence removal → Waveform → Composition → Download
-- Multi-speaker dialogue → correct timing + subtitles
-- Edge cases: Very short audio, very long audio, special characters
-
-### Device Testing (Priority)
-- Modern Android (2022+)
-- Older Android (2018-2020) with 2GB RAM
-- iOS (recent)
-- Desktop (Chrome, Safari)
+1. Run `npm run dev` and test locally
+2. Verify all test criteria pass
+3. Run `npm run check` for TypeScript errors
+4. Commit with descriptive message
+5. Proceed to next step
 
 ---
 
-## Known Constraints & Decisions
-
-1. **FFmpeg on Cloudflare Workers:**
-   - Cloudflare Workers have size limits (~1MB uncompressed)
-   - May need to delegate silence removal to external service if FFmpeg.wasm is too large
-   - **Decision pending:** Test after implementation
-
-2. **Bokeh effect rendering:**
-   - Client-side Three.js or Canvas may struggle on low-end devices
-   - **Recommendation:** Default to Template A (CSS blur) for performance
-   - Advanced templates (B, C) are opt-in
-
-3. **Whisper transcription cost:**
-   - ~$0.01-0.03 per video
-   - For 35 journalists × 50 videos = ~$17.50-52.50
-   - **Decision:** Make subtitles opt-in to control costs
-
-4. **Video storage (30-min auto-delete):**
-   - Cloudflare Stream will delete videos after 30 minutes if not renewed
-   - Users must download before expiration
-   - **Messaging:** Clearly communicate "Download your video" with countdown timer
-
----
-
-## Rollback & Decision Gates
-
-Each module includes a "Decision pending" or "Investigation" note. Before merging to main:
-
-1. **Module 1 (Silence Removal):**
-   - [ ] FFmpeg.wasm loads successfully on Cloudflare Workers
-   - [ ] Processing time ≤ 30 seconds for 5-minute audio
-   - **If blocked:** Use external service (e.g., AssemblyAI) and budget cost
-
-2. **Module 5 (Bokeh Effect):**
-   - [ ] Three template investigations complete
-   - [ ] Performance acceptable on 2GB RAM devices
-   - **If blocked:** Default to Template A only (CSS blur)
-
-3. **Optional Module B (Subtitles):**
-   - [ ] Whisper API cost acceptable for projected usage
-   - [ ] Transcription accuracy sufficient for Nigerian English
-   - **If blocked:** Defer to Phase 3, revisit based on user feedback
-
----
-
-## Success Metrics
-
-Upon completion of all modules:
-
-- [ ] Single-click "Generate Audiogram" workflow
-- [ ] Output: Professional MP4 with video + audio + optional subtitles
-- [ ] Works on low-bandwidth devices (Africa context)
-- [ ] Zero additional hosting costs beyond existing infrastructure
-- [ ] Journalists can create polished short-form podcast content in <5 minutes
-- [ ] Accessibility: Burned-in subtitles available for deaf/hard of hearing users
-
----
-
-## Future Considerations (Out of Scope)
-
-- Real-time video preview (CPU-intensive, not feasible)
-- Custom stinger uploads (adds complexity, storage)
-- Automatic speaker detection without script input
-- Batch processing (for multiple videos simultaneously)
-- Watermarking (future: add organization logo to videos)
-
----
-
-**Document Status:** Draft Roadmap  
-**Last Updated:** January 2026  
-**Next Review:** After Module 1 investigation phase
+**Document Status:** Ready for Implementation  
+**Last Updated:** January 2026

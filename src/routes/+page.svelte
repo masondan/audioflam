@@ -9,6 +9,10 @@
   import { removeSilence, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
+  type ActiveTab = 'tts' | 'audiogram';
+
+  // Navigation state
+  let activeTab = $state<ActiveTab>('tts');
 
   // App state
   let hasTextInput = $state(false);
@@ -720,9 +724,32 @@
 <div class="app-container">
   <header class="app-header">
     <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
+    <nav class="nav-tabs">
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={activeTab === 'tts'}
+        onclick={() => activeTab = 'tts'}
+        aria-label="Text to Speech"
+        aria-pressed={activeTab === 'tts'}
+      >
+        <img src="/icons/icon-tts.svg" alt="" class="nav-tab-icon" />
+      </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={activeTab === 'audiogram'}
+        onclick={() => activeTab = 'audiogram'}
+        aria-label="Audiogram"
+        aria-pressed={activeTab === 'audiogram'}
+      >
+        <img src="/icons/icon-audiogram.svg" alt="" class="nav-tab-icon" />
+      </button>
+    </nav>
   </header>
 
   <main class="main-content">
+    {#if activeTab === 'tts'}
     <div class="dropdowns-section">
       <VoiceDropdown
         label="Voice"
@@ -975,6 +1002,11 @@
         Download
       </button>
     </div>
+    {:else}
+    <div class="audiogram-placeholder">
+      <p class="placeholder-text">Audiogram creator coming soon</p>
+    </div>
+    {/if}
   </main>
 </div>
 
@@ -1017,12 +1049,62 @@
     padding: var(--spacing-md);
     border-bottom: 1px solid var(--color-border-dark);
     display: flex;
-    justify-content: center;
+    justify-content: space-between;
+    align-items: center;
   }
 
   .logotype {
-    height: 28px;
+    height: 22px;
     width: auto;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .nav-tab-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid var(--color-border-dark);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .nav-tab-btn:hover {
+    border-color: var(--color-primary);
+  }
+
+  .nav-tab-btn.active {
+    background: var(--color-primary);
+    border: none;
+  }
+
+  .nav-tab-icon {
+    width: 20px;
+    height: 20px;
+    filter: invert(0.46);
+  }
+
+  .nav-tab-btn.active .nav-tab-icon {
+    filter: brightness(0) invert(1);
+  }
+
+  .audiogram-placeholder {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 300px;
+  }
+
+  .placeholder-text {
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-base);
   }
 
   .main-content {
