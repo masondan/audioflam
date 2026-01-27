@@ -1,5 +1,5 @@
-/* Google Fonts Import: Inter */
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+/* Google Fonts Import: Inter, Roboto Slab, Lora */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Lora:wght@400;700&family=Roboto+Slab:wght@400;700&display=swap');
 
 :root {
   /* Color Palette - Defined in AGENTS.md */

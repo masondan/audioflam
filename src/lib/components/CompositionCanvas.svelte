@@ -1,23 +1,29 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { loadImage, renderFrame, type LayerConfig, type WaveformConfig, type WaveformPosition } from '$lib/utils/compositor';
+  import { loadImage, renderFrame, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition } from '$lib/utils/compositor';
 
   interface Props {
     imageUrl: string | null;
     loading?: boolean;
     waveformConfig?: WaveformConfig | null;
+    titleConfig?: TitleConfig | null;
     isPlaying?: boolean;
     onWaveformPositionChange?: (position: WaveformPosition) => void;
     onWaveformClick?: () => void;
+    onTitlePositionChange?: (position: TitlePosition) => void;
+    onTitleClick?: () => void;
   }
 
   let { 
     imageUrl, 
     loading = false, 
     waveformConfig = null,
+    titleConfig = null,
     isPlaying = false,
     onWaveformPositionChange,
-    onWaveformClick
+    onWaveformClick,
+    onTitlePositionChange,
+    onTitleClick
   }: Props = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -32,6 +38,8 @@
   let resizeHandle = $state<string | null>(null);
   let dragStartPos = $state({ x: 0, y: 0 });
   let originalPosition = $state<WaveformPosition | null>(null);
+  let activeLayer = $state<'waveform' | 'title' | null>(null);
+  let originalTitlePosition = $state<TitlePosition | null>(null);
 
   function updateCanvasSize() {
     if (!container || !canvas) return;
@@ -64,6 +72,13 @@
         isEditing: waveformConfig.enabled && !isPlaying
       };
     }
+
+    if (titleConfig) {
+      layers.title = {
+        ...titleConfig,
+        isEditing: titleConfig.enabled && !isPlaying
+      };
+    }
     
     renderFrame(ctx, canvas, image, layers);
   }
@@ -88,10 +103,7 @@
     };
   }
 
-  function getHandleAtPoint(x: number, y: number): string | null {
-    if (!waveformConfig?.enabled || isPlaying) return null;
-    
-    const pos = waveformConfig.position;
+  function getHandleAtPoint(x: number, y: number, pos: { x: number; y: number; width: number; height: number }): string | null {
     const handleSize = 0.02;
 
     const handles = [
@@ -113,85 +125,141 @@
     return null;
   }
 
-  function isInsideWaveform(x: number, y: number): boolean {
-    if (!waveformConfig?.enabled) return false;
-    const pos = waveformConfig.position;
+  function isInsideRect(x: number, y: number, pos: { x: number; y: number; width: number; height: number }): boolean {
     return x >= pos.x && x <= pos.x + pos.width &&
            y >= pos.y && y <= pos.y + pos.height;
   }
 
+  function isInsideWaveform(x: number, y: number): boolean {
+    if (!waveformConfig?.enabled) return false;
+    return isInsideRect(x, y, waveformConfig.position);
+  }
+
+  function isInsideTitle(x: number, y: number): boolean {
+    if (!titleConfig?.enabled || !titleConfig.text) return false;
+    return isInsideRect(x, y, titleConfig.position);
+  }
+
   function handlePointerDown(e: PointerEvent) {
-    if (!waveformConfig?.enabled || isPlaying) return;
+    if (isPlaying) return;
 
     const coords = getCanvasCoords(e);
-    const handle = getHandleAtPoint(coords.x, coords.y);
 
-    if (handle) {
-      isResizing = true;
-      resizeHandle = handle;
-      dragStartPos = coords;
-      originalPosition = { ...waveformConfig.position };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      e.preventDefault();
-    } else if (isInsideWaveform(coords.x, coords.y)) {
-      isDragging = true;
-      dragStartPos = coords;
-      originalPosition = { ...waveformConfig.position };
-      (e.target as HTMLElement).setPointerCapture(e.pointerId);
-      e.preventDefault();
+    // Check title layer first (renders on top)
+    if (titleConfig?.enabled && titleConfig.text) {
+      const titleHandle = getHandleAtPoint(coords.x, coords.y, titleConfig.position);
+      if (titleHandle) {
+        activeLayer = 'title';
+        isResizing = true;
+        resizeHandle = titleHandle;
+        dragStartPos = coords;
+        originalTitlePosition = { ...titleConfig.position };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      if (isInsideTitle(coords.x, coords.y)) {
+        activeLayer = 'title';
+        isDragging = true;
+        dragStartPos = coords;
+        originalTitlePosition = { ...titleConfig.position };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+    }
+
+    // Check waveform layer
+    if (waveformConfig?.enabled) {
+      const waveformHandle = getHandleAtPoint(coords.x, coords.y, waveformConfig.position);
+      if (waveformHandle) {
+        activeLayer = 'waveform';
+        isResizing = true;
+        resizeHandle = waveformHandle;
+        dragStartPos = coords;
+        originalPosition = { ...waveformConfig.position };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
+      if (isInsideWaveform(coords.x, coords.y)) {
+        activeLayer = 'waveform';
+        isDragging = true;
+        dragStartPos = coords;
+        originalPosition = { ...waveformConfig.position };
+        (e.target as HTMLElement).setPointerCapture(e.pointerId);
+        e.preventDefault();
+        return;
+      }
     }
   }
 
   function handlePointerMove(e: PointerEvent) {
-    if (!originalPosition || !onWaveformPositionChange) return;
-
     const coords = getCanvasCoords(e);
     const dx = coords.x - dragStartPos.x;
     const dy = coords.y - dragStartPos.y;
 
-    if (isDragging) {
-      const newX = Math.max(0, Math.min(1 - originalPosition.width, originalPosition.x + dx));
-      const newY = Math.max(0, Math.min(1 - originalPosition.height, originalPosition.y + dy));
-      
-      onWaveformPositionChange({
-        ...originalPosition,
-        x: newX,
-        y: newY
-      });
-    } else if (isResizing && resizeHandle) {
-      let newPos = { ...originalPosition };
-
-      if (resizeHandle.includes('w')) {
-        const newX = Math.max(0, originalPosition.x + dx);
-        const newWidth = originalPosition.width - (newX - originalPosition.x);
-        if (newWidth > 0.1) {
-          newPos.x = newX;
-          newPos.width = newWidth;
-        }
+    if (activeLayer === 'title' && originalTitlePosition && onTitlePositionChange) {
+      if (isDragging) {
+        const newX = Math.max(0, Math.min(1 - originalTitlePosition.width, originalTitlePosition.x + dx));
+        const newY = Math.max(0, Math.min(1 - originalTitlePosition.height, originalTitlePosition.y + dy));
+        onTitlePositionChange({ ...originalTitlePosition, x: newX, y: newY });
+      } else if (isResizing && resizeHandle) {
+        const newPos = applyResize(originalTitlePosition, resizeHandle, dx, dy, 0.1, 0.05);
+        onTitlePositionChange(newPos);
       }
-      if (resizeHandle.includes('e')) {
-        const newWidth = Math.min(1 - originalPosition.x, originalPosition.width + dx);
-        if (newWidth > 0.1) {
-          newPos.width = newWidth;
-        }
+    } else if (activeLayer === 'waveform' && originalPosition && onWaveformPositionChange) {
+      if (isDragging) {
+        const newX = Math.max(0, Math.min(1 - originalPosition.width, originalPosition.x + dx));
+        const newY = Math.max(0, Math.min(1 - originalPosition.height, originalPosition.y + dy));
+        onWaveformPositionChange({ ...originalPosition, x: newX, y: newY });
+      } else if (isResizing && resizeHandle) {
+        const newPos = applyResize(originalPosition, resizeHandle, dx, dy, 0.1, 0.05);
+        onWaveformPositionChange(newPos);
       }
-      if (resizeHandle.includes('n')) {
-        const newY = Math.max(0, originalPosition.y + dy);
-        const newHeight = originalPosition.height - (newY - originalPosition.y);
-        if (newHeight > 0.05) {
-          newPos.y = newY;
-          newPos.height = newHeight;
-        }
-      }
-      if (resizeHandle.includes('s')) {
-        const newHeight = Math.min(1 - originalPosition.y, originalPosition.height + dy);
-        if (newHeight > 0.05) {
-          newPos.height = newHeight;
-        }
-      }
-
-      onWaveformPositionChange(newPos);
     }
+  }
+
+  function applyResize(
+    pos: { x: number; y: number; width: number; height: number },
+    handle: string,
+    dx: number,
+    dy: number,
+    minWidth: number,
+    minHeight: number
+  ): { x: number; y: number; width: number; height: number } {
+    let newPos = { ...pos };
+
+    if (handle.includes('w')) {
+      const newX = Math.max(0, pos.x + dx);
+      const newWidth = pos.width - (newX - pos.x);
+      if (newWidth > minWidth) {
+        newPos.x = newX;
+        newPos.width = newWidth;
+      }
+    }
+    if (handle.includes('e')) {
+      const newWidth = Math.min(1 - pos.x, pos.width + dx);
+      if (newWidth > minWidth) {
+        newPos.width = newWidth;
+      }
+    }
+    if (handle.includes('n')) {
+      const newY = Math.max(0, pos.y + dy);
+      const newHeight = pos.height - (newY - pos.y);
+      if (newHeight > minHeight) {
+        newPos.y = newY;
+        newPos.height = newHeight;
+      }
+    }
+    if (handle.includes('s')) {
+      const newHeight = Math.min(1 - pos.y, pos.height + dy);
+      if (newHeight > minHeight) {
+        newPos.height = newHeight;
+      }
+    }
+
+    return newPos;
   }
 
   function handlePointerUp() {
@@ -199,13 +267,19 @@
     isResizing = false;
     resizeHandle = null;
     originalPosition = null;
+    originalTitlePosition = null;
+    activeLayer = null;
   }
 
   function handleClick(e: MouseEvent) {
-    if (!waveformConfig?.enabled) return;
-    
     const coords = getCanvasCoords(e);
-    if (isInsideWaveform(coords.x, coords.y) && onWaveformClick) {
+    
+    if (titleConfig?.enabled && titleConfig.text && isInsideTitle(coords.x, coords.y) && onTitleClick) {
+      onTitleClick();
+      return;
+    }
+    
+    if (waveformConfig?.enabled && isInsideWaveform(coords.x, coords.y) && onWaveformClick) {
       onWaveformClick();
     }
   }

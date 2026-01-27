@@ -19,17 +19,26 @@ export interface WaveformConfig {
   isEditing?: boolean;
 }
 
+export interface TitlePosition {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface TitleConfig {
+  enabled: boolean;
+  text: string;
+  font: 'Inter' | 'Roboto Slab' | 'Lora';
+  style: 'transparent' | 'background';
+  color: string;
+  position: TitlePosition;
+  isEditing?: boolean;
+}
+
 export interface LayerConfig {
   waveform?: WaveformConfig;
-  title?: {
-    enabled: boolean;
-    text: string;
-    font: 'Inter' | 'Roboto Slab' | 'Lora';
-    style: 'transparent' | 'background';
-    color: string;
-    position: { x: number; y: number };
-    scale: number;
-  };
+  title?: TitleConfig;
   lightEffect?: {
     enabled: boolean;
     opacity: number;
@@ -80,6 +89,10 @@ export function renderFrame(
 
   if (layers.waveform?.enabled) {
     renderWaveformLayer(ctx, canvas, layers.waveform);
+  }
+
+  if (layers.title?.enabled && layers.title.text) {
+    renderTitleLayer(ctx, canvas, layers.title);
   }
 }
 
@@ -298,4 +311,116 @@ export function loadImage(url: string): Promise<HTMLImageElement> {
     img.onerror = () => reject(new Error('Failed to load image'));
     img.src = url;
   });
+}
+
+export function renderTitleLayer(
+  ctx: CanvasRenderingContext2D,
+  canvas: HTMLCanvasElement,
+  config: TitleConfig
+): void {
+  const { position, text, font, style, color, isEditing } = config;
+
+  const x = position.x * canvas.width;
+  const y = position.y * canvas.height;
+  const width = position.width * canvas.width;
+  const height = position.height * canvas.height;
+
+  ctx.save();
+
+  const fontFamily = font === 'Inter' 
+    ? "'Inter', sans-serif" 
+    : font === 'Roboto Slab' 
+      ? "'Roboto Slab', serif" 
+      : "'Lora', serif";
+
+  const lines = text.split('\n');
+  const lineHeight = height / Math.max(lines.length, 1);
+  const fontSize = Math.min(lineHeight * 0.8, width * 0.15);
+
+  ctx.font = `700 ${fontSize}px ${fontFamily}`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  const padding = fontSize * 0.3;
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+    const lineY = y + (i + 0.5) * lineHeight;
+    const lineX = x + width / 2;
+    const textMetrics = ctx.measureText(line);
+    const textWidth = textMetrics.width;
+
+    if (style === 'background') {
+      ctx.fillStyle = color;
+      const bgX = lineX - textWidth / 2 - padding;
+      const bgY = lineY - fontSize / 2 - padding / 2;
+      const bgWidth = textWidth + padding * 2;
+      const bgHeight = fontSize + padding;
+      roundedRect(ctx, bgX, bgY, bgWidth, bgHeight, 4);
+      ctx.fill();
+
+      ctx.fillStyle = '#ffffff';
+      ctx.fillText(line, lineX, lineY);
+    } else {
+      ctx.fillStyle = color;
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
+      ctx.fillText(line, lineX, lineY);
+      ctx.shadowColor = 'transparent';
+    }
+  }
+
+  if (isEditing) {
+    ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
+    ctx.lineWidth = 2;
+    ctx.setLineDash([5, 5]);
+    ctx.strokeRect(x, y, width, height);
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = 'white';
+    ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
+    ctx.lineWidth = 1;
+
+    const cornerHandleSize = 12;
+    const cornerHandles = [
+      { hx: x, hy: y },
+      { hx: x + width, hy: y },
+      { hx: x, hy: y + height },
+      { hx: x + width, hy: y + height }
+    ];
+
+    for (const handle of cornerHandles) {
+      ctx.beginPath();
+      ctx.arc(handle.hx, handle.hy, cornerHandleSize / 2, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.stroke();
+    }
+
+    const edgeHandleWidth = 6;
+    const edgeHandleLength = 20;
+    const edgeHandleRadius = edgeHandleWidth / 2;
+
+    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y + height - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    roundedRect(ctx, x - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
+    ctx.fill();
+    ctx.stroke();
+
+    ctx.beginPath();
+    roundedRect(ctx, x + width - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
+    ctx.fill();
+    ctx.stroke();
+  }
+
+  ctx.restore();
 }

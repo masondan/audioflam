@@ -3,7 +3,9 @@
   import ImageCropDrawer from './ImageCropDrawer.svelte';
   import CompositionCanvas from './CompositionCanvas.svelte';
   import WaveformPanel from './WaveformPanel.svelte';
+  import TitlePanel from './TitlePanel.svelte';
   import type { WaveformStyle } from './WaveformPanel.svelte';
+  import type { TitleFont, TitleStyle } from './TitlePanel.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
   import {
     requestMicrophonePermission,
@@ -14,7 +16,7 @@
     getFrequencyData,
     drawLiveWaveform
   } from '$lib/utils/recording';
-  import type { WaveformConfig, WaveformPosition } from '$lib/utils/compositor';
+  import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition } from '$lib/utils/compositor';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
@@ -82,6 +84,18 @@
   let playbackAudioContext: AudioContext | null = null;
   let playbackAnimationId: number | null = null;
 
+  // Title overlay state
+  let titleText = $state('');
+  let titleFont = $state<TitleFont>('Inter');
+  let titleStyle = $state<TitleStyle>('transparent');
+  let titleColor = $state('#ffffff');
+  let titlePosition = $state<TitlePosition>({
+    x: 0.1,
+    y: 0.05,
+    width: 0.8,
+    height: 0.15
+  });
+
   // Recording state
   let recordingPhase = $state<RecordingPhase>('idle');
   let countdownNumber = $state(3);
@@ -108,6 +122,18 @@
       color: waveformColor,
       style: waveformStyle,
       frequencyData: waveformFrequencyData,
+      isEditing: !isPlaying
+    } : null
+  );
+
+  let titleConfig = $derived<TitleConfig | null>(
+    titleActive ? {
+      enabled: true,
+      text: titleText,
+      font: titleFont,
+      style: titleStyle,
+      color: titleColor,
+      position: titlePosition,
       isEditing: !isPlaying
     } : null
   );
@@ -833,6 +859,32 @@
     waveformColor = color;
   }
 
+  function handleTitleTextChange(text: string) {
+    titleText = text;
+  }
+
+  function handleTitleFontChange(font: TitleFont) {
+    titleFont = font;
+  }
+
+  function handleTitleStyleChange(style: TitleStyle) {
+    titleStyle = style;
+  }
+
+  function handleTitleColorChange(color: string) {
+    titleColor = color;
+  }
+
+  function handleTitlePositionChange(position: TitlePosition) {
+    titlePosition = position;
+  }
+
+  function handleTitleOverlayClick() {
+    if (isPlaying) {
+      handlePlayPause();
+    }
+  }
+
   function handleImageDragOver(e: DragEvent) {
     e.preventDefault();
     e.stopPropagation();
@@ -881,9 +933,12 @@
         imageUrl={imageData.url} 
         loading={imageLoading}
         waveformConfig={waveformConfig}
+        titleConfig={titleConfig}
         isPlaying={isPlaying}
         onWaveformPositionChange={handleWaveformPositionChange}
         onWaveformClick={handleWaveformOverlayClick}
+        onTitlePositionChange={handleTitlePositionChange}
+        onTitleClick={handleTitleOverlayClick}
       />
       <div class="image-actions">
         <button type="button" class="text-btn" onclick={handleReplaceImage}>
@@ -1096,7 +1151,16 @@
       onToggle={(active) => handlePanelToggle('title', active)}
       onOpenChange={(open) => handlePanelOpenChange('title', open)}
     >
-      <p class="panel-placeholder">Title options coming soon</p>
+      <TitlePanel
+        text={titleText}
+        selectedFont={titleFont}
+        selectedStyle={titleStyle}
+        selectedColor={titleColor}
+        onTextChange={handleTitleTextChange}
+        onFontChange={handleTitleFontChange}
+        onStyleChange={handleTitleStyleChange}
+        onColorChange={handleTitleColorChange}
+      />
     </TogglePanel>
 
     <TogglePanel
