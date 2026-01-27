@@ -1,10 +1,24 @@
 <script lang="ts">
   import TogglePanel from './TogglePanel.svelte';
   import ImageCropDrawer from './ImageCropDrawer.svelte';
+  import CompositionCanvas from './CompositionCanvas.svelte';
+  import WaveformPanel from './WaveformPanel.svelte';
+  import type { WaveformStyle } from './WaveformPanel.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
+  import {
+    requestMicrophonePermission,
+    createAudioAnalyser,
+    createMediaRecorder,
+    blobToAudioBuffer,
+    stopStream,
+    getFrequencyData,
+    drawLiveWaveform
+  } from '$lib/utils/recording';
+  import type { WaveformConfig, WaveformPosition } from '$lib/utils/compositor';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
+  type RecordingPhase = 'idle' | 'ready' | 'countdown' | 'recording';
 
   interface CropData {
     x: number;
@@ -54,9 +68,49 @@
   
   let openPanel = $state<OpenPanel>(null);
 
+  // Waveform overlay state
+  let waveformStyle = $state<WaveformStyle>('bars');
+  let waveformColor = $state('#ffffff');
+  let waveformPosition = $state<WaveformPosition>({
+    x: 0.1,
+    y: 0.65,
+    width: 0.8,
+    height: 0.25
+  });
+  let waveformFrequencyData = $state<Uint8Array | undefined>(undefined);
+  let playbackAnalyser: AnalyserNode | null = null;
+  let playbackAudioContext: AudioContext | null = null;
+  let playbackAnimationId: number | null = null;
+
+  // Recording state
+  let recordingPhase = $state<RecordingPhase>('idle');
+  let countdownNumber = $state(3);
+  let micError = $state<string | null>(null);
+  
+  // Recording resources (not reactive to avoid loops)
+  let mediaStream: MediaStream | null = null;
+  let mediaRecorder: MediaRecorder | null = null;
+  let audioContext: AudioContext | null = null;
+  let analyser: AnalyserNode | null = null;
+  let recordedChunks: Blob[] = [];
+  let liveWaveformData: number[] = [];
+  let recordingAnimationId: number | null = null;
+
   let hasAudio = $derived(audioData !== null);
   let hasImage = $derived(imageData !== null);
   let canDownload = $derived(hasImage && hasAudio);
+  let isMicActive = $derived(recordingPhase !== 'idle');
+
+  let waveformConfig = $derived<WaveformConfig | null>(
+    waveformActive ? {
+      enabled: true,
+      position: waveformPosition,
+      color: waveformColor,
+      style: waveformStyle,
+      frequencyData: waveformFrequencyData,
+      isEditing: !isPlaying
+    } : null
+  );
 
   function handleImageUploadClick() {
     const input = document.createElement('input');
@@ -288,6 +342,17 @@
       audioElement.pause();
       audioElement = null;
     }
+    
+    // Reset waveform overlay when audio is cleared
+    stopWaveformAnimation();
+    if (playbackAudioContext) {
+      playbackAudioContext.close();
+      playbackAudioContext = null;
+      playbackAnalyser = null;
+    }
+    waveformActive = false;
+    openPanel = null;
+    
     isPlaying = false;
     isRecording = false;
     trimStart = 0;
@@ -301,6 +366,7 @@
     if (isPlaying) {
       audioElement.pause();
       isPlaying = false;
+      stopWaveformAnimation();
     } else {
       const startTime = audioData.duration * trimStart;
       if (currentTime < startTime || currentTime >= audioData.duration * trimEnd) {
@@ -309,7 +375,84 @@
       }
       audioElement.play();
       isPlaying = true;
+      
+      if (waveformActive) {
+        startWaveformAnimation();
+      }
     }
+  }
+
+  function startWaveformAnimation() {
+    if (!audioElement) return;
+    
+    if (!playbackAudioContext) {
+      playbackAudioContext = new AudioContext();
+      const source = playbackAudioContext.createMediaElementSource(audioElement);
+      playbackAnalyser = playbackAudioContext.createAnalyser();
+      playbackAnalyser.fftSize = 256;
+      playbackAnalyser.smoothingTimeConstant = 0.3;
+      source.connect(playbackAnalyser);
+      playbackAnalyser.connect(playbackAudioContext.destination);
+    }
+    
+    const animate = () => {
+      if (!isPlaying || !playbackAnalyser) {
+        waveformFrequencyData = undefined;
+        return;
+      }
+      
+      const rawData = new Uint8Array(playbackAnalyser.frequencyBinCount);
+      playbackAnalyser.getByteFrequencyData(rawData);
+      
+      // Get the active frequency range (typically first 30-40% has most energy)
+      const activeRange = Math.floor(rawData.length * 0.4);
+      
+      // Calculate average energy from active frequencies
+      let totalEnergy = 0;
+      for (let i = 0; i < activeRange; i++) {
+        totalEnergy += rawData[i];
+      }
+      const avgEnergy = totalEnergy / activeRange;
+      
+      // Create output data - spread across full width
+      const targetBins = 80;
+      const enhancedData = new Uint8Array(targetBins);
+      
+      for (let i = 0; i < targetBins; i++) {
+        // Map each output bin to the active input range, then mirror for right half
+        let sourceIdx: number;
+        if (i < targetBins / 2) {
+          // Left half: map directly to active frequencies
+          sourceIdx = Math.floor((i / (targetBins / 2)) * activeRange);
+        } else {
+          // Right half: mirror from left half (reverse order)
+          sourceIdx = Math.floor(((targetBins - 1 - i) / (targetBins / 2)) * activeRange);
+        }
+        
+        const value = rawData[Math.min(sourceIdx, rawData.length - 1)];
+        
+        // Add time-based variation for organic movement
+        const phase = Date.now() * 0.008;
+        const variation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
+        
+        // Boost and clamp
+        const enhanced = Math.min(255, value * 1.3 + variation + avgEnergy * 0.3);
+        enhancedData[i] = Math.max(30, enhanced);
+      }
+      
+      waveformFrequencyData = enhancedData;
+      playbackAnimationId = requestAnimationFrame(animate);
+    };
+    
+    animate();
+  }
+
+  function stopWaveformAnimation() {
+    if (playbackAnimationId) {
+      cancelAnimationFrame(playbackAnimationId);
+      playbackAnimationId = null;
+    }
+    waveformFrequencyData = undefined;
   }
 
   function handleSkipBack() {
@@ -333,6 +476,7 @@
     if (currentTime >= audioData.duration * trimEnd) {
       audioElement.pause();
       isPlaying = false;
+      stopWaveformAnimation();
       currentTime = audioData.duration * trimStart;
       audioElement.currentTime = currentTime;
     }
@@ -468,8 +612,189 @@
     audioElement = audio;
   });
 
-  function handleMicClick() {
-    isRecording = !isRecording;
+  async function handleMicClick() {
+    micError = null;
+    
+    if (recordingPhase !== 'idle') {
+      // Deactivate mic - cancel any recording in progress
+      cleanupRecording();
+      recordingPhase = 'idle';
+      return;
+    }
+    
+    // Activate mic - request permission and enter ready state
+    try {
+      mediaStream = await requestMicrophonePermission();
+      const result = createAudioAnalyser(mediaStream);
+      audioContext = result.audioContext;
+      analyser = result.analyser;
+      recordingPhase = 'ready';
+    } catch (err) {
+      micError = err instanceof Error ? err.message : 'Failed to access microphone';
+      console.error('Mic error:', err);
+    }
+  }
+
+  function cleanupRecording() {
+    if (recordingAnimationId) {
+      cancelAnimationFrame(recordingAnimationId);
+      recordingAnimationId = null;
+    }
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    mediaRecorder = null;
+    stopStream(mediaStream);
+    mediaStream = null;
+    if (audioContext) {
+      audioContext.close();
+      audioContext = null;
+    }
+    analyser = null;
+    recordedChunks = [];
+    liveWaveformData = [];
+    isRecording = false;
+  }
+
+  async function handleRecordPlayPause() {
+    if (recordingPhase === 'ready') {
+      // Start countdown
+      startCountdown();
+    } else if (recordingPhase === 'recording') {
+      // Stop recording
+      stopRecording();
+    }
+  }
+
+  function startCountdown() {
+    recordingPhase = 'countdown';
+    countdownNumber = 3;
+    
+    const countdownInterval = setInterval(() => {
+      countdownNumber--;
+      if (countdownNumber <= 0) {
+        clearInterval(countdownInterval);
+        startRecording();
+      }
+    }, 1000);
+  }
+
+  function startRecording() {
+    if (!mediaStream) return;
+    
+    recordingPhase = 'recording';
+    isRecording = true;
+    recordedChunks = [];
+    liveWaveformData = [];
+    
+    mediaRecorder = createMediaRecorder(mediaStream);
+    
+    mediaRecorder.ondataavailable = (e) => {
+      if (e.data.size > 0) {
+        recordedChunks.push(e.data);
+      }
+    };
+    
+    mediaRecorder.onstop = async () => {
+      await processRecording();
+    };
+    
+    mediaRecorder.start(100); // Collect data every 100ms
+    
+    // Start live waveform animation
+    animateLiveWaveform();
+  }
+
+  function animateLiveWaveform() {
+    if (!analyser || !waveformCanvas || recordingPhase !== 'recording') return;
+    
+    const frequencyData = getFrequencyData(analyser);
+    
+    // Get average amplitude for this frame
+    let sum = 0;
+    for (let i = 0; i < frequencyData.length; i++) {
+      sum += frequencyData[i];
+    }
+    const avg = sum / frequencyData.length;
+    liveWaveformData.push(avg);
+    
+    // Draw live waveform
+    drawLiveWaveform(waveformCanvas, new Uint8Array(liveWaveformData), liveWaveformData.length - 1);
+    
+    recordingAnimationId = requestAnimationFrame(animateLiveWaveform);
+  }
+
+  function stopRecording() {
+    if (mediaRecorder && mediaRecorder.state !== 'inactive') {
+      mediaRecorder.stop();
+    }
+    if (recordingAnimationId) {
+      cancelAnimationFrame(recordingAnimationId);
+      recordingAnimationId = null;
+    }
+  }
+
+  async function processRecording() {
+    if (recordedChunks.length === 0) {
+      cleanupRecording();
+      recordingPhase = 'idle';
+      return;
+    }
+    
+    audioLoading = true;
+    
+    try {
+      const blob = new Blob(recordedChunks, { type: recordedChunks[0].type });
+      const buffer = await blobToAudioBuffer(blob);
+      const waveform = await extractWaveformData(buffer);
+      
+      // Create a File from the blob for consistency with imported audio
+      const file = new File([blob], 'recording.webm', { type: blob.type });
+      const url = URL.createObjectURL(blob);
+      
+      if (audioData?.url) {
+        URL.revokeObjectURL(audioData.url);
+      }
+      
+      audioData = {
+        file,
+        url,
+        duration: buffer.duration,
+        buffer,
+        waveform
+      };
+      
+      trimStart = 0;
+      trimEnd = 1;
+      currentTime = 0;
+    } catch (err) {
+      console.error('Failed to process recording:', err);
+    } finally {
+      cleanupRecording();
+      recordingPhase = 'idle';
+      audioLoading = false;
+    }
+  }
+
+  function handleRecordingStartAgain() {
+    // Clear recorded audio but stay in mic-ready mode
+    if (audioData) {
+      URL.revokeObjectURL(audioData.url);
+      audioData = null;
+    }
+    if (audioElement) {
+      audioElement.pause();
+      audioElement = null;
+    }
+    isPlaying = false;
+    trimStart = 0;
+    trimEnd = 1;
+    currentTime = 0;
+    
+    // If we have a stream, stay in ready mode
+    if (mediaStream && recordingPhase === 'idle') {
+      // Re-enter ready state if mic was active
+    }
   }
 
   function handlePanelToggle(panel: OpenPanel, active: boolean) {
@@ -488,6 +813,24 @@
 
   function handleDownload() {
     // TODO: Implement download
+  }
+
+  function handleWaveformPositionChange(position: WaveformPosition) {
+    waveformPosition = position;
+  }
+
+  function handleWaveformOverlayClick() {
+    if (isPlaying) {
+      handlePlayPause();
+    }
+  }
+
+  function handleWaveformStyleChange(style: WaveformStyle) {
+    waveformStyle = style;
+  }
+
+  function handleWaveformColorChange(color: string) {
+    waveformColor = color;
   }
 
   function handleImageDragOver(e: DragEvent) {
@@ -534,14 +877,14 @@
     </button>
   {:else}
     <div class="image-section">
-      <div class="image-preview">
-        <img src={imageData.url} alt="Uploaded" class="preview-image" />
-        {#if imageLoading}
-          <div class="image-loading-overlay">
-            <div class="loading-spinner"></div>
-          </div>
-        {/if}
-      </div>
+      <CompositionCanvas 
+        imageUrl={imageData.url} 
+        loading={imageLoading}
+        waveformConfig={waveformConfig}
+        isPlaying={isPlaying}
+        onWaveformPositionChange={handleWaveformPositionChange}
+        onWaveformClick={handleWaveformOverlayClick}
+      />
       <div class="image-actions">
         <button type="button" class="text-btn" onclick={handleReplaceImage}>
           Replace image
@@ -553,8 +896,9 @@
     </div>
   {/if}
 
-  <!-- Audio Upload -->
-  {#if !audioData}
+  <!-- Audio Upload / Recording -->
+  {#if !audioData && recordingPhase === 'idle'}
+    <!-- Default upload state -->
     <button
       type="button"
       class="upload-box"
@@ -572,6 +916,33 @@
         <img src="/icons/icon-upload.svg" alt="Upload" class="upload-icon" />
       {/if}
     </button>
+  {:else if !audioData && recordingPhase === 'ready'}
+    <!-- Mic ready - show instructions -->
+    <div class="recording-box">
+      <p class="recording-instructions">
+        Tap Play to record. Tap Stop to end. Tap refresh to start again.
+      </p>
+      {#if micError}
+        <p class="mic-error">{micError}</p>
+      {/if}
+    </div>
+  {:else if !audioData && (recordingPhase === 'countdown' || recordingPhase === 'recording')}
+    <!-- Recording in progress -->
+    <div class="recording-box recording-active" bind:this={waveformContainer}>
+      {#if recordingPhase === 'countdown'}
+        <div class="countdown-display">
+          <span class="countdown-number">{countdownNumber}</span>
+        </div>
+      {:else}
+        <canvas bind:this={waveformCanvas} class="waveform-canvas"></canvas>
+      {/if}
+    </div>
+  {:else if audioLoading}
+    <!-- Processing recorded audio -->
+    <div class="recording-box">
+      <span class="upload-label">Processing audio...</span>
+      <div class="loading-spinner small"></div>
+    </div>
   {:else}
     <div 
       class="audio-waveform-container"
@@ -581,7 +952,7 @@
       role="slider"
       aria-label="Audio waveform"
       aria-valuemin={0}
-      aria-valuemax={audioData.duration}
+      aria-valuemax={audioData?.duration ?? 0}
       aria-valuenow={currentTime}
       tabindex="0"
     >
@@ -618,7 +989,7 @@
         <div class="trim-handle-bar"></div>
       </div>
     </div>
-    <span class="audio-duration">{audioData.duration.toFixed(1)}s</span>
+    <span class="audio-duration">{audioData?.duration.toFixed(1)}s</span>
   {/if}
 
   <!-- Playback Controls -->
@@ -626,8 +997,8 @@
     <button
       type="button"
       class="control-btn start-again"
-      onclick={handleStartAgain}
-      disabled={!hasAudio}
+      onclick={isMicActive ? handleRecordingStartAgain : handleStartAgain}
+      disabled={!hasAudio && !isMicActive}
       aria-label="Start again"
     >
       <img src="/icons/icon-start-again.svg" alt="" class="control-icon" />
@@ -638,7 +1009,7 @@
         type="button"
         class="control-btn skip"
         onclick={handleSkipBack}
-        disabled={!hasAudio}
+        disabled={!hasAudio || isMicActive}
         aria-label="Skip back 5 seconds"
       >
         <img src="/icons/icon-back-five.svg" alt="" class="control-icon" />
@@ -647,24 +1018,38 @@
       <button
         type="button"
         class="play-btn"
-        class:active={hasAudio}
-        class:playing={isPlaying}
-        onclick={handlePlayPause}
-        disabled={!hasAudio && !isRecording}
-        aria-label={isPlaying ? 'Pause' : 'Play'}
+        class:active={hasAudio || isMicActive}
+        class:playing={isPlaying || recordingPhase === 'recording'}
+        onclick={isMicActive ? handleRecordPlayPause : handlePlayPause}
+        disabled={!hasAudio && !isMicActive}
+        aria-label={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
       >
-        <img
-          src={isPlaying ? '/icons/icon-pause-fill.svg' : '/icons/icon-play-fill.svg'}
-          alt=""
-          class="play-icon"
-        />
+        {#if recordingPhase === 'countdown'}
+          <img
+            src="/icons/icon-{countdownNumber === 3 ? 'three' : countdownNumber === 2 ? 'two' : 'one'}.svg"
+            alt={String(countdownNumber)}
+            class="play-icon countdown-icon"
+          />
+        {:else if recordingPhase === 'recording'}
+          <img
+            src="/icons/icon-stop-fill.svg"
+            alt=""
+            class="play-icon"
+          />
+        {:else}
+          <img
+            src={isPlaying ? '/icons/icon-pause-fill.svg' : '/icons/icon-play-fill.svg'}
+            alt=""
+            class="play-icon"
+          />
+        {/if}
       </button>
 
       <button
         type="button"
         class="control-btn skip"
         onclick={handleSkipForward}
-        disabled={!hasAudio}
+        disabled={!hasAudio || isMicActive}
         aria-label="Skip forward 5 seconds"
       >
         <img src="/icons/icon-forward-five.svg" alt="" class="control-icon" />
@@ -674,13 +1059,13 @@
     <button
       type="button"
       class="control-btn mic"
-      class:active={isRecording}
+      class:active={isMicActive}
       onclick={handleMicClick}
       aria-label="Record audio"
-      aria-pressed={isRecording}
+      aria-pressed={isMicActive}
     >
       <img
-        src={isRecording ? '/icons/icon-mic-fill.svg' : '/icons/icon-mic.svg'}
+        src={isMicActive ? '/icons/icon-mic-fill.svg' : '/icons/icon-mic.svg'}
         alt=""
         class="control-icon"
       />
@@ -696,7 +1081,12 @@
       onToggle={(active) => handlePanelToggle('waveform', active)}
       onOpenChange={(open) => handlePanelOpenChange('waveform', open)}
     >
-      <p class="panel-placeholder">Waveform options coming soon</p>
+      <WaveformPanel
+        selectedStyle={waveformStyle}
+        selectedColor={waveformColor}
+        onStyleChange={handleWaveformStyleChange}
+        onColorChange={handleWaveformColorChange}
+      />
     </TogglePanel>
 
     <TogglePanel
@@ -783,28 +1173,6 @@
     gap: var(--spacing-sm);
   }
 
-  .image-preview {
-    position: relative;
-    border-radius: var(--radius-md);
-    overflow: hidden;
-    background: var(--color-app-bg);
-  }
-
-  .preview-image {
-    width: 100%;
-    height: auto;
-    display: block;
-  }
-
-  .image-loading-overlay {
-    position: absolute;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.4);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-  }
-
   .loading-spinner {
     width: 32px;
     height: 32px;
@@ -847,6 +1215,62 @@
     width: 20px;
     height: 20px;
     border-width: 2px;
+  }
+
+  /* Recording UI */
+  .recording-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: var(--spacing-md) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+  }
+
+  .recording-box.recording-active {
+    padding: var(--spacing-sm) var(--spacing-lg);
+  }
+
+  .recording-instructions {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    text-align: center;
+    line-height: 1.5;
+    margin: 0;
+  }
+
+  .mic-error {
+    font-size: var(--font-size-sm);
+    color: #d32f2f;
+    text-align: center;
+    margin-top: var(--spacing-sm);
+  }
+
+  .countdown-display {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    height: 60px;
+  }
+
+  .countdown-number {
+    font-size: 2.5rem;
+    font-weight: 700;
+    color: var(--color-primary);
+    animation: pulse 1s ease-in-out;
+  }
+
+  @keyframes pulse {
+    0% { transform: scale(1.2); opacity: 0.7; }
+    50% { transform: scale(1); opacity: 1; }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  .countdown-icon {
+    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%) !important;
   }
 
   .audio-waveform-container {
