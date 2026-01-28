@@ -18,8 +18,7 @@ export async function exportCanvasVideo(
    onProgress?: ProgressCallback,
    renderFrame?: () => void,
    startAudioPlayback?: () => void,
-   stopAudioPlayback?: () => void,
-   includeAudio: boolean = true
+   stopAudioPlayback?: () => void
 ): Promise<ExportResult> {
    return new Promise((resolve, reject) => {
      onProgress?.({
@@ -62,36 +61,32 @@ export async function exportCanvasVideo(
        console.log('[VideoExport] Enabled disabled video track');
      }
     
-    // Capture audio stream directly from the audio element (if enabled)
+    // Capture audio stream directly from the audio element
     // This avoids conflicts with existing AudioContext connections
-    if (includeAudio) {
-      try {
-        const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
-        const audioTracks = audioStream.getAudioTracks();
-        console.log('[VideoExport] Audio stream tracks:', audioTracks.length);
+    try {
+      const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
+      const audioTracks = audioStream.getAudioTracks();
+      console.log('[VideoExport] Audio stream tracks:', audioTracks.length);
+      
+      if (audioTracks.length > 0) {
+        const audioTrack = audioTracks[0];
+        console.log('[VideoExport] Audio track state:', { 
+          readyState: audioTrack.readyState,
+          enabled: audioTrack.enabled 
+        });
         
-        if (audioTracks.length > 0) {
-          const audioTrack = audioTracks[0];
-          console.log('[VideoExport] Audio track state:', { 
-            readyState: audioTrack.readyState,
-            enabled: audioTrack.enabled 
-          });
-          
-          // Only add track if it's in a valid state
-          if (audioTrack.readyState === 'live') {
-            canvasStream.addTrack(audioTrack);
-            console.log('[VideoExport] Audio track added successfully');
-          } else {
-            console.warn('[VideoExport] Audio track not live, skipping audio');
-          }
+        // Only add track if it's in a valid state
+        if (audioTrack.readyState === 'live') {
+          canvasStream.addTrack(audioTrack);
+          console.log('[VideoExport] Audio track added successfully');
         } else {
-          console.warn('[VideoExport] No audio tracks in audio stream');
+          console.warn('[VideoExport] Audio track not live, skipping audio');
         }
-      } catch (err) {
-        console.warn('[VideoExport] Could not capture audio, exporting video only:', err);
+      } else {
+        console.warn('[VideoExport] No audio tracks in audio stream');
       }
-    } else {
-      console.log('[VideoExport] Audio disabled for this export (test mode)');
+    } catch (err) {
+      console.warn('[VideoExport] Could not capture audio, exporting video only:', err);
     }
     
     // Log canvas stream tracks for debugging
@@ -102,9 +97,8 @@ export async function exportCanvasVideo(
 
     // Determine best supported codec
     // Priority: H.264/MP4 (best sharing compatibility), then WebM
-    // Note: Use avc3 instead of avc1 to avoid codec description changes during recording
+    // Note: H.264 may fail at encoding time if bitrate is unsupported, so we'll try WebM fallback
     const h264Types = [
-      'video/mp4;codecs=avc3',
       'video/mp4;codecs=h264',
       'video/mp4;codecs=avc1',
       'video/mp4'
@@ -145,7 +139,7 @@ export async function exportCanvasVideo(
       return;
     }
 
-    const isH264 = mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1') || mimeType.includes('avc3');
+    const isH264 = mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1');
     console.log(`[VideoExport] Using codec: ${mimeType} (${isH264 ? 'H.264/MP4' : 'WebM'})`)
 
     const chunks: Blob[] = [];
@@ -153,12 +147,11 @@ export async function exportCanvasVideo(
     let mediaRecorder: MediaRecorder;
     const recorderConfig: any = { mimeType };
     
-    // Only set bitrate for H.264 (WebM doesn't use videoBitsPerSecond the same way)
+    // Only set bitrate for desktop H.264, or use lower bitrate for mobile
     if (isH264) {
       if (isMobile) {
-        // Mobile: use very low bitrate to prevent encoder errors
-        recorderConfig.videoBitsPerSecond = 500000; // 500 kbps - conservative for mobile H.264
-        console.log('[VideoExport] Mobile H.264: using 500kbps bitrate');
+        // Mobile: use no bitrate constraint (let browser choose, usually more conservative)
+        console.log('[VideoExport] Mobile H.264: using browser-managed bitrate');
       } else {
         // Desktop: use high bitrate for better quality
         recorderConfig.videoBitsPerSecond = 3500000; // 3.5 Mbps
@@ -335,7 +328,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function getExtensionFromMimeType(mimeType: string): string {
-  if (mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1') || mimeType.includes('avc3')) {
+  if (mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1')) {
     return 'mp4';
   }
   return 'webm';
