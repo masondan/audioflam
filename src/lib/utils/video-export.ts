@@ -29,24 +29,14 @@ export async function exportCanvasVideo(
     // Get canvas stream at 30fps
     const canvasStream = canvas.captureStream(30);
     
-    // Create audio context to capture audio
-    let audioContext: AudioContext | null = null;
-    let audioSource: MediaElementAudioSourceNode | null = null;
-    let audioDestination: MediaStreamAudioDestinationNode | null = null;
-    
+    // Capture audio stream directly from the audio element
+    // This avoids conflicts with existing AudioContext connections
     try {
-      audioContext = new AudioContext();
-      audioSource = audioContext.createMediaElementSource(audioElement);
-      audioDestination = audioContext.createMediaStreamDestination();
-      
-      // Connect audio to both destination (for recording) and speakers
-      audioSource.connect(audioDestination);
-      audioSource.connect(audioContext.destination);
-      
-      // Add audio track to canvas stream
-      const audioTrack = audioDestination.stream.getAudioTracks()[0];
+      const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
+      const audioTrack = audioStream.getAudioTracks()[0];
       if (audioTrack) {
         canvasStream.addTrack(audioTrack);
+        console.log('[VideoExport] Audio track added successfully');
       }
     } catch (err) {
       console.warn('Could not capture audio, exporting video only:', err);
@@ -98,14 +88,6 @@ export async function exportCanvasVideo(
         progress: 0.95,
         message: 'Finalizing video...'
       });
-
-      // Cleanup audio context
-      if (audioSource) {
-        audioSource.disconnect();
-      }
-      if (audioContext) {
-        audioContext.close();
-      }
 
       const blob = new Blob(chunks, { type: mimeType });
       
