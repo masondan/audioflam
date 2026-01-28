@@ -366,8 +366,8 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   // Close video source (no more frames)
   videoSource.close();
 
-  // Add audio data if we have it
-  if (audioSource && audioBuffer) {
+  // Add audio data if encoding was supported
+  if (audioSource && audioBuffer && audioEncodingSupported) {
     console.log('[WebCodecs] Adding audio buffer...');
     onProgress?.({
       phase: 'processing',
@@ -375,34 +375,41 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
       message: 'Encoding audio...'
     });
 
-    // Trim audio to match video duration if needed
-    const audioDuration = audioBuffer.duration;
-    const trimmedDuration = Math.min(audioDuration, duration);
-    
-    // AudioBufferSource.add() takes an AudioBuffer
-    // If audio is longer than video, we should trim it
-    if (audioDuration > duration) {
-      // Create a trimmed audio buffer
-      const sampleRate = audioBuffer.sampleRate;
-      const trimmedLength = Math.floor(trimmedDuration * sampleRate);
-      const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
-      const trimmedBuffer = audioContext.createBuffer(
-        audioBuffer.numberOfChannels,
-        trimmedLength,
-        sampleRate
-      );
-      for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-        const sourceData = audioBuffer.getChannelData(channel);
-        const destData = trimmedBuffer.getChannelData(channel);
-        destData.set(sourceData.subarray(0, trimmedLength));
+    try {
+      // Trim audio to match video duration if needed
+      const audioDuration = audioBuffer.duration;
+      const trimmedDuration = Math.min(audioDuration, duration);
+      
+      // AudioBufferSource.add() takes an AudioBuffer
+      // If audio is longer than video, we should trim it
+      if (audioDuration > duration) {
+        // Create a trimmed audio buffer
+        const sampleRate = audioBuffer.sampleRate;
+        const trimmedLength = Math.floor(trimmedDuration * sampleRate);
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const trimmedBuffer = audioContext.createBuffer(
+          audioBuffer.numberOfChannels,
+          trimmedLength,
+          sampleRate
+        );
+        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
+          const sourceData = audioBuffer.getChannelData(channel);
+          const destData = trimmedBuffer.getChannelData(channel);
+          destData.set(sourceData.subarray(0, trimmedLength));
+        }
+        await audioSource.add(trimmedBuffer);
+        audioContext.close();
+      } else {
+        await audioSource.add(audioBuffer);
       }
-      await audioSource.add(trimmedBuffer);
-      audioContext.close();
-    } else {
-      await audioSource.add(audioBuffer);
+      
+      audioSource.close();
+    } catch (audioError) {
+      console.warn('[WebCodecs] Audio encoding failed, continuing with video only:', audioError);
+      // Don't throw - just continue without audio
     }
-    
-    audioSource.close();
+  } else if (audioBuffer && !audioEncodingSupported) {
+    console.log('[WebCodecs] Exporting video only (audio encoding not supported)');
   }
 
   console.log('[WebCodecs] Finalizing...');
