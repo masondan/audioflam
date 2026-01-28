@@ -303,6 +303,26 @@
     render();
   });
 
+  // Continuous render loop when playing (required for captureStream on mobile)
+  let animationFrameId: number | null = null;
+  
+  $effect(() => {
+    if (isPlaying) {
+      function animationLoop() {
+        render();
+        animationFrameId = requestAnimationFrame(animationLoop);
+      }
+      animationFrameId = requestAnimationFrame(animationLoop);
+      
+      return () => {
+        if (animationFrameId !== null) {
+          cancelAnimationFrame(animationFrameId);
+          animationFrameId = null;
+        }
+      };
+    }
+  });
+
   onMount(() => {
     if (canvas) {
       ctx = canvas.getContext('2d');
