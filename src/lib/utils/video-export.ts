@@ -49,7 +49,7 @@ export async function smartExportVideo(
         duration,
         fps: 15, // 15fps for mobile-friendly encoding
         videoBitrate: 2_000_000,
-        audioBitrate: 128000,
+        audioBitrate: 48000, // 48 kbps - matches app audio settings
         onProgress,
         renderFrame,
         startAudioPlayback,

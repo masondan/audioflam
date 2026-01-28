@@ -34,16 +34,21 @@ async function loadMediabunny(): Promise<MediabunnyModule> {
 /**
  * Check if WebCodecs is available and supports H.264 + AAC encoding
  */
+// Store the working codec for use during export
+let cachedWorkingH264Codec: string | null = null;
+
 export async function checkWebCodecsSupport(): Promise<{
   supported: boolean;
   hasVideoEncoder: boolean;
   hasAudioEncoder: boolean;
   hasH264: boolean;
   hasAAC: boolean;
+  workingCodec?: string;
   reason?: string;
 }> {
   // Check basic API availability
   if (!('VideoEncoder' in window)) {
+    console.log('[WebCodecs] VideoEncoder not in window');
     return {
       supported: false,
       hasVideoEncoder: false,
@@ -55,6 +60,7 @@ export async function checkWebCodecsSupport(): Promise<{
   }
 
   if (!('AudioEncoder' in window)) {
+    console.log('[WebCodecs] AudioEncoder not in window');
     return {
       supported: false,
       hasVideoEncoder: true,
@@ -65,22 +71,55 @@ export async function checkWebCodecsSupport(): Promise<{
     };
   }
 
-  // Check H.264 encoding support
-  // Use Baseline profile (42E01E) for maximum compatibility
-  const videoConfig: VideoEncoderConfig = {
-    codec: 'avc1.42E01E', // H.264 Baseline Profile, Level 3.0
-    width: 1080,
-    height: 1920,
-    bitrate: 2_000_000,
-    framerate: 15,
-  };
+  // Check H.264 encoding support with CONSERVATIVE settings
+  // Use small resolution (640x480) to maximize hardware compatibility
+  // The actual export will use the canvas size
+  const testConfigs: VideoEncoderConfig[] = [
+    // Try simplest config first - very conservative
+    {
+      codec: 'avc1.42001f', // Baseline profile, level 3.1 (common on mobile)
+      width: 640,
+      height: 480,
+      bitrate: 1_000_000,
+      framerate: 15,
+    },
+    // Then try baseline profile level 3.0
+    {
+      codec: 'avc1.42E01E', // Baseline Profile, Level 3.0
+      width: 640,
+      height: 480,
+      bitrate: 1_000_000,
+      framerate: 15,
+    },
+    // Try with just 'avc1' (let browser choose profile)
+    {
+      codec: 'avc1.4d001f', // Main profile, level 3.1
+      width: 640,
+      height: 480,
+      bitrate: 1_000_000,
+      framerate: 15,
+    },
+  ];
 
   let hasH264 = false;
-  try {
-    const videoSupport = await VideoEncoder.isConfigSupported(videoConfig);
-    hasH264 = videoSupport.supported === true;
-  } catch (e) {
-    console.warn('[WebCodecs] H.264 check failed:', e);
+  let workingCodec = '';
+  
+  for (const videoConfig of testConfigs) {
+    try {
+      console.log('[WebCodecs] Testing H.264 config:', videoConfig.codec);
+      const videoSupport = await VideoEncoder.isConfigSupported(videoConfig);
+      console.log('[WebCodecs] Config result:', videoSupport);
+      
+      if (videoSupport.supported === true) {
+        hasH264 = true;
+        workingCodec = videoConfig.codec;
+        cachedWorkingH264Codec = workingCodec; // Cache for later use
+        console.log('[WebCodecs] Found working H.264 codec:', workingCodec);
+        break;
+      }
+    } catch (e) {
+      console.warn('[WebCodecs] H.264 check failed for', videoConfig.codec, ':', e);
+    }
   }
 
   // Check AAC encoding support
@@ -95,11 +134,14 @@ export async function checkWebCodecsSupport(): Promise<{
   try {
     const audioSupport = await AudioEncoder.isConfigSupported(audioConfig);
     hasAAC = audioSupport.supported === true;
+    console.log('[WebCodecs] AAC support:', hasAAC);
   } catch (e) {
     console.warn('[WebCodecs] AAC check failed:', e);
   }
 
   const supported = hasH264; // AAC is nice-to-have, video is essential
+
+  console.log('[WebCodecs] Final support check:', { supported, hasH264, hasAAC, workingCodec });
 
   return {
     supported,
@@ -107,6 +149,7 @@ export async function checkWebCodecsSupport(): Promise<{
     hasAudioEncoder: true,
     hasH264,
     hasAAC,
+    workingCodec: workingCodec || undefined,
     reason: !supported
       ? `Missing: ${!hasH264 ? 'H.264 encoder' : ''}${!hasH264 && !hasAAC ? ', ' : ''}${!hasAAC ? 'AAC encoder' : ''}`
       : undefined
@@ -118,9 +161,9 @@ export interface WebCodecsExportConfig {
   audioBuffer?: AudioBuffer; // Optional: decoded audio for encoding
   audioElement?: HTMLAudioElement; // For playback sync during recording
   duration: number; // in seconds
-  fps?: number;
-  videoBitrate?: number;
-  audioBitrate?: number;
+  fps?: number; // Default: 15 (mobile-optimized)
+  videoBitrate?: number; // Default: 2 Mbps
+  audioBitrate?: number; // Default: 48 kbps (matches app settings)
   onProgress?: ProgressCallback;
   renderFrame?: (currentTime: number) => void; // Pass current time for animation sync
   startAudioPlayback?: () => void;
@@ -141,7 +184,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
     duration,
     fps = 15,
     videoBitrate = 2_000_000,
-    audioBitrate = 128000,
+    audioBitrate = 48000, // 48 kbps - matches app settings
     onProgress,
     renderFrame,
     startAudioPlayback,
