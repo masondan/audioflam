@@ -185,11 +185,24 @@ export function renderWaveformLayer(
   ctx.restore();
 }
 
+// Cache static waveform data to prevent flickering during re-renders
+let cachedStaticWaveformData: Uint8Array | null = null;
+
 function generateStaticWaveformData(count: number): Uint8Array {
+  // Return cached data if available and same size
+  if (cachedStaticWaveformData && cachedStaticWaveformData.length === count) {
+    return cachedStaticWaveformData;
+  }
+  
   const data = new Uint8Array(count);
   for (let i = 0; i < count; i++) {
-    data[i] = 80 + Math.sin(i * 0.5) * 60 + Math.random() * 40;
+    // Use deterministic pseudo-random based on index for consistent appearance
+    const pseudoRandom = Math.sin(i * 12.9898 + i * 78.233) * 43758.5453;
+    const randomPart = (pseudoRandom - Math.floor(pseudoRandom)) * 40;
+    data[i] = 80 + Math.sin(i * 0.5) * 60 + randomPart;
   }
+  
+  cachedStaticWaveformData = data;
   return data;
 }
 

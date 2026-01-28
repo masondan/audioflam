@@ -326,6 +326,10 @@
     if (!waveformConfig?.enabled || isPlaying) return 'default';
     return 'default';
   });
+
+  export function getCanvas(): HTMLCanvasElement | null {
+    return canvas;
+  }
 </script>
 
 <div class="composition-container" bind:this={container}>

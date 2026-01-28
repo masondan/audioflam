@@ -18,6 +18,7 @@
     drawLiveWaveform
   } from '$lib/utils/recording';
   import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition, LightEffectConfig } from '$lib/utils/compositor';
+  import { exportCanvasVideo, downloadBlob, generateFilename, type ExportProgress } from '$lib/utils/video-export';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
@@ -116,6 +117,14 @@
   let recordedChunks: Blob[] = [];
   let liveWaveformData: number[] = [];
   let recordingAnimationId: number | null = null;
+
+  // Export state
+  let isExporting = $state(false);
+  let exportProgress = $state<ExportProgress | null>(null);
+  let showFilenameModal = $state(false);
+  let exportFilename = $state('');
+  let pendingVideoBlob = $state<Blob | null>(null);
+  let compositionCanvasRef = $state<{ getCanvas: () => HTMLCanvasElement | null } | null>(null);
 
   let hasAudio = $derived(audioData !== null);
   let hasImage = $derived(imageData !== null);
@@ -882,8 +891,96 @@
     }
   }
 
-  function handleDownload() {
-    // TODO: Implement download
+  async function handleDownload() {
+    if (!canDownload || !audioData) return;
+
+    isExporting = true;
+    exportProgress = {
+      phase: 'preparing',
+      progress: 0,
+      message: 'Initializing...'
+    };
+
+    try {
+      // Get the canvas from the CompositionCanvas component
+      const canvas = compositionCanvasRef?.getCanvas();
+      if (!canvas) {
+        throw new Error('Canvas not available');
+      }
+
+      // Ensure we have an audio element
+      if (!audioElement) {
+        audioElement = new Audio(audioData.url);
+        await new Promise<void>((resolve) => {
+          audioElement!.onloadedmetadata = () => resolve();
+          audioElement!.load();
+        });
+      }
+
+      // Set audio to trim start position
+      const audioDuration = audioData.duration * (trimEnd - trimStart);
+      audioElement.currentTime = audioData.duration * trimStart;
+
+      // Export using MediaRecorder (canvas.captureStream + audio)
+      const videoBlob = await exportCanvasVideo(
+        canvas,
+        audioElement,
+        audioDuration,
+        (progress) => {
+          exportProgress = progress;
+        },
+        () => {
+          // Start playback callback
+          isPlaying = true;
+          audioElement?.play();
+          if (waveformActive) {
+            startWaveformAnimation();
+          }
+        },
+        () => {
+          // Stop playback callback
+          isPlaying = false;
+          audioElement?.pause();
+          stopWaveformAnimation();
+        }
+      );
+
+      // Store the blob and show filename modal
+      pendingVideoBlob = videoBlob;
+      exportFilename = generateFilename('webm');
+      showFilenameModal = true;
+    } catch (err) {
+      console.error('Export failed:', err);
+      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
+      exportProgress = {
+        phase: 'complete',
+        progress: 0,
+        message: `Export failed: ${errorMessage}`
+      };
+      // Keep error visible for 5 seconds
+      setTimeout(() => {
+        if (exportProgress?.progress === 0) {
+          exportProgress = null;
+        }
+      }, 5000);
+    } finally {
+      isExporting = false;
+    }
+  }
+
+  function handleFilenameConfirm() {
+    if (pendingVideoBlob && exportFilename) {
+      const filename = exportFilename.endsWith('.mp4') ? exportFilename : `${exportFilename}.mp4`;
+      downloadBlob(pendingVideoBlob, filename);
+    }
+    handleFilenameCancel();
+  }
+
+  function handleFilenameCancel() {
+    showFilenameModal = false;
+    pendingVideoBlob = null;
+    exportFilename = '';
+    exportProgress = null;
   }
 
   function handleWaveformPositionChange(position: WaveformPosition) {
@@ -975,6 +1072,7 @@
   {:else}
     <div class="image-section">
       <CompositionCanvas 
+        bind:this={compositionCanvasRef}
         imageUrl={imageData.url} 
         loading={imageLoading}
         waveformConfig={waveformConfig}
@@ -1229,13 +1327,50 @@
   <button
     type="button"
     class="download-btn"
-    class:active={canDownload}
+    class:active={canDownload && !isExporting && !exportProgress}
+    class:error={exportProgress && exportProgress.progress === 0}
     onclick={handleDownload}
-    disabled={!canDownload}
+    disabled={!canDownload || isExporting || !!exportProgress}
   >
-    Download audiogram
+    {#if exportProgress}
+      <div class="export-progress">
+        <span class="export-message">{exportProgress.message}</span>
+        {#if exportProgress.progress > 0}
+          <div class="export-bar">
+            <div class="export-bar-fill" style="width: {exportProgress.progress * 100}%"></div>
+          </div>
+        {/if}
+      </div>
+    {:else}
+      Download audiogram
+    {/if}
   </button>
 </div>
+
+<!-- Filename Modal -->
+{#if showFilenameModal}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="modal-overlay" onclick={handleFilenameCancel} role="presentation">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+      <h3 id="modal-title" class="modal-title">Save audiogram</h3>
+      <input
+        type="text"
+        class="filename-input"
+        bind:value={exportFilename}
+        placeholder="Enter filename"
+        onkeydown={(e) => e.key === 'Enter' && handleFilenameConfirm()}
+      />
+      <div class="modal-actions">
+        <button type="button" class="modal-btn cancel" onclick={handleFilenameCancel}>
+          Cancel
+        </button>
+        <button type="button" class="modal-btn confirm" onclick={handleFilenameConfirm}>
+          Download
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 {#if showCropDrawer && imageData}
   <ImageCropDrawer
@@ -1571,6 +1706,119 @@
   }
 
   .download-btn.active:hover {
+    background: #4a1d9e;
+  }
+
+  .download-btn.error {
+    background: #dc3545;
+    color: var(--color-white);
+  }
+
+  /* Export progress styles */
+  .export-progress {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+    width: 100%;
+  }
+
+  .export-message {
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+  }
+
+  .export-bar {
+    width: 100%;
+    height: 4px;
+    background: rgba(255, 255, 255, 0.3);
+    border-radius: var(--radius-full);
+    overflow: hidden;
+  }
+
+  .export-bar-fill {
+    height: 100%;
+    background: white;
+    border-radius: var(--radius-full);
+    transition: width 0.2s ease-out;
+  }
+
+  /* Modal styles */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--spacing-md);
+  }
+
+  .modal-content {
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: 600;
+    color: var(--color-text-primary);
+    margin: 0;
+  }
+
+  .filename-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--transition-fast);
+  }
+
+  .filename-input:focus {
+    border-color: var(--color-primary);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+  }
+
+  .modal-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .modal-btn.cancel {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--color-text-secondary);
+  }
+
+  .modal-btn.cancel:hover {
+    background: var(--color-app-bg);
+  }
+
+  .modal-btn.confirm {
+    background: var(--color-primary);
+    border: none;
+    color: var(--color-white);
+  }
+
+  .modal-btn.confirm:hover {
     background: #4a1d9e;
   }
 </style>
