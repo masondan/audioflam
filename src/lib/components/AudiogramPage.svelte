@@ -215,7 +215,10 @@
       img.onload = () => {
         const { width, height } = img;
         const isHorizontal = width > height;
-        const maxSize = isHorizontal ? 1920 : 1080;
+        
+        // Mobile: reduce resolution for better H.264 encoding on mobile devices
+        const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+        const maxSize = isMobile ? (isHorizontal ? 1280 : 720) : (isHorizontal ? 1920 : 1080);
         
         let newWidth = width;
         let newHeight = height;

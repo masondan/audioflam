@@ -27,10 +27,15 @@ export async function exportCanvasVideo(
        message: 'Preparing export...'
      });
 
-     // Get canvas stream at 30fps
+     // Detect mobile device for framerate optimization
+     const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+     const captureFramerate = isMobile ? 15 : 30; // 15fps for mobile (lower encoding load), 30fps for desktop
+     console.log('[VideoExport] Device type:', isMobile ? 'Mobile' : 'Desktop', `- using ${captureFramerate}fps`);
+     
+     // Get canvas stream at adaptive framerate
      let canvasStream: MediaStream;
      try {
-       canvasStream = canvas.captureStream(30);
+       canvasStream = canvas.captureStream(captureFramerate);
      } catch (err) {
        console.error('[VideoExport] captureStream failed:', err);
        reject(new Error(`Failed to capture canvas: ${err}`));
@@ -138,10 +143,6 @@ export async function exportCanvasVideo(
     console.log(`[VideoExport] Using codec: ${mimeType} (${isH264 ? 'H.264/MP4' : 'WebM'})`)
 
     const chunks: Blob[] = [];
-    
-    // Detect mobile device
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    console.log('[VideoExport] Device type:', isMobile ? 'Mobile' : 'Desktop');
     
     let mediaRecorder: MediaRecorder;
     const recorderConfig: any = { mimeType };
