@@ -127,8 +127,7 @@
   let pendingVideoMimeType = $state('');
   let compositionCanvasRef = $state<{ 
   getCanvas: () => HTMLCanvasElement | null;
-  startExportRendering: () => void;
-  stopExportRendering: () => void;
+  renderFrame: () => void;
 } | null>(null);
 
   let hasAudio = $derived(audioData !== null);
@@ -935,18 +934,20 @@
           exportProgress = progress;
         },
         () => {
-          // Start playback callback
+          // Render frame callback - called continuously during export
+          compositionCanvasRef?.renderFrame();
+        },
+        () => {
+          // Start audio playback callback
           isPlaying = true;
-          compositionCanvasRef?.startExportRendering();
           audioElement?.play();
           if (waveformActive) {
             startWaveformAnimation();
           }
         },
         () => {
-          // Stop playback callback
+          // Stop audio playback callback
           isPlaying = false;
-          compositionCanvasRef?.stopExportRendering();
           audioElement?.pause();
           stopWaveformAnimation();
         }

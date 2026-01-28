@@ -16,9 +16,9 @@ export async function exportCanvasVideo(
   audioElement: HTMLAudioElement,
   duration: number,
   onProgress?: ProgressCallback,
-  startPlayback?: () => void,
-  stopPlayback?: () => void,
-  onRenderFrame?: () => void
+  renderFrame?: () => void,
+  startAudioPlayback?: () => void,
+  stopAudioPlayback?: () => void
 ): Promise<ExportResult> {
   return new Promise((resolve, reject) => {
     onProgress?.({
@@ -80,10 +80,12 @@ export async function exportCanvasVideo(
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
         chunks.push(e.data);
+        console.log(`[VideoExport] Data available, chunk size: ${e.data.size}, total chunks: ${chunks.length}`);
       }
     };
 
     let hasResolved = false;
+    let renderAnimationId: number | null = null;
 
     function finalizeRecording() {
       if (hasResolved) return;
@@ -121,6 +123,7 @@ export async function exportCanvasVideo(
 
     // Start recording
     mediaRecorder.start(100); // Collect data every 100ms
+    console.log('[VideoExport] MediaRecorder started');
     
     onProgress?.({
       phase: 'recording',
@@ -128,8 +131,22 @@ export async function exportCanvasVideo(
       message: 'Recording video...'
     });
 
-    // Start audio/animation playback
-    startPlayback?.();
+    // Start internal rendering loop - this ensures continuous frame delivery to captureStream
+    if (renderFrame) {
+      const startRenderTime = Date.now();
+      function renderLoop() {
+        const elapsed = (Date.now() - startRenderTime) / 1000;
+        if (elapsed < duration && renderFrame) {
+          renderFrame();
+          renderAnimationId = requestAnimationFrame(renderLoop);
+        }
+      }
+      renderAnimationId = requestAnimationFrame(renderLoop);
+      console.log('[VideoExport] Render loop started');
+    }
+
+    // Start audio playback
+    startAudioPlayback?.();
 
     // Track progress during recording
     const startTime = Date.now();
@@ -148,7 +165,15 @@ export async function exportCanvasVideo(
     setTimeout(() => {
       console.log('[VideoExport] Duration reached, stopping recorder');
       clearInterval(progressInterval);
-      stopPlayback?.();
+      
+      // Stop rendering loop
+      if (renderAnimationId !== null) {
+        cancelAnimationFrame(renderAnimationId);
+        console.log('[VideoExport] Render loop stopped');
+      }
+      
+      // Stop audio playback
+      stopAudioPlayback?.();
       
       try {
         if (mediaRecorder.state !== 'inactive') {

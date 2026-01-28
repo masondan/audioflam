@@ -8,7 +8,9 @@
 
 ## Project Phase
 
-**Current:** UI/UX Improvement - Enhancing user experience and visual polish after Cloudflare Pages deployment.
+**Current:** Audiogram Implementation (Steps 1-13 Complete) - Building audiogram creation feature with image, audio, waveform, title, and effects. **Immediate blocker:** MP4 export black screen on mobile devices.
+
+**Next Phase:** Step 14 - Polish & edge case testing (once MP4 export is fixed).
 
 ---
 
@@ -48,23 +50,36 @@ npm run check      # TypeScript/Svelte checks
 ```
 src/
 ├── routes/
-│   ├── +page.svelte              # Splash screen
+│   ├── +page.svelte              # Header + TTS/Audiogram tab switching
 │   ├── +layout.svelte            # Root layout
-│   ├── app/
-│   │   └── +page.svelte          # Main TTS interface
 │   └── api/
 │       └── tts/
 │           └── +server.ts        # TTS API endpoint (Azure + YarnGPT)
 ├── lib/
-│   ├── stores.ts                 # Voice definitions, app state
-│   └── components/
-│       ├── VoiceDropdown.svelte  # Voice selector
-│       └── Dropdown.svelte       # Generic dropdown
+│   ├── stores.ts                 # Voice definitions, app state, audiogram state
+│   ├── components/
+│   │   ├── VoiceDropdown.svelte  # Voice selector
+│   │   ├── Dropdown.svelte       # Generic dropdown
+│   │   ├── AudiogramPage.svelte  # Main audiogram container
+│   │   ├── ImageUpload.svelte    # Image upload & display
+│   │   ├── ImageCropDrawer.svelte # Full-screen image crop overlay
+│   │   ├── AudioImport.svelte    # Audio upload/record + waveform
+│   │   ├── CompositionCanvas.svelte # Canvas preview + export rendering
+│   │   ├── TogglePanel.svelte    # Reusable collapsible panel
+│   │   ├── WaveformPanel.svelte  # Waveform style/color options
+│   │   ├── TitlePanel.svelte     # Title text/font/style options
+│   │   ├── LightEffectPanel.svelte # Bokeh effect opacity/speed
+│   │   └── ColorPicker.svelte    # HSB color picker
+│   └── utils/
+│       ├── waveform.ts           # Waveform amplitude extraction + rendering
+│       ├── recording.ts          # MediaRecorder wrapper
+│       ├── compositor.ts         # Canvas layer composition (image, waveform, title, effects)
+│       └── video-export.ts       # FFmpeg.wasm wrapper, MP4 encoding
 ├── app.css                       # Global styles, CSS variables
 └── app.html                      # HTML template
 
 static/
-├── icons/                        # App icons, logos
+├── icons/                        # App icons (22 total for audiogram)
 └── robots.txt                    # Disallow: / (no indexing)
 ```
 
@@ -197,3 +212,32 @@ YARNGPT_API_KEY=<YarnGPT API key>
 4. **Cloudflare Workers quirk** - Azure requests require explicit `Host` header
 5. **Base64 encoding** - use `btoa()` not `Buffer` (Cloudflare compatibility)
 6. **XML escaping** - always escape user text before embedding in SSML
+
+---
+
+## Current Development Mission
+
+### MP4 Export Black Screen (Mobile) - ACTIVE BLOCKER
+
+**Problem:** Audiogram export to MP4 succeeds on desktop but produces a black/blank video on mobile devices (Android Chrome), though audio plays correctly.
+
+**Root Cause:** Canvas frames weren't being captured during `MediaRecorder` recording because the canvas wasn't actively redrawn.
+
+**Attempted Solution:** Added `requestAnimationFrame` loop in `CompositionCanvas.svelte` to continuously redraw during export, but this caused `MediaRecorder` to report 0 chunks and create empty blobs.
+
+**Implemented Fix:** Decoupled rendering from general app state:
+- Added explicit `startExportRendering()` and `stopExportRendering()` functions in `CompositionCanvas.svelte`
+- Updated `video-export.ts` to accept `startPlayback` and `stopPlayback` callbacks
+- Callbacks in `AudiogramPage.svelte` now trigger dedicated export rendering only during the `MediaRecorder` phase
+
+**Current Status:** Fix implemented; requires testing on actual mobile devices (black screen may persist or may be resolved).
+
+**Key Files:**
+- `src/lib/components/CompositionCanvas.svelte` - contains export rendering loop
+- `src/lib/utils/video-export.ts` - FFmpeg.wasm MP4 encoding logic
+- `src/lib/components/AudiogramPage.svelte` - export flow and callbacks
+
+**Next Steps:**
+1. Test MP4 export on Android/iOS mobile devices
+2. If black screen persists: investigate canvas timing, frame buffer, or codec issues
+3. Once fixed: proceed to Step 14 (Polish & edge cases)

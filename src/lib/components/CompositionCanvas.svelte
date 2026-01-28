@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { loadImage, renderFrame, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig } from '$lib/utils/compositor';
+  import { loadImage, renderFrame as renderFrameCanvasLayers, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig } from '$lib/utils/compositor';
 
   interface Props {
     imageUrl: string | null;
@@ -86,7 +86,7 @@
       };
     }
     
-    renderFrame(ctx, canvas, image, layers);
+    renderFrameCanvasLayers(ctx, canvas, image, layers);
   }
 
   async function loadImageFromUrl(url: string) {
@@ -327,31 +327,14 @@
     return 'default';
   });
 
-  // Continuous render loop for video export - canvas.captureStream needs active redraws
-  let exportAnimationId: number | null = null;
-  
-  export function startExportRendering() {
-    if (exportAnimationId !== null) return;
-    
-    function loop() {
-      render();
-      exportAnimationId = requestAnimationFrame(loop);
-    }
-    exportAnimationId = requestAnimationFrame(loop);
-    console.log('[CompositionCanvas] Export rendering started');
-  }
-  
-  export function stopExportRendering() {
-    if (exportAnimationId !== null) {
-      cancelAnimationFrame(exportAnimationId);
-      exportAnimationId = null;
-      console.log('[CompositionCanvas] Export rendering stopped');
-    }
+  export function renderFrame() {
+    render();
   }
 
   export function getCanvas(): HTMLCanvasElement | null {
     return canvas;
   }
+
 </script>
 
 <div class="composition-container" bind:this={container}>
