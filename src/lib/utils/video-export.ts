@@ -1,3 +1,5 @@
+import { checkWebCodecsSupport, exportWithWebCodecs } from './webcodecs-export';
+
 export interface ExportProgress {
   phase: 'preparing' | 'recording' | 'processing' | 'complete';
   progress: number;
@@ -11,7 +13,76 @@ export interface ExportResult {
   mimeType: string;
 }
 
-export async function exportCanvasVideo(
+/**
+ * Smart export function that chooses the best method:
+ * 1. WebCodecs + Mediabunny (for reliable MP4 on Android)
+ * 2. MediaRecorder fallback (for browsers without WebCodecs)
+ * 
+ * Note on fallback options for iOS/browsers without WebCodecs:
+ * - api.video: Free encoding, ~$0/year if videos deleted after download
+ * - Cloudinary: Needs paid tier ($89/mo) - overkill for ~200 videos/year
+ * - Cloudflare Worker → api.video: Best cost option (Worker is free proxy)
+ */
+export async function smartExportVideo(
+  canvas: HTMLCanvasElement,
+  audioElement: HTMLAudioElement,
+  audioBuffer: AudioBuffer | undefined,
+  duration: number,
+  onProgress?: ProgressCallback,
+  renderFrame?: (currentTime: number) => void,
+  startAudioPlayback?: () => void,
+  stopAudioPlayback?: () => void
+): Promise<ExportResult> {
+  // Check WebCodecs support
+  const support = await checkWebCodecsSupport();
+  
+  console.log('[SmartExport] WebCodecs support:', support);
+  
+  if (support.supported && support.hasH264) {
+    console.log('[SmartExport] Using WebCodecs (Mediabunny) for MP4 export');
+    
+    try {
+      return await exportWithWebCodecs({
+        canvas,
+        audioBuffer,
+        audioElement,
+        duration,
+        fps: 15, // 15fps for mobile-friendly encoding
+        videoBitrate: 2_000_000,
+        audioBitrate: 128000,
+        onProgress,
+        renderFrame,
+        startAudioPlayback,
+        stopAudioPlayback,
+      });
+    } catch (err) {
+      console.error('[SmartExport] WebCodecs export failed, falling back to MediaRecorder:', err);
+      // Fall through to MediaRecorder
+    }
+  }
+  
+  console.log('[SmartExport] Using MediaRecorder fallback');
+  console.log('[SmartExport] Note: If this produces WebM instead of MP4, consider cloud transcoding');
+  
+  // Legacy renderFrame wrapper (doesn't receive currentTime)
+  const legacyRenderFrame = renderFrame ? () => renderFrame(0) : undefined;
+  
+  return exportCanvasVideoLegacy(
+    canvas,
+    audioElement,
+    duration,
+    onProgress,
+    legacyRenderFrame,
+    startAudioPlayback,
+    stopAudioPlayback
+  );
+}
+
+/**
+ * Legacy MediaRecorder-based export (fallback for browsers without WebCodecs)
+ * This may produce WebM on mobile instead of MP4.
+ */
+export async function exportCanvasVideoLegacy(
    canvas: HTMLCanvasElement,
    audioElement: HTMLAudioElement,
    duration: number,
@@ -344,3 +415,9 @@ export function generateFilename(mimeType: string = 'video/webm'): string {
   const minutes = String(now.getMinutes()).padStart(2, '0');
   return `audioflam-audiogram-${day}${month}${year}-${hours}${minutes}.${extension}`;
 }
+
+/**
+ * @deprecated Use smartExportVideo instead for WebCodecs support
+ * Kept for backwards compatibility
+ */
+export const exportCanvasVideo = exportCanvasVideoLegacy;

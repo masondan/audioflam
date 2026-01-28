@@ -18,7 +18,7 @@
     drawLiveWaveform
   } from '$lib/utils/recording';
   import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition, LightEffectConfig } from '$lib/utils/compositor';
-  import { exportCanvasVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
+  import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
@@ -943,16 +943,48 @@
       const audioDuration = audioData.duration * (trimEnd - trimStart);
       audioElement.currentTime = audioData.duration * trimStart;
 
-      // Export using MediaRecorder (canvas.captureStream + audio)
-      const exportResult = await exportCanvasVideo(
+      // Get trimmed audio buffer for WebCodecs export
+      // Note: For trimmed audio, we create a slice of the original buffer
+      let trimmedAudioBuffer: AudioBuffer | undefined;
+      if (audioData.buffer) {
+        const startSample = Math.floor(audioData.buffer.sampleRate * audioData.duration * trimStart);
+        const endSample = Math.floor(audioData.buffer.sampleRate * audioData.duration * trimEnd);
+        const sampleCount = endSample - startSample;
+        
+        try {
+          const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+          trimmedAudioBuffer = audioContext.createBuffer(
+            audioData.buffer.numberOfChannels,
+            sampleCount,
+            audioData.buffer.sampleRate
+          );
+          for (let channel = 0; channel < audioData.buffer.numberOfChannels; channel++) {
+            const sourceData = audioData.buffer.getChannelData(channel);
+            const destData = trimmedAudioBuffer.getChannelData(channel);
+            destData.set(sourceData.subarray(startSample, endSample));
+          }
+          audioContext.close();
+        } catch (e) {
+          console.warn('[Export] Could not create trimmed audio buffer:', e);
+          // Will fall back to audio element capture
+        }
+      }
+
+      // Export using smartExportVideo (WebCodecs on Android, MediaRecorder fallback)
+      const exportResult = await smartExportVideo(
         canvas,
         audioElement,
+        trimmedAudioBuffer,
         audioDuration,
         (progress) => {
           exportProgress = progress;
         },
-        () => {
-          // Render frame callback - called continuously during export
+        (currentTimeInExport) => {
+          // Render frame callback - receives current time for animation sync
+          // Update the playback position for waveform animation
+          if (audioElement) {
+            audioElement.currentTime = audioData!.duration * trimStart + currentTimeInExport;
+          }
           compositionCanvasRef?.renderFrame();
         },
         () => {

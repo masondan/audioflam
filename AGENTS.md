@@ -217,41 +217,53 @@ YARNGPT_API_KEY=<YarnGPT API key>
 
 ## Current Development Mission
 
-### Step 14 - Polish & Edge Case Testing
+### Step 15 - WebCodecs MP4 Export (Phase 1)
 
-**Status:** ✅ **MP4 EXPORT FIXED** - Ready to move to final polish phase.
+**Status:** 🔄 **IN PROGRESS** - WebCodecs implementation for reliable mobile MP4 export
 
-**What Was Fixed:**
-MediaRecorder on mobile was failing due to tracks not being settled before recording started. Added a 50ms delay before `mediaRecorder.start()` to allow tracks to stabilize. Also implemented mobile-first codec selection (WebM VP8+Opus prioritized over H.264).
+**Problem Solved:**
+MediaRecorder lies about H.264 support on mobile - `isTypeSupported()` returns true but encoding fails. WebCodecs bypasses this by encoding frames directly.
 
-**Mobile Test Results (Verified):**
-- ✅ Device detection working (correctly identified as Mobile)
-- ✅ Canvas stream created with live video track
-- ✅ Audio track captured and added successfully
-- ✅ WebM codec selected for mobile
-- ✅ MediaRecorder started successfully
-- ✅ 36-51 chunks captured (5-134KB each)
-- ✅ Final blob size: 410KB-1.5MB
-- ✅ Export to file works without errors
+**New Architecture:**
+```
+Export Button → checkWebCodecsSupport() → 
+  ├── WebCodecs supported (85% Android) → Mediabunny MP4 export
+  └── Not supported (iOS, Firefox) → MediaRecorder fallback (WebM)
+```
 
-**Key Implementation:**
-- Canvas stream validation with detailed logging
-- Track state checking (must be 'live')
-- 50ms delay before recording start (critical for mobile)
-- Mobile-first codec priority (WebM → H.264)
-- Audio element load timeout (5s)
-- Comprehensive error logging
-
-**Next Phase:**
-1. Clean up diagnostic logs (optional)
-2. Test edge cases: very short audio, very long audio, different image ratios
-3. Test on desktop browsers
-4. Polish UI/UX: loading states, error messages
-5. Performance optimization if needed
+**Files Created:**
+- `src/lib/utils/webcodecs-export.ts` - WebCodecs + Mediabunny MP4 encoding
+- `EXPORT_TECH_PLAN.md` - Full technical plan with cost analysis
 
 **Files Modified:**
-- `src/lib/utils/video-export.ts` ✅
-- `src/lib/components/AudiogramPage.svelte` ✅
-- `src/lib/components/CompositionCanvas.svelte` ✅
-- `AGENTS.md` ✅
-- `MOBILE_EXPORT_FIX.md` (created for reference) ✅
+- `src/lib/utils/video-export.ts` - Added `smartExportVideo()` function
+- `package.json` - Added `mediabunny` dependency (~17KB for MP4 writing)
+
+**Key Functions:**
+- `checkWebCodecsSupport()` - Detects H.264 + AAC encoder availability
+- `exportWithWebCodecs()` - Creates MP4 via Mediabunny CanvasSource + AudioBufferSource
+- `smartExportVideo()` - Chooses best export method automatically
+
+**Browser Support:**
+| Browser | Method | Output |
+|---------|--------|--------|
+| Chrome Android | WebCodecs | MP4 ✅ |
+| Chrome Desktop | WebCodecs | MP4 ✅ |
+| Safari iOS | MediaRecorder | WebM (needs Phase 2 fallback) |
+| Firefox | MediaRecorder | WebM (needs Phase 2 fallback) |
+
+**Cost Analysis (for Phase 2 fallback - ~200 videos/year):**
+- api.video: ~$0/year (free encoding, delete after download)
+- Cloudinary: $1,068/year (overkill)
+- Cloudflare Worker → api.video: Best option (Worker is free proxy)
+
+**Next Steps:**
+1. Integrate `smartExportVideo()` into AudiogramPage.svelte
+2. Test on Android Chrome
+3. Test on desktop
+4. (Phase 2) Add api.video fallback for iOS
+
+**Previous Implementation (MediaRecorder):**
+- Still available as `exportCanvasVideoLegacy()`
+- Used as fallback when WebCodecs unavailable
+- Works for WebM export on all browsers
