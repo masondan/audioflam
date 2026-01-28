@@ -90,12 +90,16 @@ export async function exportCanvasVideo(
       audioTracks: canvasStream.getAudioTracks().length
     });
 
-    // Determine best supported codec - prioritize H.264/MP4 for all devices
-    // H.264 has best compatibility for sharing (messaging, social media, etc.)
-    const mimeTypes = [
+    // Determine best supported codec
+    // Priority: H.264/MP4 (best sharing compatibility), then WebM
+    // Note: H.264 may fail at encoding time if bitrate is unsupported, so we'll try WebM fallback
+    const h264Types = [
       'video/mp4;codecs=h264',
       'video/mp4;codecs=avc1',
-      'video/mp4',
+      'video/mp4'
+    ];
+    
+    const webmTypes = [
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus',
       'video/webm;codecs=vp9',
@@ -104,16 +108,28 @@ export async function exportCanvasVideo(
     ];
     
     let mimeType = '';
-    for (const type of mimeTypes) {
+    
+    // Try H.264 first
+    for (const type of h264Types) {
       if (MediaRecorder.isTypeSupported(type)) {
         mimeType = type;
-        console.log('[VideoExport] Selected mime type:', mimeType);
+        console.log('[VideoExport] Selected mime type (H.264):', mimeType);
         break;
       }
     }
     
+    // If H.264 not supported, try WebM
     if (!mimeType) {
-      console.error('[VideoExport] Supported types:', mimeTypes.filter((_, i) => i < 5).join(', '));
+      for (const type of webmTypes) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          console.log('[VideoExport] H.264 not supported, falling back to WebM:', mimeType);
+          break;
+        }
+      }
+    }
+    
+    if (!mimeType) {
       reject(new Error('No supported video format found on this device'));
       return;
     }
@@ -123,19 +139,35 @@ export async function exportCanvasVideo(
 
     const chunks: Blob[] = [];
     
+    // Detect mobile device
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+    console.log('[VideoExport] Device type:', isMobile ? 'Mobile' : 'Desktop');
+    
     let mediaRecorder: MediaRecorder;
+    const recorderConfig: any = { mimeType };
+    
+    // Only set bitrate for desktop H.264, or use lower bitrate for mobile
+    if (isH264) {
+      if (isMobile) {
+        // Mobile: use no bitrate constraint (let browser choose, usually more conservative)
+        console.log('[VideoExport] Mobile H.264: using browser-managed bitrate');
+      } else {
+        // Desktop: use high bitrate for better quality
+        recorderConfig.videoBitsPerSecond = 3500000; // 3.5 Mbps
+        console.log('[VideoExport] Desktop H.264: using 3.5Mbps bitrate');
+      }
+    }
+    
     try {
-      mediaRecorder = new MediaRecorder(canvasStream, {
-        mimeType,
-        videoBitsPerSecond: 3500000 // 3.5 Mbps for 720p H.264
-      });
+      mediaRecorder = new MediaRecorder(canvasStream, recorderConfig);
+      console.log('[VideoExport] MediaRecorder created with config:', recorderConfig);
     } catch (err) {
       console.error('[VideoExport] Failed to create MediaRecorder:', err);
       reject(new Error(`Failed to create recorder: ${err}`));
       return;
     }
     
-    console.log('[VideoExport] MediaRecorder created, state:', mediaRecorder.state);
+    console.log('[VideoExport] MediaRecorder state:', mediaRecorder.state);
 
     mediaRecorder.ondataavailable = (e) => {
       if (e.data.size > 0) {
@@ -177,13 +209,20 @@ export async function exportCanvasVideo(
     };
 
     mediaRecorder.onerror = (e) => {
-       console.error('[VideoExport] MediaRecorder error:', {
-         type: e.type,
-         message: (e as any).message || 'Unknown',
-         error: e.error || 'No error object'
-       });
-       reject(new Error(`Recording failed: ${(e as any).message || e}`));
-     };
+      const errorDetail = {
+        type: e.type,
+        message: (e as any).message || 'Unknown',
+        error: e.error?.name || (e.error ? String(e.error) : 'No error object')
+      };
+      console.error('[VideoExport] MediaRecorder error:', errorDetail);
+      
+      // If it's an encoding error, we need to stop and reject
+      if (errorDetail.error?.includes('EncodingError') || errorDetail.message?.includes('encoder')) {
+        console.error('[VideoExport] Encoder configuration not supported - falling back to WebM not possible mid-recording');
+      }
+      
+      reject(new Error(`Recording failed: ${errorDetail.message || e}`));
+    };
 
     // Ensure canvas is rendered at least once before recording starts
     if (renderFrame) {
