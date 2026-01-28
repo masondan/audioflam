@@ -265,29 +265,48 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   });
 
   // Add audio track if we have audio data
-  // Note: Some browsers don't support mono AAC encoding, so we may need to skip audio
+  // Note: Many mobile browsers don't support mono AAC, so we convert mono to stereo
   let audioSource: InstanceType<typeof AudioBufferSource> | null = null;
   let audioEncodingSupported = false;
+  let processedAudioBuffer: AudioBuffer | null = null;
   
   if (audioBuffer) {
-    // Check if audio encoding is supported for this config
-    const audioChannels = audioBuffer.numberOfChannels;
     const audioSampleRate = audioBuffer.sampleRate;
     
-    // Use higher bitrate for better compatibility (64kbps min for mono, 96kbps for stereo)
-    const adjustedAudioBitrate = Math.max(
-      audioBitrate,
-      audioChannels === 1 ? 64000 : 96000
-    );
+    // Convert mono to stereo if needed (many encoders don't support mono AAC)
+    if (audioBuffer.numberOfChannels === 1) {
+      console.log('[WebCodecs] Converting mono audio to stereo for AAC compatibility');
+      try {
+        const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
+        const stereoBuffer = audioContext.createBuffer(2, audioBuffer.length, audioSampleRate);
+        const monoData = audioBuffer.getChannelData(0);
+        // Duplicate mono channel to both L and R
+        stereoBuffer.getChannelData(0).set(monoData);
+        stereoBuffer.getChannelData(1).set(monoData);
+        processedAudioBuffer = stereoBuffer;
+        audioContext.close();
+      } catch (e) {
+        console.warn('[WebCodecs] Mono to stereo conversion failed:', e);
+        processedAudioBuffer = audioBuffer;
+      }
+    } else {
+      processedAudioBuffer = audioBuffer;
+    }
+    
+    const audioChannels = processedAudioBuffer.numberOfChannels;
+    
+    // Use 96kbps for stereo AAC (good quality, widely supported)
+    const adjustedAudioBitrate = Math.max(audioBitrate, 96000);
     
     console.log('[WebCodecs] Audio config:', {
-      channels: audioChannels,
+      originalChannels: audioBuffer.numberOfChannels,
+      outputChannels: audioChannels,
       sampleRate: audioSampleRate,
       bitrate: adjustedAudioBitrate
     });
 
     try {
-      // Check if AAC encoding is supported for this specific config
+      // Check if AAC encoding is supported for stereo config
       const audioConfig: AudioEncoderConfig = {
         codec: 'mp4a.40.2',
         sampleRate: audioSampleRate,
@@ -305,9 +324,9 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
         });
         output.addAudioTrack(audioSource);
         audioEncodingSupported = true;
-        console.log('[WebCodecs] Audio track added');
+        console.log('[WebCodecs] Audio track added (stereo)');
       } else {
-        console.warn('[WebCodecs] AAC encoding not supported for this config, exporting video only');
+        console.warn('[WebCodecs] AAC encoding not supported, exporting video only');
       }
     } catch (e) {
       console.warn('[WebCodecs] Could not add audio track:', e);
@@ -367,7 +386,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   videoSource.close();
 
   // Add audio data if encoding was supported
-  if (audioSource && audioBuffer && audioEncodingSupported) {
+  if (audioSource && processedAudioBuffer && audioEncodingSupported) {
     console.log('[WebCodecs] Adding audio buffer...');
     onProgress?.({
       phase: 'processing',
@@ -377,33 +396,34 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
 
     try {
       // Trim audio to match video duration if needed
-      const audioDuration = audioBuffer.duration;
+      const audioDuration = processedAudioBuffer.duration;
       const trimmedDuration = Math.min(audioDuration, duration);
       
       // AudioBufferSource.add() takes an AudioBuffer
       // If audio is longer than video, we should trim it
       if (audioDuration > duration) {
         // Create a trimmed audio buffer
-        const sampleRate = audioBuffer.sampleRate;
+        const sampleRate = processedAudioBuffer.sampleRate;
         const trimmedLength = Math.floor(trimmedDuration * sampleRate);
         const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)();
         const trimmedBuffer = audioContext.createBuffer(
-          audioBuffer.numberOfChannels,
+          processedAudioBuffer.numberOfChannels,
           trimmedLength,
           sampleRate
         );
-        for (let channel = 0; channel < audioBuffer.numberOfChannels; channel++) {
-          const sourceData = audioBuffer.getChannelData(channel);
+        for (let channel = 0; channel < processedAudioBuffer.numberOfChannels; channel++) {
+          const sourceData = processedAudioBuffer.getChannelData(channel);
           const destData = trimmedBuffer.getChannelData(channel);
           destData.set(sourceData.subarray(0, trimmedLength));
         }
         await audioSource.add(trimmedBuffer);
         audioContext.close();
       } else {
-        await audioSource.add(audioBuffer);
+        await audioSource.add(processedAudioBuffer);
       }
       
       audioSource.close();
+      console.log('[WebCodecs] Audio encoding complete');
     } catch (audioError) {
       console.warn('[WebCodecs] Audio encoding failed, continuing with video only:', audioError);
       // Don't throw - just continue without audio
