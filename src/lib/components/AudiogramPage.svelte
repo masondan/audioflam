@@ -915,8 +915,23 @@
       // Ensure we have an audio element
       if (!audioElement) {
         audioElement = new Audio(audioData.url);
-        await new Promise<void>((resolve) => {
-          audioElement!.onloadedmetadata = () => resolve();
+        audioElement.crossOrigin = 'anonymous';
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            reject(new Error('Audio element failed to load'));
+          }, 5000);
+          audioElement!.onloadedmetadata = () => {
+            clearTimeout(timeout);
+            console.log('[Export] Audio element loaded:', {
+              duration: audioElement!.duration,
+              readyState: audioElement!.readyState
+            });
+            resolve();
+          };
+          audioElement!.onerror = () => {
+            clearTimeout(timeout);
+            reject(new Error('Failed to load audio element'));
+          };
           audioElement!.load();
         });
       }

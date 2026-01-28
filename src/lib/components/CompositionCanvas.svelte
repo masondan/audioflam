@@ -328,8 +328,12 @@
   });
 
   export function renderFrame() {
-    render();
-  }
+     try {
+       render();
+     } catch (err) {
+       console.error('[CompositionCanvas] Error in renderFrame:', err);
+     }
+   }
 
   export function getCanvas(): HTMLCanvasElement | null {
     return canvas;

@@ -217,27 +217,45 @@ YARNGPT_API_KEY=<YarnGPT API key>
 
 ## Current Development Mission
 
-### MP4 Export Black Screen (Mobile) - ACTIVE BLOCKER
+### MP4 Export Black Screen (Mobile) - DIAGNOSTIC BUILD
 
-**Problem:** Audiogram export to MP4 succeeds on desktop but produces a black/blank video on mobile devices (Android Chrome), though audio plays correctly.
+**Problem:** MediaRecorder on mobile devices fails immediately with error `ErrorEvent { filename: '', colinfo: 0 }`, resulting in 0 chunks and 0-byte blob. Regression from previous attempt.
 
-**Root Cause:** Canvas frames weren't being captured during `MediaRecorder` recording because the canvas wasn't actively redrawn.
+**Root Cause:** Likely one of:
+1. `canvas.captureStream()` returns invalid stream on mobile
+2. Audio track from `audioElement.captureStream()` in invalid state
+3. MediaRecorder codec unsupported on this device
+4. Browser implementation bug with mixed streams
 
-**Attempted Solution:** Added `requestAnimationFrame` loop in `CompositionCanvas.svelte` to continuously redraw during export, but this caused `MediaRecorder` to report 0 chunks and create empty blobs.
+**Latest Changes (Diagnostic Build):**
+- ✅ Enhanced canvas stream validation with detailed logging
+- ✅ Mobile-first codec selection (WebM priority for mobile)
+- ✅ Audio track state validation before adding
+- ✅ 50ms delay before recording start (ensures track settlement)
+- ✅ Detailed error messages with full context
+- ✅ Audio element load timeout (5s) and state checking
 
-**Implemented Fix:** Decoupled rendering from general app state:
-- Added explicit `startExportRendering()` and `stopExportRendering()` functions in `CompositionCanvas.svelte`
-- Updated `video-export.ts` to accept `startPlayback` and `stopPlayback` callbacks
-- Callbacks in `AudiogramPage.svelte` now trigger dedicated export rendering only during the `MediaRecorder` phase
+**Key Files Updated:**
+- `src/lib/utils/video-export.ts` - stream validation, codec selection, error logging
+- `src/lib/components/CompositionCanvas.svelte` - render error handling
+- `src/lib/components/AudiogramPage.svelte` - audio element prep
 
-**Current Status:** Fix implemented; requires testing on actual mobile devices (black screen may persist or may be resolved).
+**Diagnostic Logs to Watch:**
+```
+[VideoExport] Device: Mobile
+[VideoExport] Canvas stream created: { videoTracks: 1, trackState: 'live', trackEnabled: true }
+[VideoExport] Audio stream tracks: 1
+[VideoExport] Selected mime type: video/webm;codecs=vp8,opus
+[VideoExport] MediaRecorder created, state: recording
+[VideoExport] MediaRecorder started, state: recording
+```
 
-**Key Files:**
-- `src/lib/components/CompositionCanvas.svelte` - contains export rendering loop
-- `src/lib/utils/video-export.ts` - FFmpeg.wasm MP4 encoding logic
-- `src/lib/components/AudiogramPage.svelte` - export flow and callbacks
+**Current Status:** Diagnostic build deployed; awaiting mobile test results.
 
 **Next Steps:**
-1. Test MP4 export on Android/iOS mobile devices
-2. If black screen persists: investigate canvas timing, frame buffer, or codec issues
-3. Once fixed: proceed to Step 14 (Polish & edge cases)
+1. Test export on Android Chrome - share full console output
+2. Identify which log line is missing (pinpoints failure)
+3. If still failing: consider audio-only fallback or different capture method
+4. Once working: proceed to Step 14 (Polish & edge cases)
+
+**See:** `MOBILE_EXPORT_FIX.md` for detailed debugging guide
