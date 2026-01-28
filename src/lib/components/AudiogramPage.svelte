@@ -947,9 +947,11 @@
       );
 
       // Store the blob/mimeType and show filename modal
+      console.log('[Export] Received result, blob size:', exportResult.blob.size);
       pendingVideoBlob = exportResult.blob;
       pendingVideoMimeType = exportResult.mimeType;
       exportFilename = generateFilename(exportResult.mimeType);
+      console.log('[Export] Showing filename modal');
       showFilenameModal = true;
     } catch (err) {
       console.error('Export failed:', err);

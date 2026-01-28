@@ -82,7 +82,14 @@ export async function exportCanvasVideo(
       }
     };
 
-    mediaRecorder.onstop = () => {
+    let hasResolved = false;
+
+    function finalizeRecording() {
+      if (hasResolved) return;
+      hasResolved = true;
+      
+      console.log('[VideoExport] Finalizing, chunks:', chunks.length);
+      
       onProgress?.({
         phase: 'processing',
         progress: 0.95,
@@ -90,6 +97,7 @@ export async function exportCanvasVideo(
       });
 
       const blob = new Blob(chunks, { type: mimeType });
+      console.log('[VideoExport] Blob created, size:', blob.size);
       
       onProgress?.({
         phase: 'complete',
@@ -98,9 +106,15 @@ export async function exportCanvasVideo(
       });
 
       resolve({ blob, mimeType });
+    }
+
+    mediaRecorder.onstop = () => {
+      console.log('[VideoExport] onstop fired');
+      finalizeRecording();
     };
 
     mediaRecorder.onerror = (e) => {
+      console.error('[VideoExport] MediaRecorder error:', e);
       reject(new Error(`Recording failed: ${e}`));
     };
 
@@ -131,12 +145,28 @@ export async function exportCanvasVideo(
 
     // Stop recording when duration is reached
     setTimeout(() => {
+      console.log('[VideoExport] Duration reached, stopping recorder');
       clearInterval(progressInterval);
       stopPlayback?.();
-      mediaRecorder.stop();
+      
+      try {
+        if (mediaRecorder.state !== 'inactive') {
+          mediaRecorder.stop();
+        }
+      } catch (err) {
+        console.error('[VideoExport] Error stopping recorder:', err);
+      }
       
       // Stop all tracks
       canvasStream.getTracks().forEach(track => track.stop());
+      
+      // Fallback: if onstop doesn't fire within 2 seconds, finalize anyway
+      setTimeout(() => {
+        if (!hasResolved && chunks.length > 0) {
+          console.warn('[VideoExport] onstop did not fire, using fallback');
+          finalizeRecording();
+        }
+      }, 2000);
     }, duration * 1000 + 500); // Add 500ms buffer
   });
 }
