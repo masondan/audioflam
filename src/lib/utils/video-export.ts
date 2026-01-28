@@ -147,11 +147,12 @@ export async function exportCanvasVideo(
     let mediaRecorder: MediaRecorder;
     const recorderConfig: any = { mimeType };
     
-    // Only set bitrate for desktop H.264, or use lower bitrate for mobile
+    // Only set bitrate for H.264 (WebM doesn't use videoBitsPerSecond the same way)
     if (isH264) {
       if (isMobile) {
-        // Mobile: use no bitrate constraint (let browser choose, usually more conservative)
-        console.log('[VideoExport] Mobile H.264: using browser-managed bitrate');
+        // Mobile: use very low bitrate to prevent encoder errors
+        recorderConfig.videoBitsPerSecond = 800000; // 800 kbps - conservative for mobile H.264
+        console.log('[VideoExport] Mobile H.264: using 800kbps bitrate');
       } else {
         // Desktop: use high bitrate for better quality
         recorderConfig.videoBitsPerSecond = 3500000; // 3.5 Mbps
