@@ -349,8 +349,10 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
 
   console.log('[WebCodecs] Recording', totalFrames, 'frames at', fps, 'fps');
 
-  // Start audio playback for waveform animation sync (if using audioElement)
-  startAudioPlayback?.();
+  // NOTE: We deliberately DON'T start audio playback during WebCodecs export
+  // The audio is encoded directly from the AudioBuffer, not captured from playback
+  // Starting playback would cause stuttering due to CPU load from encoding
+  // The waveform animation should use time-based calculation, not live audio analysis
 
   // Record frames
   const startTime = performance.now();
@@ -379,9 +381,6 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
     }
   }
 
-  // Stop audio playback
-  stopAudioPlayback?.();
-  
   // Close video source (no more frames)
   videoSource.close();
 

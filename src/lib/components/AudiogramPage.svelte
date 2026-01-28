@@ -981,9 +981,26 @@
         },
         (currentTimeInExport) => {
           // Render frame callback - receives current time for animation sync
-          // Update the playback position for waveform animation
-          if (audioElement) {
-            audioElement.currentTime = audioData!.duration * trimStart + currentTimeInExport;
+          // For WebCodecs export: generate waveform data from pre-computed peaks
+          // (we don't use live audio analysis because it causes stuttering)
+          if (waveformActive && audioData?.waveform) {
+            const totalDuration = audioData.duration * (trimEnd - trimStart);
+            const timePosition = currentTimeInExport / totalDuration;
+            const peakIndex = Math.floor(timePosition * audioData.waveform.peaks.length);
+            
+            // Generate frequency data based on current amplitude
+            const currentAmplitude = audioData.waveform.peaks[Math.min(peakIndex, audioData.waveform.peaks.length - 1)] || 0.5;
+            const targetBins = 80;
+            const syntheticData = new Uint8Array(targetBins);
+            
+            for (let i = 0; i < targetBins; i++) {
+              // Create symmetrical waveform with variation
+              const phase = currentTimeInExport * 8 + i * 0.4;
+              const variation = Math.sin(phase) * 20 + Math.sin(phase * 0.7) * 15;
+              const baseValue = currentAmplitude * 180;
+              syntheticData[i] = Math.max(30, Math.min(255, baseValue + variation));
+            }
+            waveformFrequencyData = syntheticData;
           }
           compositionCanvasRef?.renderFrame();
         },
