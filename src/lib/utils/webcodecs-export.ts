@@ -265,15 +265,50 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   });
 
   // Add audio track if we have audio data
+  // Note: Some browsers don't support mono AAC encoding, so we may need to skip audio
   let audioSource: InstanceType<typeof AudioBufferSource> | null = null;
+  let audioEncodingSupported = false;
+  
   if (audioBuffer) {
+    // Check if audio encoding is supported for this config
+    const audioChannels = audioBuffer.numberOfChannels;
+    const audioSampleRate = audioBuffer.sampleRate;
+    
+    // Use higher bitrate for better compatibility (64kbps min for mono, 96kbps for stereo)
+    const adjustedAudioBitrate = Math.max(
+      audioBitrate,
+      audioChannels === 1 ? 64000 : 96000
+    );
+    
+    console.log('[WebCodecs] Audio config:', {
+      channels: audioChannels,
+      sampleRate: audioSampleRate,
+      bitrate: adjustedAudioBitrate
+    });
+
     try {
-      audioSource = new AudioBufferSource({
-        codec: 'aac',
-        bitrate: audioBitrate,
-      });
-      output.addAudioTrack(audioSource);
-      console.log('[WebCodecs] Audio track added');
+      // Check if AAC encoding is supported for this specific config
+      const audioConfig: AudioEncoderConfig = {
+        codec: 'mp4a.40.2',
+        sampleRate: audioSampleRate,
+        numberOfChannels: audioChannels,
+        bitrate: adjustedAudioBitrate,
+      };
+      
+      const audioSupport = await AudioEncoder.isConfigSupported(audioConfig);
+      console.log('[WebCodecs] AAC config support check:', audioSupport);
+      
+      if (audioSupport.supported) {
+        audioSource = new AudioBufferSource({
+          codec: 'aac',
+          bitrate: adjustedAudioBitrate,
+        });
+        output.addAudioTrack(audioSource);
+        audioEncodingSupported = true;
+        console.log('[WebCodecs] Audio track added');
+      } else {
+        console.warn('[WebCodecs] AAC encoding not supported for this config, exporting video only');
+      }
     } catch (e) {
       console.warn('[WebCodecs] Could not add audio track:', e);
       // Continue without audio
