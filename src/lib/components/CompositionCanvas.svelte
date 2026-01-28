@@ -303,26 +303,6 @@
     render();
   });
 
-  // Continuous render loop when playing (required for captureStream on mobile)
-  let animationFrameId: number | null = null;
-  
-  $effect(() => {
-    if (isPlaying) {
-      function animationLoop() {
-        render();
-        animationFrameId = requestAnimationFrame(animationLoop);
-      }
-      animationFrameId = requestAnimationFrame(animationLoop);
-      
-      return () => {
-        if (animationFrameId !== null) {
-          cancelAnimationFrame(animationFrameId);
-          animationFrameId = null;
-        }
-      };
-    }
-  });
-
   onMount(() => {
     if (canvas) {
       ctx = canvas.getContext('2d');
@@ -346,6 +326,28 @@
     if (!waveformConfig?.enabled || isPlaying) return 'default';
     return 'default';
   });
+
+  // Continuous render loop for video export - canvas.captureStream needs active redraws
+  let exportAnimationId: number | null = null;
+  
+  export function startExportRendering() {
+    if (exportAnimationId !== null) return;
+    
+    function loop() {
+      render();
+      exportAnimationId = requestAnimationFrame(loop);
+    }
+    exportAnimationId = requestAnimationFrame(loop);
+    console.log('[CompositionCanvas] Export rendering started');
+  }
+  
+  export function stopExportRendering() {
+    if (exportAnimationId !== null) {
+      cancelAnimationFrame(exportAnimationId);
+      exportAnimationId = null;
+      console.log('[CompositionCanvas] Export rendering stopped');
+    }
+  }
 
   export function getCanvas(): HTMLCanvasElement | null {
     return canvas;

@@ -17,7 +17,8 @@ export async function exportCanvasVideo(
   duration: number,
   onProgress?: ProgressCallback,
   startPlayback?: () => void,
-  stopPlayback?: () => void
+  stopPlayback?: () => void,
+  onRenderFrame?: () => void
 ): Promise<ExportResult> {
   return new Promise((resolve, reject) => {
     onProgress?.({

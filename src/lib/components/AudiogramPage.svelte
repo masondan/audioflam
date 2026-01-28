@@ -125,7 +125,11 @@
   let exportFilename = $state('');
   let pendingVideoBlob = $state<Blob | null>(null);
   let pendingVideoMimeType = $state('');
-  let compositionCanvasRef = $state<{ getCanvas: () => HTMLCanvasElement | null } | null>(null);
+  let compositionCanvasRef = $state<{ 
+  getCanvas: () => HTMLCanvasElement | null;
+  startExportRendering: () => void;
+  stopExportRendering: () => void;
+} | null>(null);
 
   let hasAudio = $derived(audioData !== null);
   let hasImage = $derived(imageData !== null);
@@ -933,6 +937,7 @@
         () => {
           // Start playback callback
           isPlaying = true;
+          compositionCanvasRef?.startExportRendering();
           audioElement?.play();
           if (waveformActive) {
             startWaveformAnimation();
@@ -941,6 +946,7 @@
         () => {
           // Stop playback callback
           isPlaying = false;
+          compositionCanvasRef?.stopExportRendering();
           audioElement?.pause();
           stopWaveformAnimation();
         }
