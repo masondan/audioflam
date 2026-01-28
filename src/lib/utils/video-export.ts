@@ -102,8 +102,9 @@ export async function exportCanvasVideo(
 
     // Determine best supported codec
     // Priority: H.264/MP4 (best sharing compatibility), then WebM
-    // Note: H.264 may fail at encoding time if bitrate is unsupported, so we'll try WebM fallback
+    // Note: Use avc3 instead of avc1 to avoid codec description changes during recording
     const h264Types = [
+      'video/mp4;codecs=avc3',
       'video/mp4;codecs=h264',
       'video/mp4;codecs=avc1',
       'video/mp4'
@@ -144,7 +145,7 @@ export async function exportCanvasVideo(
       return;
     }
 
-    const isH264 = mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1');
+    const isH264 = mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1') || mimeType.includes('avc3');
     console.log(`[VideoExport] Using codec: ${mimeType} (${isH264 ? 'H.264/MP4' : 'WebM'})`)
 
     const chunks: Blob[] = [];
@@ -334,7 +335,7 @@ export function downloadBlob(blob: Blob, filename: string): void {
 }
 
 export function getExtensionFromMimeType(mimeType: string): string {
-  if (mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1')) {
+  if (mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1') || mimeType.includes('avc3')) {
     return 'mp4';
   }
   return 'webm';

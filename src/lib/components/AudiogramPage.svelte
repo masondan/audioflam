@@ -132,7 +132,9 @@
 
   let hasAudio = $derived(audioData !== null);
   let hasImage = $derived(imageData !== null);
-  let canDownload = $derived(hasImage && hasAudio);
+  // For testing audio-less export on mobile, allow download with just image
+const isMobileTest = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+let canDownload = $derived(isMobileTest ? hasImage : (hasImage && hasAudio));
   let isMicActive = $derived(recordingPhase !== 'idle');
 
   let waveformConfig = $derived<WaveformConfig | null>(
