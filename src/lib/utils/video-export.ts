@@ -90,19 +90,9 @@ export async function exportCanvasVideo(
       audioTracks: canvasStream.getAudioTracks().length
     });
 
-    // Determine best supported codec - prioritize H.264/MP4 for Chrome/Safari
-    // On mobile, WebM might be more reliable
-    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-    const mimeTypes = isMobile ? [
-      'video/webm;codecs=vp8,opus',
-      'video/webm;codecs=vp9,opus',
-      'video/webm;codecs=vp9',
-      'video/webm;codecs=vp8',
-      'video/webm',
-      'video/mp4;codecs=h264',
-      'video/mp4;codecs=avc1',
-      'video/mp4'
-    ] : [
+    // Determine best supported codec - prioritize H.264/MP4 for all devices
+    // H.264 has best compatibility for sharing (messaging, social media, etc.)
+    const mimeTypes = [
       'video/mp4;codecs=h264',
       'video/mp4;codecs=avc1',
       'video/mp4',
@@ -112,8 +102,6 @@ export async function exportCanvasVideo(
       'video/webm;codecs=vp8',
       'video/webm'
     ];
-    
-    console.log('[VideoExport] Device:', isMobile ? 'Mobile' : 'Desktop');
     
     let mimeType = '';
     for (const type of mimeTypes) {
