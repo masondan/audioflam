@@ -18,7 +18,7 @@
     drawLiveWaveform
   } from '$lib/utils/recording';
   import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition, LightEffectConfig } from '$lib/utils/compositor';
-  import { exportCanvasVideo, downloadBlob, generateFilename, type ExportProgress } from '$lib/utils/video-export';
+  import { exportCanvasVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
@@ -124,6 +124,7 @@
   let showFilenameModal = $state(false);
   let exportFilename = $state('');
   let pendingVideoBlob = $state<Blob | null>(null);
+  let pendingVideoMimeType = $state('');
   let compositionCanvasRef = $state<{ getCanvas: () => HTMLCanvasElement | null } | null>(null);
 
   let hasAudio = $derived(audioData !== null);
@@ -922,7 +923,7 @@
       audioElement.currentTime = audioData.duration * trimStart;
 
       // Export using MediaRecorder (canvas.captureStream + audio)
-      const videoBlob = await exportCanvasVideo(
+      const exportResult = await exportCanvasVideo(
         canvas,
         audioElement,
         audioDuration,
@@ -945,9 +946,10 @@
         }
       );
 
-      // Store the blob and show filename modal
-      pendingVideoBlob = videoBlob;
-      exportFilename = generateFilename('webm');
+      // Store the blob/mimeType and show filename modal
+      pendingVideoBlob = exportResult.blob;
+      pendingVideoMimeType = exportResult.mimeType;
+      exportFilename = generateFilename(exportResult.mimeType);
       showFilenameModal = true;
     } catch (err) {
       console.error('Export failed:', err);
@@ -970,7 +972,10 @@
 
   function handleFilenameConfirm() {
     if (pendingVideoBlob && exportFilename) {
-      const filename = exportFilename.endsWith('.mp4') ? exportFilename : `${exportFilename}.mp4`;
+      const extension = getExtensionFromMimeType(pendingVideoMimeType);
+      const filename = exportFilename.endsWith(`.${extension}`) 
+        ? exportFilename 
+        : `${exportFilename}.${extension}`;
       downloadBlob(pendingVideoBlob, filename);
     }
     handleFilenameCancel();
@@ -979,6 +984,7 @@
   function handleFilenameCancel() {
     showFilenameModal = false;
     pendingVideoBlob = null;
+    pendingVideoMimeType = '';
     exportFilename = '';
     exportProgress = null;
   }

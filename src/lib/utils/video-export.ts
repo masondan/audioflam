@@ -6,6 +6,11 @@ export interface ExportProgress {
 
 export type ProgressCallback = (progress: ExportProgress) => void;
 
+export interface ExportResult {
+  blob: Blob;
+  mimeType: string;
+}
+
 export async function exportCanvasVideo(
   canvas: HTMLCanvasElement,
   audioElement: HTMLAudioElement,
@@ -13,7 +18,7 @@ export async function exportCanvasVideo(
   onProgress?: ProgressCallback,
   startPlayback?: () => void,
   stopPlayback?: () => void
-): Promise<Blob> {
+): Promise<ExportResult> {
   return new Promise((resolve, reject) => {
     onProgress?.({
       phase: 'preparing',
@@ -47,14 +52,16 @@ export async function exportCanvasVideo(
       console.warn('Could not capture audio, exporting video only:', err);
     }
 
-    // Determine best supported codec
+    // Determine best supported codec - prioritize H.264/MP4 for Chrome/Safari
     const mimeTypes = [
+      'video/mp4;codecs=h264',
+      'video/mp4;codecs=avc1',
+      'video/mp4',
       'video/webm;codecs=vp9,opus',
       'video/webm;codecs=vp8,opus',
       'video/webm;codecs=vp9',
       'video/webm;codecs=vp8',
-      'video/webm',
-      'video/mp4'
+      'video/webm'
     ];
     
     let mimeType = '';
@@ -70,10 +77,13 @@ export async function exportCanvasVideo(
       return;
     }
 
+    const isH264 = mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1');
+    console.log(`[VideoExport] Using codec: ${mimeType} (${isH264 ? 'H.264/MP4' : 'WebM'})`)
+
     const chunks: Blob[] = [];
     const mediaRecorder = new MediaRecorder(canvasStream, {
       mimeType,
-      videoBitsPerSecond: 5000000 // 5 Mbps for good quality
+      videoBitsPerSecond: 3500000 // 3.5 Mbps for 720p H.264
     });
 
     mediaRecorder.ondataavailable = (e) => {
@@ -105,7 +115,7 @@ export async function exportCanvasVideo(
         message: 'Complete!'
       });
 
-      resolve(blob);
+      resolve({ blob, mimeType });
     };
 
     mediaRecorder.onerror = (e) => {
@@ -160,7 +170,15 @@ export function downloadBlob(blob: Blob, filename: string): void {
   URL.revokeObjectURL(url);
 }
 
-export function generateFilename(extension: string = 'webm'): string {
+export function getExtensionFromMimeType(mimeType: string): string {
+  if (mimeType.includes('mp4') || mimeType.includes('h264') || mimeType.includes('avc1')) {
+    return 'mp4';
+  }
+  return 'webm';
+}
+
+export function generateFilename(mimeType: string = 'video/webm'): string {
+  const extension = getExtensionFromMimeType(mimeType);
   const now = new Date();
   const day = String(now.getDate()).padStart(2, '0');
   const month = String(now.getMonth() + 1).padStart(2, '0');
