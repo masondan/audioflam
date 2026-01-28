@@ -191,9 +191,15 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
     stopAudioPlayback,
   } = config;
 
+  // H.264 requires even dimensions - round up to nearest even number
+  const videoWidth = canvas.width % 2 === 0 ? canvas.width : canvas.width + 1;
+  const videoHeight = canvas.height % 2 === 0 ? canvas.height : canvas.height + 1;
+
   console.log('[WebCodecs] Starting export', {
-    width: canvas.width,
-    height: canvas.height,
+    canvasWidth: canvas.width,
+    canvasHeight: canvas.height,
+    videoWidth,
+    videoHeight,
     duration,
     fps,
     videoBitrate,
@@ -233,8 +239,13 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   let encodedFrames = 0;
   const totalFrames = Math.ceil(duration * fps);
 
-  // Add video track from canvas
-  const videoSource = new CanvasSource(canvas, {
+  // Create an offscreen canvas with even dimensions for H.264 compatibility
+  // H.264 requires both width and height to be even numbers
+  const exportCanvas = new OffscreenCanvas(videoWidth, videoHeight);
+  const exportCtx = exportCanvas.getContext('2d')!;
+
+  // Add video track from the even-dimensioned canvas
+  const videoSource = new CanvasSource(exportCanvas, {
     codec: 'avc', // H.264
     bitrate: videoBitrate,
     keyFrameInterval: 2, // Keyframe every 2 seconds
@@ -250,7 +261,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   });
   
   output.addVideoTrack(videoSource, {
-    frameRate: fps
+    frameRate: fps,
   });
 
   // Add audio track if we have audio data
@@ -298,6 +309,9 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
     if (renderFrame) {
       renderFrame(currentTime);
     }
+
+    // Copy from source canvas to export canvas (handles odd -> even dimension conversion)
+    exportCtx.drawImage(canvas, 0, 0, videoWidth, videoHeight);
 
     // Add frame to video source with timestamp and duration (in seconds)
     // CanvasSource.add(timestamp, duration) captures the current canvas state
