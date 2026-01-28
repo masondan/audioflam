@@ -943,7 +943,12 @@
       const audioDuration = audioData.duration * (trimEnd - trimStart);
       audioElement.currentTime = audioData.duration * trimStart;
 
-      // Export using MediaRecorder (canvas.captureStream + audio)
+      // Test: On mobile, try without audio first to diagnose H.264 encoding issues
+      const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
+      const shouldIncludeAudio = !isMobile; // Disable audio on mobile for testing
+      console.log('[Export] Testing audio-less export on mobile. includeAudio:', shouldIncludeAudio);
+
+      // Export using MediaRecorder (canvas.captureStream + optional audio)
       const exportResult = await exportCanvasVideo(
         canvas,
         audioElement,
@@ -968,7 +973,8 @@
           isPlaying = false;
           audioElement?.pause();
           stopWaveformAnimation();
-        }
+        },
+        shouldIncludeAudio
       );
 
       // Store the blob/mimeType and show filename modal

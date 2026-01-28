@@ -18,7 +18,8 @@ export async function exportCanvasVideo(
    onProgress?: ProgressCallback,
    renderFrame?: () => void,
    startAudioPlayback?: () => void,
-   stopAudioPlayback?: () => void
+   stopAudioPlayback?: () => void,
+   includeAudio: boolean = true
 ): Promise<ExportResult> {
    return new Promise((resolve, reject) => {
      onProgress?.({
@@ -61,32 +62,36 @@ export async function exportCanvasVideo(
        console.log('[VideoExport] Enabled disabled video track');
      }
     
-    // Capture audio stream directly from the audio element
+    // Capture audio stream directly from the audio element (if enabled)
     // This avoids conflicts with existing AudioContext connections
-    try {
-      const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
-      const audioTracks = audioStream.getAudioTracks();
-      console.log('[VideoExport] Audio stream tracks:', audioTracks.length);
-      
-      if (audioTracks.length > 0) {
-        const audioTrack = audioTracks[0];
-        console.log('[VideoExport] Audio track state:', { 
-          readyState: audioTrack.readyState,
-          enabled: audioTrack.enabled 
-        });
+    if (includeAudio) {
+      try {
+        const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
+        const audioTracks = audioStream.getAudioTracks();
+        console.log('[VideoExport] Audio stream tracks:', audioTracks.length);
         
-        // Only add track if it's in a valid state
-        if (audioTrack.readyState === 'live') {
-          canvasStream.addTrack(audioTrack);
-          console.log('[VideoExport] Audio track added successfully');
+        if (audioTracks.length > 0) {
+          const audioTrack = audioTracks[0];
+          console.log('[VideoExport] Audio track state:', { 
+            readyState: audioTrack.readyState,
+            enabled: audioTrack.enabled 
+          });
+          
+          // Only add track if it's in a valid state
+          if (audioTrack.readyState === 'live') {
+            canvasStream.addTrack(audioTrack);
+            console.log('[VideoExport] Audio track added successfully');
+          } else {
+            console.warn('[VideoExport] Audio track not live, skipping audio');
+          }
         } else {
-          console.warn('[VideoExport] Audio track not live, skipping audio');
+          console.warn('[VideoExport] No audio tracks in audio stream');
         }
-      } else {
-        console.warn('[VideoExport] No audio tracks in audio stream');
+      } catch (err) {
+        console.warn('[VideoExport] Could not capture audio, exporting video only:', err);
       }
-    } catch (err) {
-      console.warn('[VideoExport] Could not capture audio, exporting video only:', err);
+    } else {
+      console.log('[VideoExport] Audio disabled for this export (test mode)');
     }
     
     // Log canvas stream tracks for debugging
