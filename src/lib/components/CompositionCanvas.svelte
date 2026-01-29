@@ -116,15 +116,12 @@
   function getHandleAtPoint(x: number, y: number, pos: { x: number; y: number; width: number; height: number }): string | null {
     const handleSize = 0.03;
 
+    // Corner handles only
     const handles = [
       { name: 'nw', hx: pos.x, hy: pos.y },
       { name: 'ne', hx: pos.x + pos.width, hy: pos.y },
       { name: 'sw', hx: pos.x, hy: pos.y + pos.height },
-      { name: 'se', hx: pos.x + pos.width, hy: pos.y + pos.height },
-      { name: 'n', hx: pos.x + pos.width / 2, hy: pos.y },
-      { name: 's', hx: pos.x + pos.width / 2, hy: pos.y + pos.height },
-      { name: 'w', hx: pos.x, hy: pos.y + pos.height / 2 },
-      { name: 'e', hx: pos.x + pos.width, hy: pos.y + pos.height / 2 }
+      { name: 'se', hx: pos.x + pos.width, hy: pos.y + pos.height }
     ];
 
     for (const handle of handles) {

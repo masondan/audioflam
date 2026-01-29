@@ -6,11 +6,13 @@
   interface Props {
     selectedStyle: WaveformStyle;
     selectedColor: string;
+    opacity: number;
     onStyleChange: (style: WaveformStyle) => void;
     onColorChange: (color: string) => void;
+    onOpacityChange: (opacity: number) => void;
   }
 
-  let { selectedStyle, selectedColor, onStyleChange, onColorChange }: Props = $props();
+  let { selectedStyle, selectedColor, opacity, onStyleChange, onColorChange, onOpacityChange }: Props = $props();
 
   let showColorPicker = $state(false);
   let isWhiteSelected = $derived(selectedColor === '#ffffff' || selectedColor === '#FFFFFF');
@@ -35,6 +37,11 @@
 
   function handleColorPickerChange(color: string) {
     onColorChange(color);
+  }
+
+  function handleOpacityInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    onOpacityChange(parseFloat(target.value));
   }
 </script>
 
@@ -82,6 +89,20 @@
         </div>
       </button>
     {/each}
+  </div>
+
+  <div class="opacity-row">
+    <label class="opacity-label" for="waveform-opacity">Opacity</label>
+    <input
+      id="waveform-opacity"
+      type="range"
+      min="0"
+      max="1"
+      step="0.01"
+      value={opacity}
+      oninput={handleOpacityInput}
+      class="opacity-slider"
+    />
   </div>
 
   <div class="color-options">
@@ -170,6 +191,82 @@
   .tile-svg {
     width: 100%;
     height: 100%;
+  }
+
+  .opacity-row {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-md);
+  }
+
+  .opacity-label {
+    font-size: var(--font-size-sm);
+    color: var(--color-text-secondary);
+    font-weight: 500;
+    flex-shrink: 0;
+  }
+
+  .opacity-slider {
+    flex: 1;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: #efefef;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+  }
+
+  .opacity-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #777777;
+    cursor: pointer;
+    transition: background var(--transition-fast);
+    border: none;
+    margin-top: -6px;
+  }
+
+  .opacity-slider::-webkit-slider-thumb:hover {
+    background: #555555;
+  }
+
+  .opacity-slider::-webkit-slider-thumb:active {
+    background: var(--color-primary);
+  }
+
+  .opacity-slider::-moz-range-thumb {
+    width: 18px;
+    height: 18px;
+    border-radius: 50%;
+    background: #777777;
+    cursor: pointer;
+    border: none;
+    transition: background var(--transition-fast);
+  }
+
+  .opacity-slider::-moz-range-thumb:hover {
+    background: #555555;
+  }
+
+  .opacity-slider::-moz-range-thumb:active {
+    background: var(--color-primary);
+  }
+
+  .opacity-slider::-webkit-slider-runnable-track {
+    background: #d0d0d0;
+    height: 6px;
+    border-radius: var(--radius-full);
+  }
+
+  .opacity-slider::-moz-range-track {
+    background: #d0d0d0;
+    height: 6px;
+    border-radius: var(--radius-full);
+    border: none;
   }
 
   .color-options {

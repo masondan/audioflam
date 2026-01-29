@@ -17,6 +17,7 @@ export interface WaveformConfig {
   style: 'bars' | 'thin' | 'blocks';
   frequencyData?: Uint8Array;
   isEditing?: boolean;
+  opacity?: number;
 }
 
 export interface TitlePosition {
@@ -107,7 +108,7 @@ export function renderWaveformLayer(
   canvas: HTMLCanvasElement,
   config: WaveformConfig
 ): void {
-  const { position, color, style, frequencyData, isEditing } = config;
+  const { position, color, style, frequencyData, isEditing, opacity = 1 } = config;
   
   const x = position.x * canvas.width;
   const y = position.y * canvas.height;
@@ -115,6 +116,7 @@ export function renderWaveformLayer(
   const height = position.height * canvas.height;
 
   ctx.save();
+  ctx.globalAlpha = opacity;
 
   if (isEditing) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
@@ -127,7 +129,7 @@ export function renderWaveformLayer(
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
 
-    // Corner handles - larger circles
+    // Corner handles only
     const cornerHandleSize = 18;
     const cornerHandles = [
       { hx: x, hy: y },
@@ -142,34 +144,6 @@ export function renderWaveformLayer(
       ctx.fill();
       ctx.stroke();
     }
-
-    // Edge handles - chunky pill/capsule shapes
-    const edgeHandleWidth = 10;
-    const edgeHandleLength = 28;
-    const edgeHandleRadius = edgeHandleWidth / 2;
-
-    // Top edge handle (horizontal pill)
-    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    // Bottom edge handle (horizontal pill)
-    ctx.beginPath();
-    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y + height - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    // Left edge handle (vertical pill)
-    ctx.beginPath();
-    roundedRect(ctx, x - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    // Right edge handle (vertical pill)
-    ctx.beginPath();
-    roundedRect(ctx, x + width - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
   }
 
   const data = frequencyData || generateStaticWaveformData(32);
@@ -416,29 +390,6 @@ export function renderTitleLayer(
       ctx.fill();
       ctx.stroke();
     }
-
-    const edgeHandleWidth = 10;
-    const edgeHandleLength = 28;
-    const edgeHandleRadius = edgeHandleWidth / 2;
-
-    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y + height - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    roundedRect(ctx, x - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
-
-    ctx.beginPath();
-    roundedRect(ctx, x + width - edgeHandleWidth / 2, y + height / 2 - edgeHandleLength / 2, edgeHandleWidth, edgeHandleLength, edgeHandleRadius);
-    ctx.fill();
-    ctx.stroke();
   }
 
   ctx.restore();

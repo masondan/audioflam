@@ -80,6 +80,7 @@
   // Waveform overlay state
   let waveformStyle = $state<WaveformStyle>('bars');
   let waveformColor = $state('#ffffff');
+  let waveformOpacity = $state(1);
   let waveformPosition = $state<WaveformPosition>({
     x: 0.1,
     y: 0.65,
@@ -149,7 +150,8 @@
       color: waveformColor,
       style: waveformStyle,
       frequencyData: waveformFrequencyData,
-      isEditing: waveformSelected && !isPlaying && !isExporting
+      isEditing: waveformSelected && !isPlaying && !isExporting,
+      opacity: waveformOpacity
     } : null
   );
 
@@ -1439,8 +1441,10 @@
       <WaveformPanel
         selectedStyle={waveformStyle}
         selectedColor={waveformColor}
+        opacity={waveformOpacity}
         onStyleChange={handleWaveformStyleChange}
         onColorChange={handleWaveformColorChange}
+        onOpacityChange={(opacity) => waveformOpacity = opacity}
       />
     </TogglePanel>
 
