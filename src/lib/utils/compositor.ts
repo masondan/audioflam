@@ -361,8 +361,11 @@ export function renderTitleLayer(
   const actualLineHeight = fontSize * lineHeightRatio;
   const totalTextHeight = numLines * actualLineHeight;
   
-  const labelPadding = fontSize * (0.15 + labelSpace * 0.4);
-  const borderRadius = fontSize * 0.12;
+  // Label padding: tighter at 0, comfortable default at 0.5, spacious at 1
+  // Horizontal padding controls left/right spacing
+  const labelPadding = fontSize * (0.15 + labelSpace * 0.6);
+  // Border radius scales with padding for consistent look
+  const borderRadius = fontSize * (0.15 + labelSpace * 0.25);
   
   // Calculate overall bounding box for positioning and editing handles
   const boxWidth = maxTextWidth + labelPadding * 2;
@@ -380,46 +383,11 @@ export function renderTitleLayer(
   
   const startY = boxY + labelPadding + actualLineHeight / 2;
 
-  // Draw per-line labels (each follows the width of that line's text)
+  // Draw single rounded rectangle label behind all text
   if (labelEnabled && labelOpacity > 0) {
     ctx.fillStyle = hexToRgba(labelColor, labelOpacity);
-    
-    for (let i = 0; i < lines.length; i++) {
-      const lineWidth = lineWidths[i];
-      const lineLabelWidth = lineWidth + labelPadding * 2;
-      const lineY = boxY + i * actualLineHeight;
-      const lineLabelHeight = actualLineHeight + (i === 0 ? labelPadding : 0) + (i === lines.length - 1 ? labelPadding : 0);
-      const lineLabelY = i === 0 ? lineY : lineY + labelPadding;
-      
-      let lineLabelX: number;
-      if (align === 'left') {
-        lineLabelX = boxX;
-      } else if (align === 'right') {
-        lineLabelX = boxX + boxWidth - lineLabelWidth;
-      } else {
-        lineLabelX = boxX + (boxWidth - lineLabelWidth) / 2;
-      }
-      
-      // Determine which corners to round based on line position
-      const isFirst = i === 0;
-      const isLast = i === lines.length - 1;
-      
-      if (isFirst && isLast) {
-        // Single line - round all corners
-        roundedRect(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius);
-      } else if (isFirst) {
-        // First line - round top corners only
-        roundedRectPartial(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius, true, true, false, false);
-      } else if (isLast) {
-        // Last line - round bottom corners only
-        roundedRectPartial(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius, false, false, true, true);
-      } else {
-        // Middle line - no rounded corners
-        ctx.beginPath();
-        ctx.rect(lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight);
-      }
-      ctx.fill();
-    }
+    roundedRect(ctx, boxX, boxY, boxWidth, boxHeight, borderRadius);
+    ctx.fill();
   }
 
   // Draw text

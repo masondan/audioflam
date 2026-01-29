@@ -1153,6 +1153,65 @@
   }
 
   function handleTitleTextChange(text: string) {
+    // Auto-wrap: insert line breaks when text exceeds 90% of canvas width
+    const canvas = compositionCanvasRef?.getCanvas();
+    if (canvas) {
+      const maxWidth = titlePosition.width * canvas.width * 0.9; // 90% of title area width
+      const fontSize = titlePosition.width * canvas.width * 0.07; // Must match compositor.ts
+      
+      const fontFamilyMap: Record<string, string> = {
+        'Inter': "'Inter', sans-serif",
+        'Lora': "'Lora', serif",
+        'Roboto Slab': "'Roboto Slab', serif",
+        'Saira Condensed': "'Saira Condensed', sans-serif",
+        'Playfair Display': "'Playfair Display', serif",
+        'Bebas Neue': "'Bebas Neue', sans-serif"
+      };
+      const fontFamily = fontFamilyMap[titleFont] || "'Inter', sans-serif";
+      const fontWeight = titleFont === 'Bebas Neue' ? 400 : (titleBold ? (titleFont === 'Inter' ? 800 : 700) : 400);
+      
+      const ctx = canvas.getContext('2d');
+      if (ctx) {
+        ctx.save();
+        ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+        if (titleLetterSpacing !== 0) {
+          ctx.letterSpacing = `${titleLetterSpacing}em`;
+        }
+        
+        // Process each line and wrap if needed
+        const inputLines = text.split('\n');
+        const outputLines: string[] = [];
+        
+        for (const line of inputLines) {
+          const words = line.split(' ');
+          let currentLine = '';
+          
+          for (const word of words) {
+            const testLine = currentLine ? currentLine + ' ' + word : word;
+            const metrics = ctx.measureText(testLine);
+            
+            if (metrics.width > maxWidth && currentLine) {
+              outputLines.push(currentLine);
+              currentLine = word;
+            } else {
+              currentLine = testLine;
+            }
+          }
+          if (currentLine) {
+            outputLines.push(currentLine);
+          }
+        }
+        
+        ctx.restore();
+        
+        const wrappedText = outputLines.join('\n');
+        if (wrappedText !== text) {
+          titleText = wrappedText;
+          return;
+        }
+      }
+    }
+    
     titleText = text;
   }
 

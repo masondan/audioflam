@@ -46,7 +46,6 @@
   let originalTitlePosition = $state<TitlePosition | null>(null);
   let showCenterLine = $state(false);
   
-  const BOUNDARY_PADDING = 0.05; // 5% padding from edges for bounding box
   const CENTER_SNAP_THRESHOLD = 0.02;
 
   function updateCanvasSize() {
@@ -199,7 +198,8 @@
     
     const actualLineHeight = fontSize * lineHeightRatio;
     const totalTextHeight = numLines * actualLineHeight;
-    const labelPadding = fontSize * (0.15 + labelSpace * 0.4);
+    // Must match compositor.ts formula
+    const labelPadding = fontSize * (0.15 + labelSpace * 0.6);
     
     const boxWidth = maxTextWidth + labelPadding * 2;
     const boxHeight = totalTextHeight + labelPadding * 2;
@@ -295,34 +295,27 @@
         let newX = originalTitlePosition.x + dx;
         let newY = originalTitlePosition.y + dy;
         
-        // Get current bounds to calculate constraints
+        // Get current bounds to constrain within viewport
         const bounds = getTitleRenderedBounds();
         if (bounds) {
-          // Calculate where the bounds would be after the move
-          const boundsAfterMoveX = bounds.x + dx;
-          const boundsAfterMoveY = bounds.y + dy;
-          const boundsRight = boundsAfterMoveX + bounds.width;
-          const boundsBottom = boundsAfterMoveY + bounds.height;
+          // Calculate the offset from position to bounds
+          const offsetX = bounds.x - originalTitlePosition.x;
+          const offsetY = bounds.y - originalTitlePosition.y;
           
-          // Constrain so bounding box stays within 5% padding
-          if (boundsAfterMoveX < BOUNDARY_PADDING) {
-            newX = originalTitlePosition.x + (BOUNDARY_PADDING - bounds.x);
-          }
-          if (boundsRight > 1 - BOUNDARY_PADDING) {
-            newX = originalTitlePosition.x + ((1 - BOUNDARY_PADDING) - (bounds.x + bounds.width));
-          }
-          if (boundsAfterMoveY < BOUNDARY_PADDING) {
-            newY = originalTitlePosition.y + (BOUNDARY_PADDING - bounds.y);
-          }
-          if (boundsBottom > 1 - BOUNDARY_PADDING) {
-            newY = originalTitlePosition.y + ((1 - BOUNDARY_PADDING) - (bounds.y + bounds.height));
-          }
+          // Clamp so bounding box stays within viewport [0, 1]
+          const minX = -offsetX;
+          const maxX = 1 - bounds.width - offsetX;
+          const minY = -offsetY;
+          const maxY = 1 - bounds.height - offsetY;
           
-          // Center snap detection (recalculate after constraints)
-          const finalBoundsX = bounds.x + (newX - originalTitlePosition.x);
+          newX = Math.max(minX, Math.min(maxX, newX));
+          newY = Math.max(minY, Math.min(maxY, newY));
+          
+          // Center snap detection
+          const finalBoundsX = newX + offsetX;
           const renderedCenterX = finalBoundsX + bounds.width / 2;
           if (Math.abs(renderedCenterX - 0.5) < CENTER_SNAP_THRESHOLD) {
-            newX = originalTitlePosition.x + (0.5 - (bounds.x + bounds.width / 2));
+            newX = 0.5 - bounds.width / 2 - offsetX;
             showCenterLine = true;
           } else {
             showCenterLine = false;
