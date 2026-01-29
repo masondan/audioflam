@@ -1,9 +1,11 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { ALL_VOICES, selectedVoice, textInput } from '$lib/stores';
+  import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio } from '$lib/stores';
+  import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
+  import SilenceSlider from '$lib/components/SilenceSlider.svelte';
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
@@ -44,6 +46,8 @@
   let singleSpeakerSpeed = $state(1.0);
   let speaker1Speed = $state(1.0);
   let speaker2Speed = $state(1.0);
+  let speaker1SilenceLevel = $state<SilenceLevel>('default');
+  let speaker2SilenceLevel = $state<SilenceLevel>('default');
   
   let speedLevel = $state<SpeedLevel>('default');
   let silenceLevel = $state<SilenceLevel>('default');
@@ -84,12 +88,29 @@
     try {
       const filename = downloadFilename.trim() || generateDefaultFilename();
       const response = await fetch(audioUrl);
-      const blob = await response.blob();
-      const blobUrl = URL.createObjectURL(blob);
       
-      // Use .wav extension for two-speaker mode (properly concatenated audio)
-      // Use .mp3 for single-speaker mode (original Azure/YarnGPT output)
-      const extension = twoSpeakerMode ? 'wav' : 'mp3';
+      // Check if we need to apply time stretch (speed adjustment)
+      const currentSpeed = twoSpeakerMode ? 1.0 : singleSpeakerSpeed;
+      let downloadBlob: Blob;
+      let extension: string;
+      
+      if (currentSpeed !== 1.0) {
+        // Apply pitch-preserving time stretch
+        const arrayBuffer = await response.arrayBuffer();
+        const audioContext = new AudioContext();
+        let audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+        await audioContext.close();
+        
+        audioBuffer = await timeStretch(audioBuffer, currentSpeed);
+        downloadBlob = audioBufferToWav(audioBuffer);
+        extension = 'wav'; // Time-stretched audio is always WAV
+      } else {
+        // No time stretch needed - use original format
+        downloadBlob = await response.blob();
+        extension = twoSpeakerMode ? 'wav' : 'mp3';
+      }
+      
+      const blobUrl = URL.createObjectURL(downloadBlob);
       
       const a = document.createElement('a');
       a.href = blobUrl;
@@ -179,6 +200,22 @@
       return;
     }
     speaker2Speed = speed;
+  }
+
+  function handleSpeaker1SilenceChange(level: SilenceLevel) {
+    if (audioUrl === null) {
+      showSpeedBlockModal = true;
+      return;
+    }
+    speaker1SilenceLevel = level;
+  }
+
+  function handleSpeaker2SilenceChange(level: SilenceLevel) {
+    if (audioUrl === null) {
+      showSpeedBlockModal = true;
+      return;
+    }
+    speaker2SilenceLevel = level;
   }
 
   function closeSpeeedBlockModal() {
@@ -488,16 +525,18 @@
       }));
     }
 
-    // Apply silence removal if not default
-    if (silenceLevel !== 'default') {
-      const processedAudios = [];
-      for (const audioData of normalizedAudios) {
+    // Apply per-speaker silence removal
+    const processedAudios = [];
+    for (const audioData of normalizedAudios) {
+      const speakerSilenceLevel = audioData.speaker === 'speaker1' ? speaker1SilenceLevel : speaker2SilenceLevel;
+      
+      if (speakerSilenceLevel !== 'default') {
         const silenceRes = await fetch('/api/audio/silence-removal', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             base64Audio: audioData.base64Audio,
-            level: silenceLevel
+            level: speakerSilenceLevel
           }),
           signal
         });
@@ -511,9 +550,11 @@
         } else {
           processedAudios.push(audioData);
         }
+      } else {
+        processedAudios.push(audioData);
       }
-      normalizedAudios = processedAudios;
     }
+    normalizedAudios = processedAudios;
 
     // Convert normalized audios to segments for playlist playback
     for (let i = 0; i < normalizedAudios.length; i++) {
@@ -719,6 +760,38 @@
     speedLevel = 'default';
     silenceLevel = 'default';
   }
+
+  async function addToAudiogram() {
+    if (!audioUrl) return;
+    
+    try {
+      // Fetch the audio and decode it to an AudioBuffer
+      const response = await fetch(audioUrl);
+      const arrayBuffer = await response.arrayBuffer();
+      const audioContext = new AudioContext();
+      let audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      await audioContext.close();
+      
+      // Apply pitch-preserving time stretch if speed is not 1.0
+      const currentSpeed = twoSpeakerMode ? 1.0 : singleSpeakerSpeed;
+      if (currentSpeed !== 1.0) {
+        audioBuffer = await timeStretch(audioBuffer, currentSpeed);
+      }
+      
+      // Get the voice name for reference
+      const voiceName = twoSpeakerMode 
+        ? `${speaker1?.displayName ?? ''} & ${speaker2?.displayName ?? ''}`
+        : ($selectedVoice?.displayName ?? 'Unknown');
+      
+      // Store in the preloaded audio store
+      preloadedTTSAudio.set({ buffer: audioBuffer, voiceName });
+      
+      // Switch to audiogram tab
+      activeTab = 'audiogram';
+    } catch (err) {
+      console.error('Failed to prepare audio for audiogram:', err);
+    }
+  }
 </script>
 
 <div class="app-container">
@@ -749,7 +822,7 @@
   </header>
 
   <main class="main-content">
-    {#if activeTab === 'tts'}
+    <div class="tab-panel" class:hidden={activeTab !== 'tts'}>
     <div class="dropdowns-section">
       <VoiceDropdown
         label="Voice"
@@ -988,6 +1061,23 @@
                 />
               </div>
             </div>
+            <div class="speaker-speeds-section">
+              <span class="speaker-speeds-label">Silence</span>
+              <div class="speaker-speeds-row">
+                <SilenceSlider
+                  level={speaker1SilenceLevel}
+                  isActive={audioUrl !== null}
+                  onLevelChange={handleSpeaker1SilenceChange}
+                  size="small"
+                />
+                <SilenceSlider
+                  level={speaker2SilenceLevel}
+                  isActive={audioUrl !== null}
+                  onLevelChange={handleSpeaker2SilenceChange}
+                  size="small"
+                />
+              </div>
+            </div>
           {/if}
         {/if}
       </div>
@@ -999,12 +1089,23 @@
         disabled={!audioUrl}
         onclick={openDownloadModal}
       >
-        Download
+        Download audio
+      </button>
+
+      <button
+        type="button"
+        class="audiogram-btn"
+        class:enabled={!!audioUrl}
+        disabled={!audioUrl}
+        onclick={addToAudiogram}
+      >
+        Add to audiogram
       </button>
     </div>
-    {:else}
+    </div>
+    <div class="tab-panel" class:hidden={activeTab !== 'audiogram'}>
       <AudiogramPage />
-    {/if}
+    </div>
   </main>
 </div>
 
@@ -1041,6 +1142,14 @@
     margin: 0 auto;
     min-height: 100vh;
     background-color: var(--color-white);
+  }
+
+  .tab-panel {
+    display: contents;
+  }
+
+  .tab-panel.hidden {
+    display: none;
   }
 
   .app-header {
@@ -1252,7 +1361,7 @@
   .skip-btn img {
     width: 32px;
     height: 32px;
-    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    filter: brightness(0) saturate(100%) invert(60%);
     transition: filter var(--transition-fast);
   }
 
@@ -1275,7 +1384,7 @@
     align-items: center;
     justify-content: center;
     background: var(--color-white);
-    border: 3px solid #777777 !important;
+    border: 3px solid #999999 !important;
     border-radius: 50%;
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
@@ -1289,12 +1398,12 @@
   .play-btn .play-icon {
     width: 40px;
     height: 40px;
-    filter: brightness(0) saturate(100%) invert(60%);
+    filter: brightness(0) saturate(100%) invert(70%);
     transition: filter var(--transition-fast);
     position: relative;
     z-index: 2;
     display: block;
-    -webkit-filter: brightness(0) saturate(100%) invert(60%);
+    -webkit-filter: brightness(0) saturate(100%) invert(70%);
   }
 
   .play-btn.active {
@@ -1354,24 +1463,48 @@
   .download-btn {
     display: block;
     width: 100%;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: var(--spacing-md);
     border: none;
     border-radius: var(--radius-md);
-    background: #999999;
-    color: var(--color-white);
+    background: var(--color-app-bg);
+    color: var(--color-text-secondary);
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: not-allowed;
-    transition: background var(--transition-fast);
+    transition: all var(--transition-fast);
   }
 
   .download-btn.enabled {
     background: var(--color-primary);
+    color: var(--color-white);
     cursor: pointer;
   }
 
   .download-btn.enabled:hover {
     background: #4a1d9e;
+  }
+
+  .audiogram-btn {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-xs) 0;
+    margin-top: calc(-1 * var(--spacing-sm));
+    border: none;
+    background: transparent;
+    color: var(--color-text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: not-allowed;
+    transition: color var(--transition-fast);
+  }
+
+  .audiogram-btn.enabled {
+    color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .audiogram-btn.enabled:hover {
+    text-decoration: underline;
   }
 
   .modal-overlay {

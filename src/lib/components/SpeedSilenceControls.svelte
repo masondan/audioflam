@@ -167,6 +167,7 @@
     display: flex;
     gap: var(--spacing-sm);
     transition: opacity var(--transition-fast);
+    align-items: flex-start;
   }
 
   .speed-silence-row.inactive {
@@ -204,14 +205,14 @@
 
   .panel-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     font-weight: 500;
   }
 
   .panel-chevron {
     width: 16px;
     height: 16px;
-    filter: invert(0.43);
+    filter: brightness(0) saturate(100%) invert(60%);
   }
 
   .panel-content {

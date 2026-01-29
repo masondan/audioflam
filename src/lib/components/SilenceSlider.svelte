@@ -1,46 +1,41 @@
 <script lang="ts">
-  type SpeedLevel = 'default' | 'lively' | 'fast';
+  import type { SilenceLevel } from '$lib/audioProcessing';
 
   interface Props {
-    speed: number;
+    level: SilenceLevel;
     isActive: boolean;
-    onSpeedChange: (speed: number) => void;
+    onLevelChange: (level: SilenceLevel) => void;
     size?: 'large' | 'small';
   }
 
-  let { speed = 1.0, isActive = false, onSpeedChange, size = 'large' }: Props = $props();
+  let { level = 'default', isActive = false, onLevelChange, size = 'large' }: Props = $props();
 
-  const speedSteps: { level: SpeedLevel; label: string; value: number }[] = [
-    { level: 'default', label: 'Default', value: 1.0 },
-    { level: 'lively', label: 'Lively', value: 1.15 },
-    { level: 'fast', label: 'Fast', value: 1.25 }
-  ];
+  const silenceSteps: SilenceLevel[] = ['default', 'trim', 'tight'];
+  const silenceLabels: Record<SilenceLevel, string> = {
+    default: 'Default',
+    trim: 'Trim',
+    tight: 'Tight'
+  };
 
   let isDragging = $state(false);
   let sliderRef: HTMLInputElement;
 
-  function getSpeedIndex(spd: number): number {
-    const idx = speedSteps.findIndex(s => s.value === spd);
-    return idx >= 0 ? idx : 0;
-  }
-
-  function getCurrentLevel(spd: number): SpeedLevel {
-    const step = speedSteps.find(s => s.value === spd);
-    return step?.level ?? 'default';
+  function getLevelIndex(lvl: SilenceLevel): number {
+    return silenceSteps.indexOf(lvl);
   }
 
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;
     const value = parseInt(target.value);
-    const step = speedSteps[value];
+    const step = silenceSteps[value];
     if (step) {
-      onSpeedChange(step.value);
+      onLevelChange(step);
     }
   }
 
   function handleMouseDown() {
     if (!isActive) {
-      onSpeedChange(speed);
+      onLevelChange(level);
       return;
     }
     isDragging = true;
@@ -52,7 +47,7 @@
 
   function handleTouchStart() {
     if (!isActive) {
-      onSpeedChange(speed);
+      onLevelChange(level);
       return;
     }
     isDragging = true;
@@ -64,7 +59,7 @@
 
   $effect(() => {
     if (sliderRef) {
-      sliderRef.value = getSpeedIndex(speed).toString();
+      sliderRef.value = getLevelIndex(level).toString();
     }
   });
 </script>
@@ -73,7 +68,7 @@
 
 <!-- svelte-ignore a11y_no_static_element_interactions -->
 <div
-  class="speed-slider-container"
+  class="silence-slider-container"
   class:inactive={!isActive}
   class:size-large={size === 'large'}
   class:size-small={size === 'small'}
@@ -86,45 +81,45 @@
     min="0"
     max="2"
     step="1"
-    value={getSpeedIndex(speed)}
+    value={getLevelIndex(level)}
     disabled={!isActive}
     oninput={handleInput}
-    class="speed-slider"
+    class="silence-slider"
   />
   
   <div class="slider-labels">
-    {#each speedSteps as step}
-      <span class="slider-label" class:active={getCurrentLevel(speed) === step.level}>{step.label}</span>
+    {#each silenceSteps as step}
+      <span class="slider-label" class:active={level === step}>{silenceLabels[step]}</span>
     {/each}
   </div>
   
   {#if isDragging && isActive}
-    <div class="speed-label-popup">{speedSteps.find(s => s.value === speed)?.label ?? 'Default'}</div>
+    <div class="silence-label-popup">{silenceLabels[level]}</div>
   {/if}
 </div>
 
 <style>
-  .speed-slider-container {
+  .silence-slider-container {
     position: relative;
     transition: opacity var(--transition-fast);
   }
 
-  .speed-slider-container.inactive {
+  .silence-slider-container.inactive {
     opacity: 0.5;
     cursor: not-allowed;
   }
 
-  .speed-slider-container.size-large {
+  .silence-slider-container.size-large {
     --slider-height: 6px;
     --thumb-size: 20px;
   }
 
-  .speed-slider-container.size-small {
+  .silence-slider-container.size-small {
     --slider-height: 4px;
     --thumb-size: 16px;
   }
 
-  .speed-slider {
+  .silence-slider {
     width: 100%;
     height: var(--slider-height);
     border-radius: var(--radius-full);
@@ -140,12 +135,11 @@
     margin-bottom: var(--spacing-xs);
   }
 
-  .speed-slider:disabled {
+  .silence-slider:disabled {
     cursor: not-allowed;
   }
 
-  /* Webkit browsers (Chrome, Safari) */
-  .speed-slider::-webkit-slider-thumb {
+  .silence-slider::-webkit-slider-thumb {
     -webkit-appearance: none;
     appearance: none;
     width: var(--thumb-size);
@@ -159,21 +153,20 @@
     border: none;
   }
 
-  .speed-slider::-webkit-slider-thumb:hover:not(:disabled) {
+  .silence-slider::-webkit-slider-thumb:hover:not(:disabled) {
     background: #777777;
   }
 
-  .speed-slider::-webkit-slider-thumb:active:not(:disabled),
-  .speed-slider:active::-webkit-slider-thumb {
+  .silence-slider::-webkit-slider-thumb:active:not(:disabled),
+  .silence-slider:active::-webkit-slider-thumb {
     background: var(--color-primary);
   }
 
-  .speed-slider-container:not(.inactive) .speed-slider::-webkit-slider-thumb {
+  .silence-slider-container:not(.inactive) .silence-slider::-webkit-slider-thumb {
     background: #666666;
   }
 
-  /* Firefox */
-  .speed-slider::-moz-range-thumb {
+  .silence-slider::-moz-range-thumb {
     width: var(--thumb-size);
     height: var(--thumb-size);
     border-radius: 50%;
@@ -184,27 +177,26 @@
     transform: translateY(calc((var(--slider-height) - var(--thumb-size)) / 2));
   }
 
-  .speed-slider::-moz-range-thumb:hover:not(:disabled) {
+  .silence-slider::-moz-range-thumb:hover:not(:disabled) {
     background: #777777;
   }
 
-  .speed-slider::-moz-range-thumb:active:not(:disabled),
-  .speed-slider:active::-moz-range-thumb {
+  .silence-slider::-moz-range-thumb:active:not(:disabled),
+  .silence-slider:active::-moz-range-thumb {
     background: var(--color-primary);
   }
 
-  .speed-slider-container:not(.inactive) .speed-slider::-moz-range-thumb {
+  .silence-slider-container:not(.inactive) .silence-slider::-moz-range-thumb {
     background: #666666;
   }
 
-  /* Track styling */
-  .speed-slider::-webkit-slider-runnable-track {
+  .silence-slider::-webkit-slider-runnable-track {
     background: #efefef;
     height: var(--slider-height);
     border-radius: var(--radius-full);
   }
 
-  .speed-slider::-moz-range-track {
+  .silence-slider::-moz-range-track {
     background: transparent;
     border: none;
   }
@@ -225,7 +217,7 @@
     font-weight: 600;
   }
 
-  .speed-label-popup {
+  .silence-label-popup {
     position: absolute;
     top: -24px;
     right: 0;

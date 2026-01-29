@@ -1,5 +1,8 @@
 <script lang="ts">
   import { tick } from 'svelte';
+  import { get } from 'svelte/store';
+  import { preloadedTTSAudio } from '$lib/stores';
+  import { audioBufferToWav } from '$lib/utils/timestretch';
   import TogglePanel from './TogglePanel.svelte';
   import ImageCropDrawer from './ImageCropDrawer.svelte';
   import CompositionCanvas from './CompositionCanvas.svelte';
@@ -218,6 +221,59 @@
       stopLightAnimation();
     };
   });
+
+  // Check for preloaded TTS audio reactively (component stays mounted)
+  // Subscribe to store changes to detect when audio is pushed from TTS
+  $effect(() => {
+    const unsubscribe = preloadedTTSAudio.subscribe((preloaded) => {
+      if (preloaded) {
+        loadPreloadedAudio();
+      }
+    });
+    return unsubscribe;
+  });
+
+  async function loadPreloadedAudio() {
+    const preloaded = get(preloadedTTSAudio);
+    if (!preloaded) return;
+    
+    audioLoading = true;
+    try {
+      const buffer = preloaded.buffer;
+      const waveform = await extractWaveformData(buffer);
+      
+      // Convert AudioBuffer to WAV blob for playback URL
+      const wavBlob = audioBufferToWav(buffer);
+      const url = URL.createObjectURL(wavBlob);
+      
+      // Clean up old audio if present
+      if (audioData?.url) {
+        URL.revokeObjectURL(audioData.url);
+      }
+      
+      // Create a synthetic File for compatibility
+      const file = new File([wavBlob], `tts-${preloaded.voiceName}.wav`, { type: 'audio/wav' });
+      
+      audioData = {
+        file,
+        url,
+        duration: buffer.duration,
+        buffer,
+        waveform
+      };
+      
+      trimStart = 0;
+      trimEnd = 1;
+      currentTime = 0;
+      
+      // Clear the preloaded audio so it doesn't reload on next visit
+      preloadedTTSAudio.set(null);
+    } catch (err) {
+      console.error('Failed to load preloaded audio:', err);
+    } finally {
+      audioLoading = false;
+    }
+  }
 
   function handleImageUploadClick() {
     const input = document.createElement('input');
@@ -1952,7 +2008,7 @@
     align-items: center;
     justify-content: center;
     background: var(--color-white);
-    border: 3px solid #777777 !important;
+    border: 3px solid #999999 !important;
     border-radius: 50%;
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
@@ -1990,10 +2046,10 @@
   .play-icon {
     width: 40px;
     height: 40px;
-    filter: brightness(0) saturate(100%) invert(60%);
+    filter: brightness(0) saturate(100%) invert(20%);
     transition: filter var(--transition-fast);
     display: block;
-    -webkit-filter: brightness(0) saturate(100%) invert(60%);
+    -webkit-filter: brightness(0) saturate(100%) invert(20%);
   }
 
   .toggle-panels {

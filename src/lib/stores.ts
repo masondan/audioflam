@@ -47,3 +47,10 @@ export const textInput = writable('');
 // Audio State
 export const isGenerating = writable(false);
 export const audioResult = writable<string | null>(null);
+
+// TTS → Audiogram Integration
+export interface PreloadedTTSAudio {
+	buffer: AudioBuffer;
+	voiceName: string;
+}
+export const preloadedTTSAudio = writable<PreloadedTTSAudio | null>(null);
