@@ -1,26 +1,41 @@
 # AudioFlam
 
 **Purpose:** Technical reference for AI agents working on AudioFlam.  
-**Status:** Production (UI/UX Improvement Phase)  
+**Status:** Production (Step 15 - Smart Export & Polish Phase)  
 **Updated:** January 2026
 
 ---
 
-## Project Phase
+## Project Overview
 
-**Current:** Step 14 - Polish & Edge Case Testing - All core features complete. MP4 export working on both desktop and mobile. Final phase focuses on edge cases and UX polish.
+**AudioFlam** is a mobile-first web app combining two features:
 
-**Previous Phases:** ✅ Steps 1-13 Complete - Audiogram creation feature with image, audio, waveform, title, and effects fully implemented.
+1. **TTS Conversion:** Text scripts → audio (Nigerian/British English voices)
+2. **Audiogram Creation:** Image + audio + waveform + title + effects → MP4 video
+
+Built for journalism training in Nigeria. Non-commercial, educational use only.
+
+- **No auth required** - public URL, hidden from search engines
+- **2000 character limit** per TTS generation
+- **Dual-tab interface:** Toggle between TTS and Audiogram creation
 
 ---
 
-## Overview
+## Current Project Phase
 
-**AudioFlam** is a mobile-first web app that converts text scripts into audio using Nigerian TTS voices. Built for journalism training in Nigeria.
+**Phase:** Step 15 - Smart Export & UX Polish  
+**Status:** 🎯 MP4 export working on Android and desktop. Polish and edge cases remaining.
 
-- **No auth required** - public URL, hidden from search engines
-- **Non-commercial, educational use only**
-- **2000 character limit** per generation
+**What's Complete:**
+- ✅ TTS: Azure Speech + YarnGPT integration
+- ✅ Audiogram: Full creation pipeline (image, audio, waveform, title, effects)
+- ✅ MP4 Export: WebCodecs-based (native mobile support) + MediaRecorder fallback
+- ✅ WebCodecs support detection with intelligent fallback strategy
+
+**Current Focus:**
+- Edge case testing and UX polish
+- Ensure smooth export experience across browsers
+- Potential Phase 2: iOS fallback (Cloudinary/api.video transcoding)
 
 ---
 
@@ -204,6 +219,82 @@ YARNGPT_API_KEY=<YarnGPT API key>
 
 ---
 
+## Future Development: Phase 2 - iOS Fallback & TTS→Audiogram Integration
+
+### iOS MP4 Export Fallback
+
+**Context:** iOS Safari and Firefox don't support WebCodecs H.264 encoding natively. For Phase 2, we'll add cloud-based transcoding:
+
+**Recommended Approach: Cloudflare Worker → api.video**
+- Export WebM locally (works everywhere) → Upload to api.video via Cloudflare Worker
+- Cost: Free encoding + ~$0.003/video for storage/delivery (~$0.60/year for 200 videos)
+- Better than Cloudinary (cheaper, free encoding)
+- Cloudflare Worker acts as proxy to avoid CORS issues
+
+**Implementation Pattern:**
+```typescript
+// Browser-side: Check WebCodecs support
+if (support.hasH264) {
+  // Fast path: Use WebCodecs MP4
+  return exportWithWebCodecs(config);
+} else {
+  // Fallback: Export WebM, upload to cloud
+  const webmBlob = await exportCanvasVideoLegacy(config);
+  return await transcodeViaWorker(webmBlob);
+}
+```
+
+### TTS→Audiogram Integration (Smart Audio Import)
+
+**Vision:** Allow users to generate TTS audio, then seamlessly push it into the Audiogram creation tab without manual download/upload.
+
+**Current Flow:** TTS page → download MP3 → return to Audiogram → manually upload
+
+**Future Flow:** TTS page → "Create Audiogram" button → auto-load into Audiogram tab
+
+**Implementation Strategy:**
+1. Add `createAudiogramWithTTS()` action that:
+   - Takes generated audio buffer from TTS
+   - Switches to Audiogram tab
+   - Auto-populates audio in AudioImport component
+   - Pre-generates waveform visualization
+   
+2. Store audio state in global store (`stores.ts`):
+   - `lastGeneratedAudio: AudioBuffer | null`
+   - `lastGeneratedVoice: string`
+   
+3. AudioImport component checks for pre-loaded audio on mount:
+   ```typescript
+   onMount(() => {
+     const preloaded = get(generatedAudioStore);
+     if (preloaded) {
+       audioBuffer = preloaded;
+       renderWaveform();
+       clearPreloadedAudio();
+     }
+   });
+   ```
+
+4. Workflow improvements:
+   - Show "Generate & Create Audiogram" button variant in TTS
+   - Auto-switch tabs after TTS generation
+   - Preserve audio quality through the pipeline
+   - Keep MediaRecorder recording option available
+
+**Files to Modify:**
+- `src/lib/stores.ts` - Add audio preload state
+- `src/routes/+page.svelte` - Tab switching logic for seamless UX
+- `src/lib/components/TtsPanel.svelte` (or equivalent) - Add quick-action button
+- `src/lib/components/AudioImport.svelte` - Check for preloaded audio
+
+**Benefits:**
+- Dramatically improves user experience (one-click workflow)
+- Keeps both TTS and Audiogram as independent features
+- Maintains flexibility (users can still record audio directly)
+- No backend changes required
+
+---
+
 ## Critical Rules
 
 1. **Simplicity first** - single-purpose tool, don't over-engineer
@@ -215,55 +306,72 @@ YARNGPT_API_KEY=<YarnGPT API key>
 
 ---
 
-## Current Development Mission
+## MP4 Export Implementation
 
-### Step 15 - WebCodecs MP4 Export (Phase 1)
+### The Challenge
+Mobile browsers (especially Android Chrome) return `true` for `MediaRecorder.isTypeSupported('video/mp4')` but fail when actually trying to encode H.264. This caused black-screen exports and silent failures on devices representing ~85% of user base.
 
-**Status:** 🔄 **IN PROGRESS** - WebCodecs implementation for reliable mobile MP4 export
+### The Solution: WebCodecs + Mediabunny (Phase 1 - COMPLETE)
 
-**Problem Solved:**
-MediaRecorder lies about H.264 support on mobile - `isTypeSupported()` returns true but encoding fails. WebCodecs bypasses this by encoding frames directly.
+Instead of relying on MediaRecorder's unreliable H.264 support, we:
 
-**New Architecture:**
+1. **Detect availability** - Check if WebCodecs API + H.264 encoder available
+2. **Encode directly** - Use WebCodecs `VideoEncoder` (H.264) + `AudioEncoder` (AAC)
+3. **Mux to MP4** - Use Mediabunny library (17KB) to write MP4 container
+4. **Fallback gracefully** - Use MediaRecorder for iOS/Firefox (produces WebM)
+
+**Smart Export Pipeline:**
 ```
-Export Button → checkWebCodecsSupport() → 
-  ├── WebCodecs supported (85% Android) → Mediabunny MP4 export
-  └── Not supported (iOS, Firefox) → MediaRecorder fallback (WebM)
+Export Button → checkWebCodecsSupport()
+├── WebCodecs + H.264 available (85% Android, Chrome Desktop)
+│   └── exportWithWebCodecs() → MP4 file direct to user
+└── WebCodecs unavailable (iOS Safari, Firefox)
+    └── exportCanvasVideoLegacy() → WebM (MediaRecorder fallback)
 ```
 
-**Files Created:**
-- `src/lib/utils/webcodecs-export.ts` - WebCodecs + Mediabunny MP4 encoding
-- `EXPORT_TECH_PLAN.md` - Full technical plan with cost analysis
+### Key Implementation Details
 
-**Files Modified:**
-- `src/lib/utils/video-export.ts` - Added `smartExportVideo()` function
-- `package.json` - Added `mediabunny` dependency (~17KB for MP4 writing)
+**Frame Capture Redesign (took multiple iterations to fix):**
+- Problem: Initial approach had external render loop start/stop callbacks
+- Solution: Moved RAF render loop **inside** `exportCanvasVideo()` 
+- Result: Tight coupling ensures frames actively rendering when MediaRecorder starts
+- Impact: Fixed black-screen on mobile, eliminated frame delivery gaps
+
+**Audio Handling:**
+- WebCodecs: Uses decoded AudioBuffer directly (no playback needed during export)
+- Mediabunny: Mono audio converted to stereo (AAC encoder compatibility)
+- Audio trimmed to match video duration exactly
+- Bitrate: 96 kbps stereo AAC (good quality, widely supported)
+
+**H.264 Configuration:**
+- Uses conservative codec profile: `avc1.42001f` (Baseline profile, level 3.1)
+- Tests multiple profiles for maximum device compatibility
+- Canvas dimensions auto-corrected to even numbers (H.264 requirement)
+- 15 fps for mobile (lower CPU load), 30 fps for desktop
+- 2 Mbps video bitrate (balanced quality/file size for mobile)
+
+**Files Involved:**
+- `src/lib/utils/webcodecs-export.ts` - WebCodecs + Mediabunny encoding engine
+- `src/lib/utils/video-export.ts` - Smart export orchestration + MediaRecorder fallback
+- `src/lib/components/AudiogramPage.svelte` - Export button integration
+- `src/lib/components/CompositionCanvas.svelte` - Canvas rendering export
 
 **Key Functions:**
-- `checkWebCodecsSupport()` - Detects H.264 + AAC encoder availability
-- `exportWithWebCodecs()` - Creates MP4 via Mediabunny CanvasSource + AudioBufferSource
-- `smartExportVideo()` - Chooses best export method automatically
+- `checkWebCodecsSupport()` - Feature detection (returns codec availability)
+- `exportWithWebCodecs(config)` - MP4 encoding via Mediabunny
+- `smartExportVideo()` - Intelligent method selection + fallback
+- `exportCanvasVideoLegacy()` - MediaRecorder with decoupled render loop
 
-**Browser Support:**
+### Browser Support
 | Browser | Method | Output |
 |---------|--------|--------|
 | Chrome Android | WebCodecs | MP4 ✅ |
 | Chrome Desktop | WebCodecs | MP4 ✅ |
-| Safari iOS | MediaRecorder | WebM (needs Phase 2 fallback) |
-| Firefox | MediaRecorder | WebM (needs Phase 2 fallback) |
+| Safari iOS | MediaRecorder | WebM ⚠️ |
+| Firefox | MediaRecorder | WebM ⚠️ |
 
-**Cost Analysis (for Phase 2 fallback - ~200 videos/year):**
-- api.video: ~$0/year (free encoding, delete after download)
-- Cloudinary: $1,068/year (overkill)
-- Cloudflare Worker → api.video: Best option (Worker is free proxy)
-
-**Next Steps:**
-1. Integrate `smartExportVideo()` into AudiogramPage.svelte
-2. Test on Android Chrome
-3. Test on desktop
-4. (Phase 2) Add api.video fallback for iOS
-
-**Previous Implementation (MediaRecorder):**
-- Still available as `exportCanvasVideoLegacy()`
-- Used as fallback when WebCodecs unavailable
-- Works for WebM export on all browsers
+### Performance
+- MP4 export: 10-30 seconds for 60-second video (depends on device)
+- Mobile: 15 fps encoding (low CPU burden)
+- Desktop: 30 fps encoding (full quality)
+- Progress feedback via onProgress callback
