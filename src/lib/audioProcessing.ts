@@ -3,6 +3,7 @@
  * Handles silence detection and removal on actual PCM samples
  */
 
+
 export type SilenceLevel = 'default' | 'trim' | 'tight';
 
 interface SilenceConfig {
@@ -267,6 +268,74 @@ export interface ProcessingResult {
 	originalDuration: number;
 	processedDuration: number;
 	silenceRemoved: number;
+}
+
+/**
+ * Concatenate multiple base64-encoded audio segments into a single audio file
+ * Uses Web Audio API to decode, concatenates PCM, outputs as WAV
+ * WAV format ensures correct duration metadata (unlike naive MP3 concatenation)
+ */
+export async function concatenateAudioSegments(base64Audios: string[]): Promise<Blob> {
+	if (base64Audios.length === 0) {
+		throw new Error('No audio segments provided');
+	}
+
+	if (base64Audios.length === 1) {
+		// Single segment - just convert to blob
+		const binaryString = atob(base64Audios[0]);
+		const bytes = new Uint8Array(binaryString.length);
+		for (let i = 0; i < binaryString.length; i++) {
+			bytes[i] = binaryString.charCodeAt(i);
+		}
+		return new Blob([bytes], { type: 'audio/mp3' });
+	}
+
+	// Decode all segments to AudioBuffers
+	const audioBuffers: AudioBuffer[] = [];
+	for (const base64 of base64Audios) {
+		const buffer = await decodeAudio(base64);
+		audioBuffers.push(buffer);
+	}
+
+	// Use the sample rate from the first buffer (should all be the same)
+	const sampleRate = audioBuffers[0].sampleRate;
+
+	// Calculate total length
+	const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.length, 0);
+
+	// Create a new AudioBuffer to hold concatenated audio (mono)
+	const audioContext = new OfflineAudioContext(1, totalLength, sampleRate);
+	const concatenatedBuffer = audioContext.createBuffer(1, totalLength, sampleRate);
+	const outputData = concatenatedBuffer.getChannelData(0);
+	
+	let offset = 0;
+	for (const buffer of audioBuffers) {
+		// Get first channel (mono) or mix down stereo
+		const channelData = buffer.numberOfChannels > 1
+			? mixToMono(buffer)
+			: buffer.getChannelData(0);
+		
+		outputData.set(channelData, offset);
+		offset += buffer.length;
+	}
+
+	// Convert to WAV - this guarantees correct duration metadata
+	return audioBufferToWav(concatenatedBuffer);
+}
+
+/**
+ * Mix stereo AudioBuffer to mono Float32Array
+ */
+function mixToMono(buffer: AudioBuffer): Float32Array {
+	const left = buffer.getChannelData(0);
+	const right = buffer.getChannelData(1);
+	const mono = new Float32Array(buffer.length);
+	
+	for (let i = 0; i < buffer.length; i++) {
+		mono[i] = (left[i] + right[i]) / 2;
+	}
+	
+	return mono;
 }
 
 /**

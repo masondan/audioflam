@@ -7,7 +7,7 @@
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
-  import { removeSilence, type SilenceLevel } from '$lib/audioProcessing';
+  import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
   type ActiveTab = 'tts' | 'audiogram';
@@ -87,9 +87,13 @@
       const blob = await response.blob();
       const blobUrl = URL.createObjectURL(blob);
       
+      // Use .wav extension for two-speaker mode (properly concatenated audio)
+      // Use .mp3 for single-speaker mode (original Azure/YarnGPT output)
+      const extension = twoSpeakerMode ? 'wav' : 'mp3';
+      
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `${filename}.mp3`;
+      a.download = `${filename}.${extension}`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -310,9 +314,11 @@
       const newText = editorRef.innerText;
       textInput.set(newText);
       
-      if (audioUrl && newText.trim() !== lastGeneratedText) {
+      // Invalidate audio if text has changed from last generation
+      if ((audioUrl || audioPlaylist.length > 0) && newText.trim() !== lastGeneratedText) {
         audioUrl = null;
         audioElement = null;
+        audioPlaylist = [];
         isPlaying = false;
         lastGeneratedText = '';
       }
@@ -426,7 +432,6 @@
     }
 
     const segments: PlaylistSegment[] = [];
-    const audioChunks: Uint8Array[] = [];
     const base64Audios: { base64Audio: string; speaker: 'speaker1' | 'speaker2' }[] = [];
     
     // Generate audio for all segments
@@ -510,7 +515,7 @@
       normalizedAudios = processedAudios;
     }
 
-    // Convert normalized audios to chunks and create segments
+    // Convert normalized audios to segments for playlist playback
     for (let i = 0; i < normalizedAudios.length; i++) {
       const audioData = normalizedAudios[i];
       const byteCharacters = atob(audioData.base64Audio);
@@ -518,7 +523,6 @@
       for (let j = 0; j < byteCharacters.length; j++) {
         byteArray[j] = byteCharacters.charCodeAt(j);
       }
-      audioChunks.push(byteArray);
       const blob = new Blob([byteArray], { type: 'audio/mp3' });
       const url = URL.createObjectURL(blob);
       
@@ -532,14 +536,9 @@
     const durations = await Promise.all(urls.map(url => getAudioDuration(url)));
     const totalDuration = durations.reduce((acc, d) => acc + d, 0);
     
-    const totalLength = audioChunks.reduce((acc, chunk) => acc + chunk.length, 0);
-    const merged = new Uint8Array(totalLength);
-    let offset = 0;
-    for (const chunk of audioChunks) {
-      merged.set(chunk, offset);
-      offset += chunk.length;
-    }
-    const mergedBlob = new Blob([merged], { type: 'audio/mp3' });
+    // Properly concatenate audio segments using Web Audio API + lamejs encoding
+    // This creates a single MP3 with correct duration metadata
+    const mergedBlob = await concatenateAudioSegments(normalizedAudios.map(a => a.base64Audio));
     const mergedUrl = URL.createObjectURL(mergedBlob);
     
     return { segments, mergedUrl, totalDuration };
@@ -1025,7 +1024,7 @@
           bind:value={downloadFilename}
           placeholder="audioflam-050126-1234"
         />
-        <span class="filename-extension">.mp3</span>
+        <span class="filename-extension">.{twoSpeakerMode ? 'wav' : 'mp3'}</span>
       </div>
 
       <div class="modal-actions">

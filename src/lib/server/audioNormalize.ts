@@ -3,7 +3,7 @@
  * Decodes MP3s to PCM, normalizes peak levels, re-encodes to MP3
  */
 
-import Mp3Encoder from 'lamejs';
+import { Mp3Encoder } from 'lamejs';
 
 export interface AudioNormalizationInput {
 	base64Audio: string;
