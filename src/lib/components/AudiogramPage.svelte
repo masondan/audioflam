@@ -296,8 +296,11 @@
     }
   }
 
-  function handleReplaceImage() {
-    handleImageUploadClick();
+  function handleDeleteImage() {
+    if (imageData?.url) {
+      URL.revokeObjectURL(imageData.url);
+    }
+    imageData = null;
   }
 
   function handleResizeClick() {
@@ -1230,8 +1233,8 @@
         onBackgroundClick={handleCanvasBackgroundClick}
       />
       <div class="image-actions">
-        <button type="button" class="text-btn" onclick={handleReplaceImage}>
-          Replace image
+        <button type="button" class="text-btn" onclick={handleDeleteImage}>
+          Delete image
         </button>
         <button type="button" class="text-btn" onclick={handleResizeClick}>
           Resize
