@@ -128,7 +128,7 @@ export function renderWaveformLayer(
     ctx.lineWidth = 1;
 
     // Corner handles - larger circles
-    const cornerHandleSize = 12;
+    const cornerHandleSize = 18;
     const cornerHandles = [
       { hx: x, hy: y },
       { hx: x + width, hy: y },
@@ -144,8 +144,8 @@ export function renderWaveformLayer(
     }
 
     // Edge handles - chunky pill/capsule shapes
-    const edgeHandleWidth = 6;
-    const edgeHandleLength = 20;
+    const edgeHandleWidth = 10;
+    const edgeHandleLength = 28;
     const edgeHandleRadius = edgeHandleWidth / 2;
 
     // Top edge handle (horizontal pill)
@@ -402,7 +402,7 @@ export function renderTitleLayer(
     ctx.strokeStyle = 'rgba(0, 0, 0, 0.3)';
     ctx.lineWidth = 1;
 
-    const cornerHandleSize = 12;
+    const cornerHandleSize = 18;
     const cornerHandles = [
       { hx: x, hy: y },
       { hx: x + width, hy: y },
@@ -417,8 +417,8 @@ export function renderTitleLayer(
       ctx.stroke();
     }
 
-    const edgeHandleWidth = 6;
-    const edgeHandleLength = 20;
+    const edgeHandleWidth = 10;
+    const edgeHandleLength = 28;
     const edgeHandleRadius = edgeHandleWidth / 2;
 
     roundedRect(ctx, x + width / 2 - edgeHandleLength / 2, y - edgeHandleWidth / 2, edgeHandleLength, edgeHandleWidth, edgeHandleRadius);

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { tick } from 'svelte';
   import TogglePanel from './TogglePanel.svelte';
   import ImageCropDrawer from './ImageCropDrawer.svelte';
   import CompositionCanvas from './CompositionCanvas.svelte';
@@ -71,6 +72,10 @@
   let lightActive = $state(false);
   
   let openPanel = $state<OpenPanel>(null);
+  
+  // Track which overlay is currently selected (showing border)
+  let waveformSelected = $state(false);
+  let titleSelected = $state(false);
 
   // Waveform overlay state
   let waveformStyle = $state<WaveformStyle>('bars');
@@ -117,6 +122,8 @@
   let recordedChunks: Blob[] = [];
   let liveWaveformData: number[] = [];
   let recordingAnimationId: number | null = null;
+  let lastBarTime = 0;
+  const BAR_INTERVAL_MS = 100; // Add a new bar every 100ms (~10 bars/second)
 
   // Export state
   let isExporting = $state(false);
@@ -142,7 +149,7 @@
       color: waveformColor,
       style: waveformStyle,
       frequencyData: waveformFrequencyData,
-      isEditing: !isPlaying
+      isEditing: waveformSelected && !isPlaying && !isExporting
     } : null
   );
 
@@ -154,7 +161,7 @@
       style: titleStyle,
       color: titleColor,
       position: titlePosition,
-      isEditing: !isPlaying
+      isEditing: titleSelected && !isPlaying && !isExporting
     } : null
   );
 
@@ -766,13 +773,14 @@
     }, 1000);
   }
 
-  function startRecording() {
+  async function startRecording() {
     if (!mediaStream) return;
     
     recordingPhase = 'recording';
     isRecording = true;
     recordedChunks = [];
     liveWaveformData = [];
+    lastBarTime = 0;
     
     mediaRecorder = createMediaRecorder(mediaStream);
     
@@ -788,6 +796,9 @@
     
     mediaRecorder.start(100); // Collect data every 100ms
     
+    // Wait for DOM to update so canvas is available
+    await tick();
+    
     // Start live waveform animation
     animateLiveWaveform();
   }
@@ -795,18 +806,27 @@
   function animateLiveWaveform() {
     if (!analyser || !waveformCanvas || recordingPhase !== 'recording') return;
     
-    const frequencyData = getFrequencyData(analyser);
+    const now = performance.now();
+    const shouldAddBar = now - lastBarTime >= BAR_INTERVAL_MS;
     
-    // Get average amplitude for this frame
-    let sum = 0;
-    for (let i = 0; i < frequencyData.length; i++) {
-      sum += frequencyData[i];
+    if (shouldAddBar) {
+      const frequencyData = getFrequencyData(analyser);
+      
+      // Get RMS amplitude for better sensitivity
+      let sumSquares = 0;
+      for (let i = 0; i < frequencyData.length; i++) {
+        sumSquares += frequencyData[i] * frequencyData[i];
+      }
+      const rms = Math.sqrt(sumSquares / frequencyData.length);
+      
+      // Boost and clamp the amplitude for visibility (rms typically 0-100 range)
+      const boosted = Math.min(255, rms * 2.5);
+      liveWaveformData.push(boosted);
+      lastBarTime = now;
     }
-    const avg = sum / frequencyData.length;
-    liveWaveformData.push(avg);
     
-    // Draw live waveform
-    drawLiveWaveform(waveformCanvas, new Uint8Array(liveWaveformData), liveWaveformData.length - 1);
+    // Always redraw for smooth visuals
+    drawLiveWaveform(waveformCanvas, new Uint8Array(liveWaveformData), liveWaveformData.length);
     
     recordingAnimationId = requestAnimationFrame(animateLiveWaveform);
   }
@@ -885,14 +905,40 @@
   }
 
   function handlePanelToggle(panel: OpenPanel, active: boolean) {
-    if (panel === 'waveform') waveformActive = active;
-    if (panel === 'title') titleActive = active;
-    if (panel === 'light') lightActive = active;
+    if (panel === 'waveform') {
+      waveformActive = active;
+      // Select waveform when activated, deselect when deactivated
+      waveformSelected = active;
+      if (active) titleSelected = false;
+    }
+    if (panel === 'title') {
+      titleActive = active;
+      // Select title when activated, deselect when deactivated
+      titleSelected = active;
+      if (active) waveformSelected = false;
+    }
+    if (panel === 'light') {
+      lightActive = active;
+      // Light effect panel deselects all overlays
+      waveformSelected = false;
+      titleSelected = false;
+    }
   }
 
   function handlePanelOpenChange(panel: OpenPanel, open: boolean) {
     if (open) {
       openPanel = panel;
+      // Deselect overlays when opening a different panel's options
+      if (panel === 'waveform') {
+        waveformSelected = true;
+        titleSelected = false;
+      } else if (panel === 'title') {
+        titleSelected = true;
+        waveformSelected = false;
+      } else if (panel === 'light') {
+        waveformSelected = false;
+        titleSelected = false;
+      }
     } else if (openPanel === panel) {
       openPanel = null;
     }
@@ -1072,6 +1118,10 @@
   function handleWaveformOverlayClick() {
     if (isPlaying) {
       handlePlayPause();
+    } else {
+      // Select waveform overlay (show border)
+      waveformSelected = true;
+      titleSelected = false;
     }
   }
 
@@ -1106,7 +1156,17 @@
   function handleTitleOverlayClick() {
     if (isPlaying) {
       handlePlayPause();
+    } else {
+      // Select title overlay (show border)
+      titleSelected = true;
+      waveformSelected = false;
     }
+  }
+  
+  function handleCanvasBackgroundClick() {
+    // Deselect all overlays when clicking canvas background
+    waveformSelected = false;
+    titleSelected = false;
   }
 
   function handleImageDragOver(e: DragEvent) {
@@ -1165,6 +1225,7 @@
         onWaveformClick={handleWaveformOverlayClick}
         onTitlePositionChange={handleTitlePositionChange}
         onTitleClick={handleTitleOverlayClick}
+        onBackgroundClick={handleCanvasBackgroundClick}
       />
       <div class="image-actions">
         <button type="button" class="text-btn" onclick={handleReplaceImage}>
@@ -1201,7 +1262,8 @@
     <!-- Mic ready - show instructions -->
     <div class="recording-box">
       <p class="recording-instructions">
-        Tap Play to record. Tap Stop to end. Tap refresh to start again.
+        Tap Play to record. Tap Stop to end.<br />
+        Tap refresh to start again.
       </p>
       {#if micError}
         <p class="mic-error">{micError}</p>
@@ -1215,7 +1277,10 @@
           <span class="countdown-number">{countdownNumber}</span>
         </div>
       {:else}
-        <canvas bind:this={waveformCanvas} class="waveform-canvas"></canvas>
+        <div class="live-waveform-container">
+          <canvas bind:this={waveformCanvas} class="waveform-canvas"></canvas>
+          <div class="center-playhead"></div>
+        </div>
       {/if}
     </div>
   {:else if audioLoading}
@@ -1239,7 +1304,7 @@
     >
       <div
         class="trim-handle start"
-        style="left: {trimStart * 100}%"
+        style="left: calc({trimStart} * (100% - 44px))"
         onmousedown={(e) => handleTrimHandleMouseDown('start', e)}
         ontouchstart={(e) => handleTrimHandleTouchStart('start', e)}
         role="slider"
@@ -1251,13 +1316,21 @@
       >
         <div class="trim-handle-bar"></div>
       </div>
+      <!-- White overlay for trimmed start area -->
+      {#if trimStart > 0}
+        <div class="trim-overlay start" style="width: calc({trimStart} * (100% - 44px))"></div>
+      {/if}
       <canvas
         bind:this={waveformCanvas}
         class="waveform-canvas"
       ></canvas>
+      <!-- White overlay for trimmed end area -->
+      {#if trimEnd < 1}
+        <div class="trim-overlay end" style="width: calc({1 - trimEnd} * (100% - 44px))"></div>
+      {/if}
       <div
         class="trim-handle end"
-        style="left: {trimEnd * 100}%"
+        style="left: calc(22px + {trimEnd} * (100% - 44px))"
         onmousedown={(e) => handleTrimHandleMouseDown('end', e)}
         ontouchstart={(e) => handleTrimHandleTouchStart('end', e)}
         role="slider"
@@ -1342,6 +1415,7 @@
       class="control-btn mic"
       class:active={isMicActive}
       onclick={handleMicClick}
+      disabled={hasAudio}
       aria-label="Record audio"
       aria-pressed={isMicActive}
     >
@@ -1562,7 +1636,7 @@
   }
 
   .recording-box.recording-active {
-    padding: var(--spacing-sm) var(--spacing-lg);
+    padding: var(--spacing-sm) 0;
   }
 
   .recording-instructions {
@@ -1605,11 +1679,28 @@
     filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%) !important;
   }
 
+  .live-waveform-container {
+    position: relative;
+    width: 100%;
+  }
+
+  .center-playhead {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 50%;
+    width: 2px;
+    background: var(--color-primary);
+    transform: translateX(-50%);
+    pointer-events: none;
+    z-index: 5;
+  }
+
   .audio-waveform-container {
     position: relative;
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    padding: var(--spacing-sm) var(--spacing-lg);
+    padding: var(--spacing-sm) 22px;
     background: var(--color-white);
     cursor: pointer;
     touch-action: none;
@@ -1621,40 +1712,56 @@
     display: block;
   }
 
+  /* White overlay for trimmed areas */
+  .trim-overlay {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    background: var(--color-white);
+    z-index: 5;
+    pointer-events: none;
+  }
+
+  .trim-overlay.start {
+    left: 22px;
+  }
+
+  .trim-overlay.end {
+    right: 22px;
+  }
+
   .trim-handle {
     position: absolute;
     top: 0;
     bottom: 0;
-    width: 20px;
-    transform: translateX(-50%);
+    width: 22px;
     cursor: ew-resize;
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 10;
     touch-action: none;
+    background: #999999;
   }
 
   .trim-handle.start {
-    background: linear-gradient(to right, rgba(200, 200, 200, 0.6), transparent);
-    border-radius: var(--radius-md) 0 0 var(--radius-md);
+    border-radius: 6px 0 0 6px;
   }
 
   .trim-handle.end {
-    background: linear-gradient(to left, rgba(200, 200, 200, 0.6), transparent);
-    border-radius: 0 var(--radius-md) var(--radius-md) 0;
+    border-radius: 0 6px 6px 0;
   }
 
   .trim-handle-bar {
     width: 4px;
-    height: 24px;
-    background: #555555;
+    height: 28px;
+    background: var(--color-white);
     border-radius: 2px;
   }
 
-  .trim-handle:hover .trim-handle-bar,
-  .trim-handle:focus .trim-handle-bar {
-    background: var(--color-primary);
+  .trim-handle:hover,
+  .trim-handle:focus {
+    background: #888888;
   }
 
   .audio-duration {

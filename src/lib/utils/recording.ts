@@ -78,7 +78,7 @@ export function stopStream(stream: MediaStream | null): void {
 export function drawLiveWaveform(
   canvas: HTMLCanvasElement,
   frequencyData: Uint8Array,
-  scrollOffset: number,
+  dataLength: number,
   color: string = '#777777'
 ): void {
   const ctx = canvas.getContext('2d');
@@ -100,21 +100,23 @@ export function drawLiveWaveform(
   const centerY = height / 2;
   const maxBarHeight = (height / 2) - 2;
 
-  const visibleBars = Math.floor(width / totalBarWidth);
-  const halfVisibleBars = Math.floor(visibleBars / 2);
-  
-  const startX = Math.max(0, halfVisibleBars - scrollOffset) * totalBarWidth;
-
-  const numBars = Math.min(frequencyData.length, scrollOffset + 1);
+  // Center position: align the newest bar directly under the playhead
+  // Playhead is at 50% of width, so center the bar there
+  const centerBarX = (width / 2) - (barWidth / 2);
   
   ctx.fillStyle = color;
   
-  for (let i = 0; i < numBars; i++) {
-    const displayIndex = halfVisibleBars - (scrollOffset - i);
-    if (displayIndex < 0) continue;
-    if (displayIndex >= visibleBars) break;
+  // Newest bar is always at center, older bars extend to the left
+  for (let i = 0; i < dataLength; i++) {
+    // Position each bar relative to center
+    // Newest bar (index dataLength-1) at center, older bars to the left
+    const offset = dataLength - 1 - i;
+    const x = centerBarX - (offset * totalBarWidth);
     
-    const x = displayIndex * totalBarWidth + barGap / 2;
+    // Skip bars that are off-screen
+    if (x >= width) continue;
+    if (x < -barWidth) continue;
+    
     const amplitude = frequencyData[i] / 255;
     const barHeight = Math.max(2, amplitude * maxBarHeight);
     

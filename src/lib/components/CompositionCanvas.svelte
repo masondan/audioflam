@@ -13,6 +13,7 @@
     onWaveformClick?: () => void;
     onTitlePositionChange?: (position: TitlePosition) => void;
     onTitleClick?: () => void;
+    onBackgroundClick?: () => void;
   }
 
   let { 
@@ -25,7 +26,8 @@
     onWaveformPositionChange,
     onWaveformClick,
     onTitlePositionChange,
-    onTitleClick
+    onTitleClick,
+    onBackgroundClick
   }: Props = $props();
 
   let canvas = $state<HTMLCanvasElement | null>(null);
@@ -75,14 +77,16 @@
     if (waveformConfig) {
       layers.waveform = {
         ...waveformConfig,
-        isEditing: waveformConfig.enabled && !isPlaying
+        // Use isEditing from parent, but also hide during playback
+        isEditing: waveformConfig.isEditing && !isPlaying
       };
     }
 
     if (titleConfig) {
       layers.title = {
         ...titleConfig,
-        isEditing: titleConfig.enabled && !isPlaying
+        // Use isEditing from parent, but also hide during playback
+        isEditing: titleConfig.isEditing && !isPlaying
       };
     }
     
@@ -110,7 +114,7 @@
   }
 
   function getHandleAtPoint(x: number, y: number, pos: { x: number; y: number; width: number; height: number }): string | null {
-    const handleSize = 0.02;
+    const handleSize = 0.03;
 
     const handles = [
       { name: 'nw', hx: pos.x, hy: pos.y },
@@ -287,6 +291,12 @@
     
     if (waveformConfig?.enabled && isInsideWaveform(coords.x, coords.y) && onWaveformClick) {
       onWaveformClick();
+      return;
+    }
+    
+    // Clicked on canvas background (outside any overlay)
+    if (onBackgroundClick) {
+      onBackgroundClick();
     }
   }
 

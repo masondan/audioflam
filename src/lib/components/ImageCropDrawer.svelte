@@ -348,7 +348,8 @@
     z-index: 1000;
     display: flex;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: center;
+    align-items: center;
     animation: fadeIn var(--transition-fast);
   }
 
@@ -359,11 +360,15 @@
 
   .crop-drawer {
     background: var(--color-white);
-    border-radius: var(--radius-lg) var(--radius-lg) 0 0;
-    max-height: 90vh;
+    border-radius: var(--radius-lg);
+    width: 100%;
+    max-width: 480px;
+    height: 100%;
+    max-height: 100vh;
     display: flex;
     flex-direction: column;
     animation: slideUp var(--transition-normal);
+    overflow: hidden;
   }
 
   @keyframes slideUp {
@@ -403,6 +408,9 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-lg);
+    flex: 1;
+    overflow-y: auto;
+    min-height: 0;
   }
 
   .image-container {
