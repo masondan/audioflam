@@ -30,9 +30,16 @@ export interface TitlePosition {
 export interface TitleConfig {
   enabled: boolean;
   text: string;
-  font: 'Inter' | 'Roboto Slab' | 'Lora';
-  style: 'transparent' | 'background';
+  font: 'Inter' | 'Lora' | 'Roboto Slab' | 'Saira Condensed' | 'Playfair Display' | 'Bebas Neue';
+  align: 'left' | 'center' | 'right';
+  bold: boolean;
+  lineHeight: number;
+  letterSpacing: number;
   color: string;
+  labelEnabled: boolean;
+  labelOpacity: number;
+  labelSpace: number;
+  labelColor: string;
   position: TitlePosition;
   isEditing?: boolean;
 }
@@ -311,65 +318,134 @@ export function renderTitleLayer(
   canvas: HTMLCanvasElement,
   config: TitleConfig
 ): void {
-  const { position, text, font, style, color, isEditing } = config;
-
-  const x = position.x * canvas.width;
-  const y = position.y * canvas.height;
-  const width = position.width * canvas.width;
-  const height = position.height * canvas.height;
+  const { 
+    position, text, font, align, bold, lineHeight: lineHeightRatio, 
+    letterSpacing, color, labelEnabled, labelOpacity, labelSpace, 
+    labelColor, isEditing 
+  } = config;
 
   ctx.save();
 
-  const fontFamily = font === 'Inter' 
-    ? "'Inter', sans-serif" 
-    : font === 'Roboto Slab' 
-      ? "'Roboto Slab', serif" 
-      : "'Lora', serif";
+  const fontFamilyMap: Record<string, string> = {
+    'Inter': "'Inter', sans-serif",
+    'Lora': "'Lora', serif",
+    'Roboto Slab': "'Roboto Slab', serif",
+    'Saira Condensed': "'Saira Condensed', sans-serif",
+    'Playfair Display': "'Playfair Display', serif",
+    'Bebas Neue': "'Bebas Neue', sans-serif"
+  };
+  const fontFamily = fontFamilyMap[font] || "'Inter', sans-serif";
+
+  const fontWeight = font === 'Bebas Neue' ? 400 : (bold ? (font === 'Inter' ? 800 : 700) : 400);
 
   const lines = text.split('\n');
-  const lineHeight = height / Math.max(lines.length, 1);
-  const fontSize = Math.min(lineHeight * 0.8, width * 0.15);
-
-  ctx.font = `700 ${fontSize}px ${fontFamily}`;
-  ctx.textAlign = 'center';
+  const numLines = Math.max(lines.length, 1);
+  
+  const fontSize = position.width * canvas.width * 0.07;
+  
+  ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+  if (letterSpacing !== 0) {
+    ctx.letterSpacing = `${letterSpacing}em`;
+  }
   ctx.textBaseline = 'middle';
+  
+  // Measure each line individually
+  const lineWidths: number[] = [];
+  let maxTextWidth = 0;
+  for (const line of lines) {
+    const metrics = ctx.measureText(line);
+    lineWidths.push(metrics.width);
+    maxTextWidth = Math.max(maxTextWidth, metrics.width);
+  }
+  
+  const actualLineHeight = fontSize * lineHeightRatio;
+  const totalTextHeight = numLines * actualLineHeight;
+  
+  const labelPadding = fontSize * (0.15 + labelSpace * 0.4);
+  const borderRadius = fontSize * 0.12;
+  
+  // Calculate overall bounding box for positioning and editing handles
+  const boxWidth = maxTextWidth + labelPadding * 2;
+  const boxHeight = totalTextHeight + labelPadding * 2;
+  
+  let boxX: number;
+  if (align === 'left') {
+    boxX = position.x * canvas.width;
+  } else if (align === 'right') {
+    boxX = (position.x + position.width) * canvas.width - boxWidth;
+  } else {
+    boxX = (position.x + position.width / 2) * canvas.width - boxWidth / 2;
+  }
+  const boxY = position.y * canvas.height;
+  
+  const startY = boxY + labelPadding + actualLineHeight / 2;
 
-  const padding = fontSize * 0.3;
-
-  for (let i = 0; i < lines.length; i++) {
-    const line = lines[i];
-    const lineY = y + (i + 0.5) * lineHeight;
-    const lineX = x + width / 2;
-    const textMetrics = ctx.measureText(line);
-    const textWidth = textMetrics.width;
-
-    if (style === 'background') {
-      ctx.fillStyle = color;
-      const bgX = lineX - textWidth / 2 - padding;
-      const bgY = lineY - fontSize / 2 - padding / 2;
-      const bgWidth = textWidth + padding * 2;
-      const bgHeight = fontSize + padding;
-      roundedRect(ctx, bgX, bgY, bgWidth, bgHeight, 4);
+  // Draw per-line labels (each follows the width of that line's text)
+  if (labelEnabled && labelOpacity > 0) {
+    ctx.fillStyle = hexToRgba(labelColor, labelOpacity);
+    
+    for (let i = 0; i < lines.length; i++) {
+      const lineWidth = lineWidths[i];
+      const lineLabelWidth = lineWidth + labelPadding * 2;
+      const lineY = boxY + i * actualLineHeight;
+      const lineLabelHeight = actualLineHeight + (i === 0 ? labelPadding : 0) + (i === lines.length - 1 ? labelPadding : 0);
+      const lineLabelY = i === 0 ? lineY : lineY + labelPadding;
+      
+      let lineLabelX: number;
+      if (align === 'left') {
+        lineLabelX = boxX;
+      } else if (align === 'right') {
+        lineLabelX = boxX + boxWidth - lineLabelWidth;
+      } else {
+        lineLabelX = boxX + (boxWidth - lineLabelWidth) / 2;
+      }
+      
+      // Determine which corners to round based on line position
+      const isFirst = i === 0;
+      const isLast = i === lines.length - 1;
+      
+      if (isFirst && isLast) {
+        // Single line - round all corners
+        roundedRect(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius);
+      } else if (isFirst) {
+        // First line - round top corners only
+        roundedRectPartial(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius, true, true, false, false);
+      } else if (isLast) {
+        // Last line - round bottom corners only
+        roundedRectPartial(ctx, lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight, borderRadius, false, false, true, true);
+      } else {
+        // Middle line - no rounded corners
+        ctx.beginPath();
+        ctx.rect(lineLabelX, lineLabelY, lineLabelWidth, lineLabelHeight);
+      }
       ctx.fill();
-
-      ctx.fillStyle = '#ffffff';
-      ctx.fillText(line, lineX, lineY);
-    } else {
-      ctx.fillStyle = color;
-      ctx.shadowColor = 'rgba(0, 0, 0, 0.5)';
-      ctx.shadowBlur = 4;
-      ctx.shadowOffsetX = 1;
-      ctx.shadowOffsetY = 1;
-      ctx.fillText(line, lineX, lineY);
-      ctx.shadowColor = 'transparent';
     }
+  }
+
+  // Draw text
+  ctx.fillStyle = color;
+  let textX: number;
+  if (align === 'left') {
+    ctx.textAlign = 'left';
+    textX = boxX + labelPadding;
+  } else if (align === 'right') {
+    ctx.textAlign = 'right';
+    textX = boxX + boxWidth - labelPadding;
+  } else {
+    ctx.textAlign = 'center';
+    textX = boxX + boxWidth / 2;
+  }
+  
+  for (let i = 0; i < lines.length; i++) {
+    const lineY = startY + i * actualLineHeight;
+    ctx.fillText(lines[i], textX, lineY);
   }
 
   if (isEditing) {
     ctx.strokeStyle = 'rgba(255, 255, 255, 0.8)';
     ctx.lineWidth = 2;
     ctx.setLineDash([5, 5]);
-    ctx.strokeRect(x, y, width, height);
+    ctx.strokeRect(boxX, boxY, boxWidth, boxHeight);
     ctx.setLineDash([]);
 
     ctx.fillStyle = 'white';
@@ -378,10 +454,10 @@ export function renderTitleLayer(
 
     const cornerHandleSize = 18;
     const cornerHandles = [
-      { hx: x, hy: y },
-      { hx: x + width, hy: y },
-      { hx: x, hy: y + height },
-      { hx: x + width, hy: y + height }
+      { hx: boxX, hy: boxY },
+      { hx: boxX + boxWidth, hy: boxY },
+      { hx: boxX, hy: boxY + boxHeight },
+      { hx: boxX + boxWidth, hy: boxY + boxHeight }
     ];
 
     for (const handle of cornerHandles) {
@@ -393,6 +469,55 @@ export function renderTitleLayer(
   }
 
   ctx.restore();
+}
+
+function roundedRectPartial(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  width: number,
+  height: number,
+  radius: number,
+  topLeft: boolean,
+  topRight: boolean,
+  bottomRight: boolean,
+  bottomLeft: boolean
+): void {
+  ctx.beginPath();
+  radius = Math.min(radius, width / 2, height / 2);
+  
+  const tl = topLeft ? radius : 0;
+  const tr = topRight ? radius : 0;
+  const br = bottomRight ? radius : 0;
+  const bl = bottomLeft ? radius : 0;
+  
+  ctx.moveTo(x + tl, y);
+  ctx.lineTo(x + width - tr, y);
+  if (tr > 0) {
+    ctx.quadraticCurveTo(x + width, y, x + width, y + tr);
+  }
+  ctx.lineTo(x + width, y + height - br);
+  if (br > 0) {
+    ctx.quadraticCurveTo(x + width, y + height, x + width - br, y + height);
+  }
+  ctx.lineTo(x + bl, y + height);
+  if (bl > 0) {
+    ctx.quadraticCurveTo(x, y + height, x, y + height - bl);
+  }
+  ctx.lineTo(x, y + tl);
+  if (tl > 0) {
+    ctx.quadraticCurveTo(x, y, x + tl, y);
+  }
+  ctx.closePath();
+}
+
+function hexToRgba(hex: string, alpha: number): string {
+  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (!result) return `rgba(51, 51, 51, ${alpha})`;
+  const r = parseInt(result[1], 16);
+  const g = parseInt(result[2], 16);
+  const b = parseInt(result[3], 16);
+  return `rgba(${r}, ${g}, ${b}, ${alpha})`;
 }
 
 export function renderLightEffectLayer(

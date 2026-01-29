@@ -7,7 +7,7 @@
   import TitlePanel from './TitlePanel.svelte';
   import LightEffectPanel from './LightEffectPanel.svelte';
   import type { WaveformStyle } from './WaveformPanel.svelte';
-  import type { TitleFont, TitleStyle } from './TitlePanel.svelte';
+  import type { TitleFont, TitleAlign } from './TitlePanel.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
   import {
     requestMicrophonePermission,
@@ -95,8 +95,15 @@
   // Title overlay state
   let titleText = $state('');
   let titleFont = $state<TitleFont>('Inter');
-  let titleStyle = $state<TitleStyle>('transparent');
+  let titleAlign = $state<TitleAlign>('center');
+  let titleBold = $state(true);
+  let titleLineHeight = $state(1);
+  let titleLetterSpacing = $state(0);
   let titleColor = $state('#ffffff');
+  let labelEnabled = $state(true);
+  let labelOpacity = $state(0.5);
+  let labelSpace = $state(0.5);
+  let labelColor = $state('#333333');
   let titlePosition = $state<TitlePosition>({
     x: 0.1,
     y: 0.05,
@@ -160,8 +167,15 @@
       enabled: true,
       text: titleText,
       font: titleFont,
-      style: titleStyle,
+      align: titleAlign,
+      bold: titleBold,
+      lineHeight: titleLineHeight,
+      letterSpacing: titleLetterSpacing,
       color: titleColor,
+      labelEnabled: labelEnabled,
+      labelOpacity: labelOpacity,
+      labelSpace: labelSpace,
+      labelColor: labelColor,
       position: titlePosition,
       isEditing: titleSelected && !isPlaying && !isExporting
     } : null
@@ -1144,14 +1158,47 @@
 
   function handleTitleFontChange(font: TitleFont) {
     titleFont = font;
+    if (font === 'Inter') {
+      titleBold = true;
+    } else if (font === 'Bebas Neue') {
+      titleBold = false;
+    }
   }
 
-  function handleTitleStyleChange(style: TitleStyle) {
-    titleStyle = style;
+  function handleTitleAlignChange(align: TitleAlign) {
+    titleAlign = align;
+  }
+
+  function handleTitleBoldChange(bold: boolean) {
+    titleBold = bold;
+  }
+
+  function handleTitleLineHeightChange(value: number) {
+    titleLineHeight = value;
+  }
+
+  function handleTitleLetterSpacingChange(value: number) {
+    titleLetterSpacing = value;
   }
 
   function handleTitleColorChange(color: string) {
     titleColor = color;
+  }
+
+  function handleLabelEnabledChange(enabled: boolean) {
+    labelEnabled = enabled;
+  }
+
+  function handleLabelOpacityChange(value: number) {
+    labelOpacity = value;
+  }
+
+  function handleLabelSpaceChange(value: number) {
+    labelSpace = value;
+  }
+
+  function handleLabelColorChange(color: string) {
+    labelColor = color;
   }
 
   function handleTitlePositionChange(position: TitlePosition) {
@@ -1461,12 +1508,26 @@
       <TitlePanel
         text={titleText}
         selectedFont={titleFont}
-        selectedStyle={titleStyle}
-        selectedColor={titleColor}
+        selectedAlign={titleAlign}
+        isBold={titleBold}
+        lineHeight={titleLineHeight}
+        letterSpacing={titleLetterSpacing}
+        textColor={titleColor}
+        labelEnabled={labelEnabled}
+        labelOpacity={labelOpacity}
+        labelSpace={labelSpace}
+        labelColor={labelColor}
         onTextChange={handleTitleTextChange}
         onFontChange={handleTitleFontChange}
-        onStyleChange={handleTitleStyleChange}
-        onColorChange={handleTitleColorChange}
+        onAlignChange={handleTitleAlignChange}
+        onBoldChange={handleTitleBoldChange}
+        onLineHeightChange={handleTitleLineHeightChange}
+        onLetterSpacingChange={handleTitleLetterSpacingChange}
+        onTextColorChange={handleTitleColorChange}
+        onLabelEnabledChange={handleLabelEnabledChange}
+        onLabelOpacityChange={handleLabelOpacityChange}
+        onLabelSpaceChange={handleLabelSpaceChange}
+        onLabelColorChange={handleLabelColorChange}
       />
     </TogglePanel>
 

@@ -146,6 +146,7 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
+    padding-bottom: var(--spacing-sm);
   }
 
   .style-tiles {

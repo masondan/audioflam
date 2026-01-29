@@ -44,6 +44,10 @@
   let originalPosition = $state<WaveformPosition | null>(null);
   let activeLayer = $state<'waveform' | 'title' | null>(null);
   let originalTitlePosition = $state<TitlePosition | null>(null);
+  let showCenterLine = $state(false);
+  
+  const BOUNDARY_PADDING = 0.05; // 5% padding from edges for bounding box
+  const CENTER_SNAP_THRESHOLD = 0.02;
 
   function updateCanvasSize() {
     if (!container || !canvas) return;
@@ -77,7 +81,6 @@
     if (waveformConfig) {
       layers.waveform = {
         ...waveformConfig,
-        // Use isEditing from parent, but also hide during playback
         isEditing: waveformConfig.isEditing && !isPlaying
       };
     }
@@ -85,12 +88,30 @@
     if (titleConfig) {
       layers.title = {
         ...titleConfig,
-        // Use isEditing from parent, but also hide during playback
         isEditing: titleConfig.isEditing && !isPlaying
       };
     }
     
     renderFrameCanvasLayers(ctx, canvas, image, layers);
+    
+    if (showCenterLine && isDragging && activeLayer === 'title') {
+      renderCenterSnapLine(ctx, canvas);
+    }
+  }
+  
+  function renderCenterSnapLine(ctx: CanvasRenderingContext2D, canvas: HTMLCanvasElement) {
+    const centerX = canvas.width / 2;
+    
+    ctx.save();
+    ctx.strokeStyle = 'rgba(84, 34, 176, 0.6)';
+    ctx.lineWidth = 1;
+    
+    ctx.beginPath();
+    ctx.moveTo(centerX, 0);
+    ctx.lineTo(centerX, canvas.height);
+    ctx.stroke();
+    
+    ctx.restore();
   }
 
   async function loadImageFromUrl(url: string) {
@@ -142,9 +163,69 @@
     return isInsideRect(x, y, waveformConfig.position);
   }
 
+  function getTitleRenderedBounds(): { x: number; y: number; width: number; height: number } | null {
+    if (!titleConfig?.enabled || !titleConfig.text || !ctx || !canvas) return null;
+    
+    const { position, text, font, bold, lineHeight: lineHeightRatio, letterSpacing, align, labelSpace } = titleConfig;
+    
+    const fontFamilyMap: Record<string, string> = {
+      'Inter': "'Inter', sans-serif",
+      'Lora': "'Lora', serif",
+      'Roboto Slab': "'Roboto Slab', serif",
+      'Saira Condensed': "'Saira Condensed', sans-serif",
+      'Playfair Display': "'Playfair Display', serif",
+      'Bebas Neue': "'Bebas Neue', sans-serif"
+    };
+    const fontFamily = fontFamilyMap[font] || "'Inter', sans-serif";
+    const fontWeight = font === 'Bebas Neue' ? 400 : (bold ? (font === 'Inter' ? 800 : 700) : 400);
+    
+    const lines = text.split('\n');
+    const numLines = Math.max(lines.length, 1);
+    // Must match compositor.ts: position.width * canvas.width * 0.07
+    const fontSize = position.width * canvas.width * 0.07;
+    
+    ctx.save();
+    ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
+    if (letterSpacing !== 0) {
+      ctx.letterSpacing = `${letterSpacing}em`;
+    }
+    
+    let maxTextWidth = 0;
+    for (const line of lines) {
+      const metrics = ctx.measureText(line);
+      maxTextWidth = Math.max(maxTextWidth, metrics.width);
+    }
+    ctx.restore();
+    
+    const actualLineHeight = fontSize * lineHeightRatio;
+    const totalTextHeight = numLines * actualLineHeight;
+    const labelPadding = fontSize * (0.15 + labelSpace * 0.4);
+    
+    const boxWidth = maxTextWidth + labelPadding * 2;
+    const boxHeight = totalTextHeight + labelPadding * 2;
+    
+    let boxX: number;
+    if (align === 'left') {
+      boxX = position.x;
+    } else if (align === 'right') {
+      boxX = position.x + position.width - boxWidth / canvas.width;
+    } else {
+      boxX = position.x + position.width / 2 - boxWidth / canvas.width / 2;
+    }
+    const boxY = position.y;
+    
+    return {
+      x: boxX,
+      y: boxY,
+      width: boxWidth / canvas.width,
+      height: boxHeight / canvas.height
+    };
+  }
+
   function isInsideTitle(x: number, y: number): boolean {
-    if (!titleConfig?.enabled || !titleConfig.text) return false;
-    return isInsideRect(x, y, titleConfig.position);
+    const bounds = getTitleRenderedBounds();
+    if (!bounds) return false;
+    return isInsideRect(x, y, bounds);
   }
 
   function handlePointerDown(e: PointerEvent) {
@@ -154,25 +235,28 @@
 
     // Check title layer first (renders on top)
     if (titleConfig?.enabled && titleConfig.text) {
-      const titleHandle = getHandleAtPoint(coords.x, coords.y, titleConfig.position);
-      if (titleHandle) {
-        activeLayer = 'title';
-        isResizing = true;
-        resizeHandle = titleHandle;
-        dragStartPos = coords;
-        originalTitlePosition = { ...titleConfig.position };
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        e.preventDefault();
-        return;
-      }
-      if (isInsideTitle(coords.x, coords.y)) {
-        activeLayer = 'title';
-        isDragging = true;
-        dragStartPos = coords;
-        originalTitlePosition = { ...titleConfig.position };
-        (e.target as HTMLElement).setPointerCapture(e.pointerId);
-        e.preventDefault();
-        return;
+      const titleBounds = getTitleRenderedBounds();
+      if (titleBounds) {
+        const titleHandle = getHandleAtPoint(coords.x, coords.y, titleBounds);
+        if (titleHandle) {
+          activeLayer = 'title';
+          isResizing = true;
+          resizeHandle = titleHandle;
+          dragStartPos = coords;
+          originalTitlePosition = { ...titleConfig.position };
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          e.preventDefault();
+          return;
+        }
+        if (isInsideTitle(coords.x, coords.y)) {
+          activeLayer = 'title';
+          isDragging = true;
+          dragStartPos = coords;
+          originalTitlePosition = { ...titleConfig.position };
+          (e.target as HTMLElement).setPointerCapture(e.pointerId);
+          e.preventDefault();
+          return;
+        }
       }
     }
 
@@ -208,12 +292,59 @@
 
     if (activeLayer === 'title' && originalTitlePosition && onTitlePositionChange) {
       if (isDragging) {
-        const newX = Math.max(0, Math.min(1 - originalTitlePosition.width, originalTitlePosition.x + dx));
-        const newY = Math.max(0, Math.min(1 - originalTitlePosition.height, originalTitlePosition.y + dy));
+        let newX = originalTitlePosition.x + dx;
+        let newY = originalTitlePosition.y + dy;
+        
+        // Get current bounds to calculate constraints
+        const bounds = getTitleRenderedBounds();
+        if (bounds) {
+          // Calculate where the bounds would be after the move
+          const boundsAfterMoveX = bounds.x + dx;
+          const boundsAfterMoveY = bounds.y + dy;
+          const boundsRight = boundsAfterMoveX + bounds.width;
+          const boundsBottom = boundsAfterMoveY + bounds.height;
+          
+          // Constrain so bounding box stays within 5% padding
+          if (boundsAfterMoveX < BOUNDARY_PADDING) {
+            newX = originalTitlePosition.x + (BOUNDARY_PADDING - bounds.x);
+          }
+          if (boundsRight > 1 - BOUNDARY_PADDING) {
+            newX = originalTitlePosition.x + ((1 - BOUNDARY_PADDING) - (bounds.x + bounds.width));
+          }
+          if (boundsAfterMoveY < BOUNDARY_PADDING) {
+            newY = originalTitlePosition.y + (BOUNDARY_PADDING - bounds.y);
+          }
+          if (boundsBottom > 1 - BOUNDARY_PADDING) {
+            newY = originalTitlePosition.y + ((1 - BOUNDARY_PADDING) - (bounds.y + bounds.height));
+          }
+          
+          // Center snap detection (recalculate after constraints)
+          const finalBoundsX = bounds.x + (newX - originalTitlePosition.x);
+          const renderedCenterX = finalBoundsX + bounds.width / 2;
+          if (Math.abs(renderedCenterX - 0.5) < CENTER_SNAP_THRESHOLD) {
+            newX = originalTitlePosition.x + (0.5 - (bounds.x + bounds.width / 2));
+            showCenterLine = true;
+          } else {
+            showCenterLine = false;
+          }
+        }
+        
         onTitlePositionChange({ ...originalTitlePosition, x: newX, y: newY });
       } else if (isResizing && resizeHandle) {
-        const newPos = applyResize(originalTitlePosition, resizeHandle, dx, dy, 0.1, 0.05);
-        onTitlePositionChange(newPos);
+        // Scale uniformly based on drag direction
+        let scaleFactor = 0;
+        if (resizeHandle === 'se') {
+          scaleFactor = (dx + dy) / 2;
+        } else if (resizeHandle === 'sw') {
+          scaleFactor = (-dx + dy) / 2;
+        } else if (resizeHandle === 'ne') {
+          scaleFactor = (dx - dy) / 2;
+        } else if (resizeHandle === 'nw') {
+          scaleFactor = (-dx - dy) / 2;
+        }
+        
+        const newWidth = Math.max(0.15, Math.min(0.9, originalTitlePosition.width + scaleFactor));
+        onTitlePositionChange({ ...originalTitlePosition, width: newWidth });
       }
     } else if (activeLayer === 'waveform' && originalPosition && onWaveformPositionChange) {
       if (isDragging) {
@@ -276,6 +407,7 @@
     originalPosition = null;
     originalTitlePosition = null;
     activeLayer = null;
+    showCenterLine = false;
   }
 
   function handleClick(e: MouseEvent) {
