@@ -59,8 +59,7 @@ async function handleAzure(text: string, voiceName: string) {
 			'Ocp-Apim-Subscription-Key': AZURE_SPEECH_KEY,
 			'Content-Type': 'application/ssml+xml; charset=utf-8',
 			'X-Microsoft-OutputFormat': 'audio-16khz-48kbitrate-mono-mp3',
-			'User-Agent': 'audioflam-cloudflare/1.0',
-			'Host': `${AZURE_SPEECH_REGION}.tts.speech.microsoft.com`
+			'User-Agent': 'audioflam-cloudflare/1.0'
 		},
 		body: ssml
 	});
