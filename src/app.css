@@ -14,7 +14,7 @@
   --color-primary: var(--color-indigo-bloom);
   --color-background: var(--color-app-bg);
   --color-surface: var(--color-white);
-  --color-border: #e0e0e0;
+  --color-border: #999999;
   --color-border-dark: #777777;
   
   /* SSML Emphasis */
