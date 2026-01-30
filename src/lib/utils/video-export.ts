@@ -104,13 +104,20 @@ async function transcodeInCloud(
   const formData = new FormData();
   formData.append('video', webmBlob, 'video.webm');
 
+  console.log('[CloudTranscode] Starting upload, blob size:', webmBlob.size, 'bytes');
+
   // Upload with progress tracking via XMLHttpRequest
   const { mp4Url, videoId } = await new Promise<{ mp4Url: string; videoId: string }>((resolve, reject) => {
     const xhr = new XMLHttpRequest();
+    let transcodingInterval: ReturnType<typeof setInterval> | null = null;
+    
+    // 3 minute timeout for the entire operation (upload + transcoding)
+    xhr.timeout = 180000;
     
     xhr.upload.addEventListener('progress', (e) => {
       if (e.lengthComputable) {
         const uploadProgress = e.loaded / e.total;
+        console.log('[CloudTranscode] Upload progress:', Math.round(uploadProgress * 100) + '%');
         onProgress?.({
           phase: 'uploading',
           progress: uploadProgress * 0.3, // Upload is 30% of cloud process
@@ -120,39 +127,62 @@ async function transcodeInCloud(
     });
 
     xhr.addEventListener('load', () => {
+      if (transcodingInterval) clearInterval(transcodingInterval);
+      console.log('[CloudTranscode] XHR load, status:', xhr.status);
+      
       if (xhr.status >= 200 && xhr.status < 300) {
         try {
           const response = JSON.parse(xhr.responseText);
           if (response.error) {
+            console.error('[CloudTranscode] Server error:', response.error);
             reject(new Error(response.error));
           } else {
+            console.log('[CloudTranscode] Success, MP4 URL:', response.mp4Url);
             resolve({ mp4Url: response.mp4Url, videoId: response.videoId });
           }
         } catch (e) {
+          console.error('[CloudTranscode] Parse error:', e, 'Response:', xhr.responseText);
           reject(new Error('Invalid response from transcoding service'));
         }
       } else {
         try {
           const error = JSON.parse(xhr.responseText);
+          console.error('[CloudTranscode] HTTP error:', xhr.status, error);
           reject(new Error(error.error || `Upload failed: ${xhr.status}`));
         } catch {
+          console.error('[CloudTranscode] HTTP error:', xhr.status, xhr.responseText);
           reject(new Error(`Upload failed: ${xhr.status}`));
         }
       }
     });
 
-    xhr.addEventListener('error', () => {
+    xhr.addEventListener('error', (e) => {
+      if (transcodingInterval) clearInterval(transcodingInterval);
+      console.error('[CloudTranscode] Network error:', e);
       reject(new Error('Network error during upload'));
     });
 
+    xhr.addEventListener('timeout', () => {
+      if (transcodingInterval) clearInterval(transcodingInterval);
+      console.error('[CloudTranscode] Request timed out');
+      reject(new Error('Upload timed out - please try again'));
+    });
+
+    xhr.addEventListener('abort', () => {
+      if (transcodingInterval) clearInterval(transcodingInterval);
+      console.log('[CloudTranscode] Request aborted');
+      reject(new Error('Upload cancelled'));
+    });
+
     xhr.open('POST', '/api/transcode');
+    console.log('[CloudTranscode] Sending request...');
     xhr.send(formData);
 
     // Show transcoding progress while waiting
     let transcodingProgress = 0.3;
-    const transcodingInterval = setInterval(() => {
+    transcodingInterval = setInterval(() => {
       if (xhr.readyState === XMLHttpRequest.DONE) {
-        clearInterval(transcodingInterval);
+        clearInterval(transcodingInterval!);
         return;
       }
       // Slowly increment progress while transcoding (max 90%)
