@@ -46,6 +46,10 @@
   let originalTitlePosition = $state<TitlePosition | null>(null);
   let showCenterLine = $state(false);
   
+  let isPinching = $state(false);
+  let initialPinchDistance = $state(0);
+  let pinchStartWidth = $state(0);
+  
   const CENTER_SNAP_THRESHOLD = 0.02;
 
   function updateCanvasSize() {
@@ -162,10 +166,10 @@
     return isInsideRect(x, y, waveformConfig.position);
   }
 
-  function getTitleRenderedBounds(): { x: number; y: number; width: number; height: number } | null {
+  function getTitleBoundsAtPosition(posX: number, posY: number, posWidth: number): { x: number; y: number; width: number; height: number } | null {
     if (!titleConfig?.enabled || !titleConfig.text || !ctx || !canvas) return null;
     
-    const { position, text, font, bold, lineHeight: lineHeightRatio, letterSpacing, align, labelSpace } = titleConfig;
+    const { text, font, bold, lineHeight: lineHeightRatio, letterSpacing, align, labelSpace } = titleConfig;
     
     const fontFamilyMap: Record<string, string> = {
       'Inter': "'Inter', sans-serif",
@@ -180,8 +184,7 @@
     
     const lines = text.split('\n');
     const numLines = Math.max(lines.length, 1);
-    // Must match compositor.ts: position.width * canvas.width * 0.07
-    const fontSize = position.width * canvas.width * 0.07;
+    const fontSize = posWidth * canvas.width * 0.07;
     
     ctx.save();
     ctx.font = `${fontWeight} ${fontSize}px ${fontFamily}`;
@@ -198,7 +201,6 @@
     
     const actualLineHeight = fontSize * lineHeightRatio;
     const totalTextHeight = numLines * actualLineHeight;
-    // Must match compositor.ts formula
     const labelPadding = fontSize * (0.15 + labelSpace * 0.6);
     
     const boxWidth = maxTextWidth + labelPadding * 2;
@@ -206,13 +208,13 @@
     
     let boxX: number;
     if (align === 'left') {
-      boxX = position.x;
+      boxX = posX;
     } else if (align === 'right') {
-      boxX = position.x + position.width - boxWidth / canvas.width;
+      boxX = posX + posWidth - boxWidth / canvas.width;
     } else {
-      boxX = position.x + position.width / 2 - boxWidth / canvas.width / 2;
+      boxX = posX + posWidth / 2 - boxWidth / canvas.width / 2;
     }
-    const boxY = position.y;
+    const boxY = posY;
     
     return {
       x: boxX,
@@ -220,6 +222,44 @@
       width: boxWidth / canvas.width,
       height: boxHeight / canvas.height
     };
+  }
+
+  function getTitleRenderedBounds(): { x: number; y: number; width: number; height: number } | null {
+    if (!titleConfig?.enabled || !titleConfig.text) return null;
+    return getTitleBoundsAtPosition(titleConfig.position.x, titleConfig.position.y, titleConfig.position.width);
+  }
+
+  function applyTitleResize(dx: number, dy: number) {
+    if (!originalTitlePosition || !onTitlePositionChange || !resizeHandle || !canvas) return;
+    
+    let scaleFactor = 0;
+    if (resizeHandle === 'se') {
+      scaleFactor = (dx + dy) / 2;
+    } else if (resizeHandle === 'sw') {
+      scaleFactor = (-dx + dy) / 2;
+    } else if (resizeHandle === 'ne') {
+      scaleFactor = (dx - dy) / 2;
+    } else if (resizeHandle === 'nw') {
+      scaleFactor = (-dx - dy) / 2;
+    }
+    
+    const proposedWidth = originalTitlePosition.width + scaleFactor;
+    
+    const bounds = getTitleBoundsAtPosition(originalTitlePosition.x, originalTitlePosition.y, proposedWidth);
+    
+    const minWidth = 0.15;
+    let maxWidth = 2.0;
+    
+    if (bounds) {
+      const margin = 0.01;
+      const availableForBounds = 1 - 2 * margin;
+      if (bounds.width > availableForBounds) {
+        maxWidth = proposedWidth * (availableForBounds / bounds.width);
+      }
+    }
+    
+    const newWidth = Math.max(minWidth, Math.min(maxWidth, proposedWidth));
+    onTitlePositionChange({ ...originalTitlePosition, width: newWidth });
   }
 
   function isInsideTitle(x: number, y: number): boolean {
@@ -297,49 +337,40 @@
         let newX = originalTitlePosition.x + dx;
         let newY = originalTitlePosition.y + dy;
         
-        // Get current bounds to constrain within viewport
-        const bounds = getTitleRenderedBounds();
+        // Calculate bounds at the new position for constraint checking
+        const bounds = getTitleBoundsAtPosition(newX, newY, originalTitlePosition.width);
         if (bounds) {
-          // Calculate the offset from position to bounds
-          const offsetX = bounds.x - originalTitlePosition.x;
-          const offsetY = bounds.y - originalTitlePosition.y;
+          // Clamp so bounding box stays within viewport [0, 1] with small margin
+          const margin = 0.01;
+          if (bounds.x < margin) {
+            newX += (margin - bounds.x);
+          } else if (bounds.x + bounds.width > 1 - margin) {
+            newX -= (bounds.x + bounds.width - (1 - margin));
+          }
           
-          // Clamp so bounding box stays within viewport [0, 1]
-          const minX = -offsetX;
-          const maxX = 1 - bounds.width - offsetX;
-          const minY = -offsetY;
-          const maxY = 1 - bounds.height - offsetY;
-          
-          newX = Math.max(minX, Math.min(maxX, newX));
-          newY = Math.max(minY, Math.min(maxY, newY));
+          if (bounds.y < margin) {
+            newY += (margin - bounds.y);
+          } else if (bounds.y + bounds.height > 1 - margin) {
+            newY -= (bounds.y + bounds.height - (1 - margin));
+          }
           
           // Center snap detection
-          const finalBoundsX = newX + offsetX;
-          const renderedCenterX = finalBoundsX + bounds.width / 2;
-          if (Math.abs(renderedCenterX - 0.5) < CENTER_SNAP_THRESHOLD) {
-            newX = 0.5 - bounds.width / 2 - offsetX;
-            showCenterLine = true;
-          } else {
-            showCenterLine = false;
+          const finalBounds = getTitleBoundsAtPosition(newX, newY, originalTitlePosition.width);
+          if (finalBounds) {
+            const renderedCenterX = finalBounds.x + finalBounds.width / 2;
+            if (Math.abs(renderedCenterX - 0.5) < CENTER_SNAP_THRESHOLD) {
+              const offsetX = finalBounds.x - newX;
+              newX = 0.5 - finalBounds.width / 2 - offsetX;
+              showCenterLine = true;
+            } else {
+              showCenterLine = false;
+            }
           }
         }
         
         onTitlePositionChange({ ...originalTitlePosition, x: newX, y: newY });
       } else if (isResizing && resizeHandle) {
-        // Scale uniformly based on drag direction
-        let scaleFactor = 0;
-        if (resizeHandle === 'se') {
-          scaleFactor = (dx + dy) / 2;
-        } else if (resizeHandle === 'sw') {
-          scaleFactor = (-dx + dy) / 2;
-        } else if (resizeHandle === 'ne') {
-          scaleFactor = (dx - dy) / 2;
-        } else if (resizeHandle === 'nw') {
-          scaleFactor = (-dx - dy) / 2;
-        }
-        
-        const newWidth = Math.max(0.15, Math.min(0.9, originalTitlePosition.width + scaleFactor));
-        onTitlePositionChange({ ...originalTitlePosition, width: newWidth });
+        applyTitleResize(dx, dy);
       }
     } else if (activeLayer === 'waveform' && originalPosition && onWaveformPositionChange) {
       if (isDragging) {
@@ -403,6 +434,58 @@
     originalTitlePosition = null;
     activeLayer = null;
     showCenterLine = false;
+  }
+
+  function getTouchDistance(touches: TouchList): number {
+    if (touches.length < 2) return 0;
+    const dx = touches[0].clientX - touches[1].clientX;
+    const dy = touches[0].clientY - touches[1].clientY;
+    return Math.sqrt(dx * dx + dy * dy);
+  }
+
+  function handleTouchStart(e: TouchEvent) {
+    if (isPlaying) return;
+    
+    if (e.touches.length === 2 && titleConfig?.enabled && titleConfig.text && titleConfig.isEditing) {
+      e.preventDefault();
+      isPinching = true;
+      initialPinchDistance = getTouchDistance(e.touches);
+      pinchStartWidth = titleConfig.position.width;
+      activeLayer = 'title';
+    }
+  }
+
+  function handleTouchMove(e: TouchEvent) {
+    if (!isPinching || e.touches.length !== 2 || !onTitlePositionChange || !titleConfig) return;
+    
+    e.preventDefault();
+    const currentDistance = getTouchDistance(e.touches);
+    const scale = currentDistance / initialPinchDistance;
+    const proposedWidth = pinchStartWidth * scale;
+    
+    const bounds = getTitleBoundsAtPosition(titleConfig.position.x, titleConfig.position.y, proposedWidth);
+    
+    const minWidth = 0.15;
+    let maxWidth = 2.0;
+    
+    if (bounds) {
+      const margin = 0.01;
+      const availableForBounds = 1 - 2 * margin;
+      if (bounds.width > availableForBounds) {
+        maxWidth = proposedWidth * (availableForBounds / bounds.width);
+      }
+    }
+    
+    const newWidth = Math.max(minWidth, Math.min(maxWidth, proposedWidth));
+    onTitlePositionChange({ ...titleConfig.position, width: newWidth });
+  }
+
+  function handleTouchEnd(e: TouchEvent) {
+    if (e.touches.length < 2) {
+      isPinching = false;
+      initialPinchDistance = 0;
+      pinchStartWidth = 0;
+    }
   }
 
   function handleClick(e: MouseEvent) {
@@ -488,6 +571,9 @@
     onpointermove={handlePointerMove}
     onpointerup={handlePointerUp}
     onpointerleave={handlePointerUp}
+    ontouchstart={handleTouchStart}
+    ontouchmove={handleTouchMove}
+    ontouchend={handleTouchEnd}
     onclick={handleClick}
   ></canvas>
   {#if loading}
