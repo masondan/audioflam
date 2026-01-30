@@ -479,6 +479,7 @@
   <canvas
     bind:this={canvas}
     class="composition-canvas"
+    class:editing={waveformConfig?.isEditing || titleConfig?.isEditing}
     class:dragging={isDragging || isResizing}
     width={canvasWidth}
     height={canvasHeight}
@@ -509,11 +510,13 @@
     display: block;
     width: 100%;
     height: auto;
-    /* Allow scroll by default - only prevent when actively dragging */
+    /* Allow scroll by default */
     touch-action: pan-y pinch-zoom;
   }
   
+  .composition-canvas.editing,
   .composition-canvas.dragging {
+    /* Disable scroll when element is selected (ready for drag) or actively dragging */
     touch-action: none;
   }
 

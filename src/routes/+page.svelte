@@ -964,7 +964,7 @@
              type="button"
              class="chevron-btn"
              class:disabled={!twoSpeakerMode}
-             onclick={() => twoSpeakerCardOpen = !twoSpeakerCardOpen}
+             onclick={() => { if (twoSpeakerMode) twoSpeakerCardOpen = !twoSpeakerCardOpen; }}
              aria-expanded={twoSpeakerCardOpen}
              aria-label="Toggle two speakers panel"
              aria-disabled={!twoSpeakerMode}
