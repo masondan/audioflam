@@ -21,7 +21,7 @@
     getFrequencyData,
     drawLiveWaveform
   } from '$lib/utils/recording';
-  import type { WaveformConfig, WaveformPosition, TitleConfig, TitlePosition, LightEffectConfig } from '$lib/utils/compositor';
+  import { loadImage, renderFrame as renderCompositorFrame, getExportResolution, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig, type LayerConfig } from '$lib/utils/compositor';
   import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | null;
@@ -1035,11 +1035,38 @@
     };
 
     try {
-      // Get the canvas from the CompositionCanvas component
-      const canvas = compositionCanvasRef?.getCanvas();
-      if (!canvas) {
-        throw new Error('Canvas not available');
+      // Load the image at full resolution for export
+      let exportImage: HTMLImageElement | null = null;
+      if (imageData?.url) {
+        exportImage = await loadImage(imageData.url);
       }
+      
+      // Determine export resolution based on image dimensions
+      // Targets: 1280x720 (horizontal), 720x1280 (vertical), 720x720 (square)
+      let exportWidth: number;
+      let exportHeight: number;
+      
+      if (exportImage) {
+        const resolution = getExportResolution(exportImage.width, exportImage.height);
+        exportWidth = resolution.width;
+        exportHeight = resolution.height;
+      } else {
+        // Fallback to horizontal if no image
+        exportWidth = 1280;
+        exportHeight = 720;
+      }
+      
+      // Create high-resolution export canvas
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = exportWidth;
+      exportCanvas.height = exportHeight;
+      const exportCtx = exportCanvas.getContext('2d');
+      
+      if (!exportCtx) {
+        throw new Error('Could not create export canvas context');
+      }
+      
+      console.log('[Export] Created export canvas:', exportWidth, 'x', exportHeight);
 
       // Ensure we have an audio element
       if (!audioElement) {
@@ -1095,10 +1122,13 @@
           // Will fall back to audio element capture
         }
       }
+      
+      // Track current waveform data for export render callback
+      let currentExportWaveformData: Uint8Array | undefined;
 
       // Export using smartExportVideo (WebCodecs on Android, MediaRecorder fallback, cloud transcode for WebM)
       const exportResult = await smartExportVideo(
-        canvas,
+        exportCanvas,
         audioElement,
         trimmedAudioBuffer,
         audioDuration,
@@ -1108,8 +1138,7 @@
         },
         (currentTimeInExport) => {
           // Render frame callback - receives current time for animation sync
-          // For WebCodecs export: generate waveform data from pre-computed peaks
-          // (we don't use live audio analysis because it causes stuttering)
+          // Generate waveform data from pre-computed peaks (no live audio analysis)
           if (waveformActive && audioData?.waveform) {
             const totalDuration = audioData.duration * (trimEnd - trimStart);
             const timePosition = currentTimeInExport / totalDuration;
@@ -1127,9 +1156,52 @@
               const baseValue = currentAmplitude * 180;
               syntheticData[i] = Math.max(30, Math.min(255, baseValue + variation));
             }
-            waveformFrequencyData = syntheticData;
+            currentExportWaveformData = syntheticData;
           }
-          compositionCanvasRef?.renderFrame();
+          
+          // Build layer config for export rendering
+          const exportLayers: LayerConfig = {};
+          
+          if (lightActive) {
+            exportLayers.lightEffect = {
+              enabled: true,
+              opacity: lightOpacity,
+              speed: lightSpeed,
+              phase: currentTimeInExport * 60 // Animate light effect based on time
+            };
+          }
+          
+          if (waveformActive) {
+            exportLayers.waveform = {
+              enabled: true,
+              position: waveformPosition,
+              color: waveformColor,
+              style: waveformStyle,
+              frequencyData: currentExportWaveformData,
+              opacity: waveformOpacity
+            };
+          }
+          
+          if (titleActive) {
+            exportLayers.title = {
+              enabled: true,
+              text: titleText,
+              font: titleFont,
+              align: titleAlign,
+              bold: titleBold,
+              lineHeight: titleLineHeight,
+              letterSpacing: titleLetterSpacing,
+              color: titleColor,
+              labelEnabled: labelEnabled,
+              labelOpacity: labelOpacity,
+              labelSpace: labelSpace,
+              labelColor: labelColor,
+              position: titlePosition
+            };
+          }
+          
+          // Render to the high-resolution export canvas
+          renderCompositorFrame(exportCtx, exportCanvas, exportImage, exportLayers);
         },
         () => {
           // Start audio playback callback

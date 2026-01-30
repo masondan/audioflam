@@ -3,6 +3,69 @@ export interface CompositorState {
   imageRect: { x: number; y: number; width: number; height: number };
 }
 
+/**
+ * Target export resolutions for high-quality output.
+ * Preview canvas uses container width; export canvas uses these fixed sizes.
+ */
+export const EXPORT_RESOLUTIONS = {
+  horizontal: { width: 1280, height: 720 },  // 16:9 landscape
+  vertical: { width: 720, height: 1280 },    // 9:16 portrait
+  square: { width: 720, height: 720 },       // 1:1 square
+} as const;
+
+/**
+ * Determine the export resolution based on image aspect ratio.
+ */
+export function getExportResolution(imageWidth: number, imageHeight: number): { width: number; height: number } {
+  const aspectRatio = imageWidth / imageHeight;
+  
+  if (Math.abs(aspectRatio - 1) < 0.1) {
+    // Square (aspect ratio ~1:1)
+    return EXPORT_RESOLUTIONS.square;
+  } else if (aspectRatio > 1) {
+    // Horizontal/landscape
+    return EXPORT_RESOLUTIONS.horizontal;
+  } else {
+    // Vertical/portrait
+    return EXPORT_RESOLUTIONS.vertical;
+  }
+}
+
+/**
+ * Create a high-resolution export canvas and render the composition to it.
+ * This keeps the preview canvas at container width while exporting at fixed HD resolution.
+ */
+export function createExportCanvas(
+  image: HTMLImageElement | null,
+  layers: LayerConfig
+): HTMLCanvasElement {
+  // Determine export resolution based on image dimensions
+  let exportWidth: number;
+  let exportHeight: number;
+  
+  if (image) {
+    const resolution = getExportResolution(image.width, image.height);
+    exportWidth = resolution.width;
+    exportHeight = resolution.height;
+  } else {
+    // Fallback to horizontal if no image
+    exportWidth = EXPORT_RESOLUTIONS.horizontal.width;
+    exportHeight = EXPORT_RESOLUTIONS.horizontal.height;
+  }
+  
+  // Create the export canvas at full resolution
+  const exportCanvas = document.createElement('canvas');
+  exportCanvas.width = exportWidth;
+  exportCanvas.height = exportHeight;
+  
+  const ctx = exportCanvas.getContext('2d');
+  if (ctx) {
+    renderFrame(ctx, exportCanvas, image, layers);
+  }
+  
+  return exportCanvas;
+}
+
 export interface WaveformPosition {
   x: number;
   y: number;

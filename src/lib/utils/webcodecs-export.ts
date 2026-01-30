@@ -161,7 +161,7 @@ export interface WebCodecsExportConfig {
   audioBuffer?: AudioBuffer; // Optional: decoded audio for encoding
   audioElement?: HTMLAudioElement; // For playback sync during recording
   duration: number; // in seconds
-  fps?: number; // Default: 15 (mobile-optimized)
+  fps?: number; // Default: 24 (smooth waveform animation)
   videoBitrate?: number; // Default: 2 Mbps
   audioBitrate?: number; // Default: 48 kbps (matches app settings)
   onProgress?: ProgressCallback;
@@ -182,7 +182,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
     audioBuffer,
     audioElement,
     duration,
-    fps = 15,
+    fps = 24,
     videoBitrate = 2_000_000,
     audioBitrate = 48000, // 48 kbps - matches app settings
     onProgress,

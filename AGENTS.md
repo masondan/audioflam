@@ -347,7 +347,9 @@ Export Button → checkWebCodecsSupport()
 - Uses conservative codec profile: `avc1.42001f` (Baseline profile, level 3.1)
 - Tests multiple profiles for maximum device compatibility
 - Canvas dimensions auto-corrected to even numbers (H.264 requirement)
-- 15 fps for mobile (lower CPU load), 30 fps for desktop
+- 24 fps (smooth waveform animation)
+- Export resolution: 1280x720 (horizontal), 720x1280 (vertical), 720x720 (square)
+- Preview canvas uses container width; export uses high-resolution canvas
 - 2 Mbps video bitrate (balanced quality/file size for mobile)
 
 **Files Involved:**
@@ -371,7 +373,6 @@ Export Button → checkWebCodecsSupport()
 | Firefox | MediaRecorder | WebM ⚠️ |
 
 ### Performance
-- MP4 export: 10-30 seconds for 60-second video (depends on device)
-- Mobile: 15 fps encoding (low CPU burden)
-- Desktop: 30 fps encoding (full quality)
+- MP4 export: 10-40 seconds for 60-second video (depends on device)
+- 24 fps encoding (smooth waveform animation)
 - Progress feedback via onProgress callback
