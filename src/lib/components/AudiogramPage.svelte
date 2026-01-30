@@ -1929,7 +1929,8 @@
     padding: var(--spacing-sm) 22px;
     background: var(--color-white);
     cursor: pointer;
-    touch-action: none;
+    /* Allow vertical scroll - handles have their own touch-action: none */
+    touch-action: pan-y;
   }
 
   .waveform-canvas {

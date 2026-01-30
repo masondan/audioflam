@@ -477,6 +477,7 @@
   <canvas
     bind:this={canvas}
     class="composition-canvas"
+    class:dragging={isDragging || isResizing}
     width={canvasWidth}
     height={canvasHeight}
     style="cursor: {cursorStyle}"
@@ -506,6 +507,11 @@
     display: block;
     width: 100%;
     height: auto;
+    /* Allow scroll by default - only prevent when actively dragging */
+    touch-action: pan-y pinch-zoom;
+  }
+  
+  .composition-canvas.dragging {
     touch-action: none;
   }
 
