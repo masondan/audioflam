@@ -255,7 +255,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
       onProgress?.({
         phase: 'recording',
         progress,
-        message: `Encoding: ${Math.round(progress * 100)}%`
+        message: `Processing: ${Math.round(progress * 100)}%`
       });
     }
   });
@@ -453,7 +453,7 @@ export async function exportWithWebCodecs(config: WebCodecsExportConfig): Promis
   onProgress?.({
     phase: 'complete',
     progress: 1,
-    message: 'Complete!'
+    message: 'Complete'
   });
 
   return {

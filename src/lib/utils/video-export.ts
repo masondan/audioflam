@@ -1,7 +1,7 @@
 import { checkWebCodecsSupport, exportWithWebCodecs } from './webcodecs-export';
 
 export interface ExportProgress {
-  phase: 'preparing' | 'recording' | 'processing' | 'complete';
+  phase: 'preparing' | 'recording' | 'processing' | 'uploading' | 'transcoding' | 'complete';
   progress: number;
   message: string;
 }
@@ -16,12 +16,11 @@ export interface ExportResult {
 /**
  * Smart export function that chooses the best method:
  * 1. WebCodecs + Mediabunny (for reliable MP4 on Android)
- * 2. MediaRecorder fallback (for browsers without WebCodecs)
+ * 2. MediaRecorder fallback → Cloud transcoding if WebM produced
  * 
- * Note on fallback options for iOS/browsers without WebCodecs:
- * - api.video: Free encoding, ~$0/year if videos deleted after download
- * - Cloudinary: Needs paid tier ($89/mo) - overkill for ~200 videos/year
- * - Cloudflare Worker → api.video: Best cost option (Worker is free proxy)
+ * Cloud transcoding via api.video:
+ * - Free encoding, ~$0/year if videos deleted after download
+ * - Cloudflare Worker acts as proxy to avoid CORS and protect API key
  */
 export async function smartExportVideo(
   canvas: HTMLCanvasElement,
@@ -31,14 +30,15 @@ export async function smartExportVideo(
   onProgress?: ProgressCallback,
   renderFrame?: (currentTime: number) => void,
   startAudioPlayback?: () => void,
-  stopAudioPlayback?: () => void
+  stopAudioPlayback?: () => void,
+  forceCloudTranscode?: boolean
 ): Promise<ExportResult> {
   // Check WebCodecs support
   const support = await checkWebCodecsSupport();
   
   console.log('[SmartExport] WebCodecs support:', support);
   
-  if (support.supported && support.hasH264) {
+  if (support.supported && support.hasH264 && !forceCloudTranscode) {
     console.log('[SmartExport] Using WebCodecs (Mediabunny) for MP4 export');
     
     try {
@@ -62,12 +62,11 @@ export async function smartExportVideo(
   }
   
   console.log('[SmartExport] Using MediaRecorder fallback');
-  console.log('[SmartExport] Note: If this produces WebM instead of MP4, consider cloud transcoding');
   
   // Legacy renderFrame wrapper (doesn't receive currentTime)
   const legacyRenderFrame = renderFrame ? () => renderFrame(0) : undefined;
   
-  return exportCanvasVideoLegacy(
+  const localResult = await exportCanvasVideoLegacy(
     canvas,
     audioElement,
     duration,
@@ -76,6 +75,143 @@ export async function smartExportVideo(
     startAudioPlayback,
     stopAudioPlayback
   );
+
+  // If we got MP4 locally, we're done
+  if (localResult.mimeType.includes('mp4') && !forceCloudTranscode) {
+    console.log('[SmartExport] Got MP4 from MediaRecorder, no cloud transcode needed');
+    return localResult;
+  }
+
+  // Need cloud transcoding (either WebM or forced cloud mode)
+  console.log('[SmartExport] Sending to cloud for MP4 transcoding...', { mimeType: localResult.mimeType, forceCloud: forceCloudTranscode });
+  
+  return transcodeInCloud(localResult.blob, onProgress);
+}
+
+/**
+ * Upload WebM to api.video via our Cloudflare Worker and get back MP4
+ */
+async function transcodeInCloud(
+  webmBlob: Blob,
+  onProgress?: ProgressCallback
+): Promise<ExportResult> {
+  onProgress?.({
+    phase: 'uploading',
+    progress: 0,
+    message: 'Sending to cloud...'
+  });
+
+  const formData = new FormData();
+  formData.append('video', webmBlob, 'video.webm');
+
+  // Upload with progress tracking via XMLHttpRequest
+  const { mp4Url, videoId } = await new Promise<{ mp4Url: string; videoId: string }>((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    
+    xhr.upload.addEventListener('progress', (e) => {
+      if (e.lengthComputable) {
+        const uploadProgress = e.loaded / e.total;
+        onProgress?.({
+          phase: 'uploading',
+          progress: uploadProgress * 0.3, // Upload is 30% of cloud process
+          message: `Uploading: ${Math.round(uploadProgress * 100)}%`
+        });
+      }
+    });
+
+    xhr.addEventListener('load', () => {
+      if (xhr.status >= 200 && xhr.status < 300) {
+        try {
+          const response = JSON.parse(xhr.responseText);
+          if (response.error) {
+            reject(new Error(response.error));
+          } else {
+            resolve({ mp4Url: response.mp4Url, videoId: response.videoId });
+          }
+        } catch (e) {
+          reject(new Error('Invalid response from transcoding service'));
+        }
+      } else {
+        try {
+          const error = JSON.parse(xhr.responseText);
+          reject(new Error(error.error || `Upload failed: ${xhr.status}`));
+        } catch {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      }
+    });
+
+    xhr.addEventListener('error', () => {
+      reject(new Error('Network error during upload'));
+    });
+
+    xhr.open('POST', '/api/transcode');
+    xhr.send(formData);
+
+    // Show transcoding progress while waiting
+    let transcodingProgress = 0.3;
+    const transcodingInterval = setInterval(() => {
+      if (xhr.readyState === XMLHttpRequest.DONE) {
+        clearInterval(transcodingInterval);
+        return;
+      }
+      // Slowly increment progress while transcoding (max 90%)
+      transcodingProgress = Math.min(transcodingProgress + 0.02, 0.9);
+      onProgress?.({
+        phase: 'transcoding',
+        progress: transcodingProgress,
+        message: 'Converting in the cloud...'
+      });
+    }, 2000);
+  });
+
+  onProgress?.({
+    phase: 'processing',
+    progress: 0.95,
+    message: 'Downloading MP4...'
+  });
+
+  // Fetch the MP4 file with retry (api.video sometimes needs a moment after reporting ready)
+  let mp4Blob: Blob | null = null;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    if (attempt > 0) {
+      console.log(`[SmartExport] MP4 download retry ${attempt + 1}/5...`);
+      await new Promise(r => setTimeout(r, 2000)); // Wait 2s between retries
+    }
+    
+    const mp4Response = await fetch(mp4Url);
+    if (mp4Response.ok) {
+      mp4Blob = await mp4Response.blob();
+      break;
+    } else if (mp4Response.status === 404 && attempt < 4) {
+      console.log('[SmartExport] MP4 not ready yet, retrying...');
+      continue;
+    } else {
+      throw new Error(`Failed to download transcoded MP4: ${mp4Response.status}`);
+    }
+  }
+
+  if (!mp4Blob) {
+    throw new Error('Failed to download transcoded MP4 after retries');
+  }
+
+  // Clean up: delete the video from api.video (fire and forget)
+  fetch('/api/transcode', {
+    method: 'DELETE',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ videoId })
+  }).catch(e => console.warn('[SmartExport] Failed to delete cloud video:', e));
+
+  onProgress?.({
+    phase: 'complete',
+    progress: 1,
+    message: 'Complete'
+  });
+
+  return {
+    blob: mp4Blob,
+    mimeType: 'video/mp4'
+  };
 }
 
 /**
@@ -269,7 +405,7 @@ export async function exportCanvasVideoLegacy(
       onProgress?.({
         phase: 'complete',
         progress: 1,
-        message: 'Complete!'
+        message: 'Complete'
       });
 
       resolve({ blob, mimeType });
@@ -346,7 +482,7 @@ export async function exportCanvasVideoLegacy(
         onProgress?.({
           phase: 'recording',
           progress,
-          message: `Recording: ${Math.round(elapsed)}s / ${Math.round(duration)}s`
+          message: `Processing: ${Math.round(elapsed)}s / ${Math.round(duration)}s`
         });
       }, 200);
 

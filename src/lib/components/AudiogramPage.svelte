@@ -143,6 +143,9 @@
   let exportFilename = $state('');
   let pendingVideoBlob = $state<Blob | null>(null);
   let pendingVideoMimeType = $state('');
+  let exportCancelled = $state(false);
+  let exportAbortController = $state<AbortController | null>(null);
+  let forceCloudTranscode = $state(false); // Test mode: force cloud transcoding
   let compositionCanvasRef = $state<{ 
   getCanvas: () => HTMLCanvasElement | null;
   renderFrame: () => void;
@@ -1023,10 +1026,12 @@
     if (!canDownload || !audioData) return;
 
     isExporting = true;
+    exportCancelled = false;
+    exportAbortController = new AbortController();
     exportProgress = {
       phase: 'preparing',
       progress: 0,
-      message: 'Initializing...'
+      message: 'Preparing...'
     };
 
     try {
@@ -1091,13 +1096,14 @@
         }
       }
 
-      // Export using smartExportVideo (WebCodecs on Android, MediaRecorder fallback)
+      // Export using smartExportVideo (WebCodecs on Android, MediaRecorder fallback, cloud transcode for WebM)
       const exportResult = await smartExportVideo(
         canvas,
         audioElement,
         trimmedAudioBuffer,
         audioDuration,
         (progress) => {
+          if (exportCancelled) return; // Don't update progress if cancelled
           exportProgress = progress;
         },
         (currentTimeInExport) => {
@@ -1138,7 +1144,8 @@
           isPlaying = false;
           audioElement?.pause();
           stopWaveformAnimation();
-        }
+        },
+        forceCloudTranscode // Pass the test mode flag
       );
 
       // Store the blob/mimeType and show filename modal
@@ -1184,6 +1191,25 @@
     pendingVideoMimeType = '';
     exportFilename = '';
     exportProgress = null;
+  }
+
+  function handleCancelExport() {
+    if (!isExporting) return;
+    
+    exportCancelled = true;
+    exportAbortController?.abort();
+    
+    // Stop audio playback
+    if (audioElement) {
+      audioElement.pause();
+    }
+    isPlaying = false;
+    stopWaveformAnimation();
+    
+    // Reset export state
+    isExporting = false;
+    exportProgress = null;
+    exportAbortController = null;
   }
 
   function handleWaveformPositionChange(position: WaveformPosition) {
@@ -1663,27 +1689,44 @@
   </div>
 
   <!-- Download Button -->
-  <button
-    type="button"
-    class="download-btn"
-    class:active={canDownload && !isExporting && !exportProgress}
-    class:error={exportProgress && exportProgress.progress === 0}
-    onclick={handleDownload}
-    disabled={!canDownload || isExporting || !!exportProgress}
-  >
-    {#if exportProgress}
-      <div class="export-progress">
-        <span class="export-message">{exportProgress.message}</span>
-        {#if exportProgress.progress > 0}
+  <div class="download-section">
+    <button
+      type="button"
+      class="download-btn"
+      class:active={canDownload && !isExporting && !exportProgress}
+      class:exporting={isExporting || (exportProgress && exportProgress.phase !== 'complete')}
+      onclick={handleDownload}
+      disabled={!canDownload || isExporting || !!exportProgress}
+    >
+      {#if exportProgress}
+        <div class="export-progress">
+          <span class="export-message">{exportProgress.message}</span>
           <div class="export-bar">
             <div class="export-bar-fill" style="width: {exportProgress.progress * 100}%"></div>
           </div>
-        {/if}
-      </div>
-    {:else}
-      Download audiogram
-    {/if}
-  </button>
+        </div>
+      {:else}
+        Download audiogram
+      {/if}
+    </button>
+    <button
+      type="button"
+      class="cancel-text-btn"
+      class:active={isExporting}
+      onclick={handleCancelExport}
+      disabled={!isExporting}
+    >
+      Cancel export
+    </button>
+    <p class="download-hint">
+      Local processing works on most devices. If not, we'll convert in the cloud (a few extra seconds). You'll see a progress indicator.
+    </p>
+    <!-- Test mode: force cloud transcoding (remove after testing) -->
+    <label class="test-checkbox">
+      <input type="checkbox" bind:checked={forceCloudTranscode} />
+      <span>Test: Force cloud transcode</span>
+    </label>
+  </div>
 </div>
 
 <!-- Filename Modal -->
@@ -2058,6 +2101,12 @@
     gap: var(--spacing-sm);
   }
 
+  .download-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
   .download-btn {
     width: 100%;
     padding: var(--spacing-md);
@@ -2081,9 +2130,52 @@
     background: #4a1d9e;
   }
 
-  .download-btn.error {
-    background: #dc3545;
+  .download-btn.exporting {
+    background: var(--color-primary);
     color: var(--color-white);
+    cursor: default;
+  }
+
+  .cancel-text-btn {
+    align-self: flex-end;
+    background: none;
+    border: none;
+    padding: var(--spacing-xs) 0;
+    font-size: var(--font-size-xs);
+    font-weight: 500;
+    color: var(--color-text-secondary);
+    cursor: not-allowed;
+    transition: color var(--transition-fast);
+  }
+
+  .cancel-text-btn.active {
+    color: var(--color-primary);
+    cursor: pointer;
+  }
+
+  .cancel-text-btn.active:hover {
+    text-decoration: underline;
+  }
+
+  .download-hint {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    margin: 0;
+    line-height: 1.4;
+  }
+
+  .test-checkbox {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    cursor: pointer;
+    padding: var(--spacing-xs) 0;
+  }
+
+  .test-checkbox input {
+    margin: 0;
   }
 
   /* Export progress styles */
@@ -2101,8 +2193,8 @@
 
   .export-bar {
     width: 100%;
-    height: 4px;
-    background: rgba(255, 255, 255, 0.3);
+    height: 6px;
+    background: rgba(255, 255, 255, 0.25);
     border-radius: var(--radius-full);
     overflow: hidden;
   }
@@ -2111,7 +2203,7 @@
     height: 100%;
     background: white;
     border-radius: var(--radius-full);
-    transition: width 0.2s ease-out;
+    transition: width 0.15s ease-out;
   }
 
   /* Modal styles */
