@@ -234,7 +234,9 @@
     const coords = getCanvasCoords(e);
 
     // Check title layer first (renders on top)
-    if (titleConfig?.enabled && titleConfig.text) {
+    // Only allow drag/resize when already selected (isEditing: true)
+    // This enables "tap to select, then drag" pattern for better mobile scrolling
+    if (titleConfig?.enabled && titleConfig.text && titleConfig.isEditing) {
       const titleBounds = getTitleRenderedBounds();
       if (titleBounds) {
         const titleHandle = getHandleAtPoint(coords.x, coords.y, titleBounds);
@@ -260,8 +262,8 @@
       }
     }
 
-    // Check waveform layer
-    if (waveformConfig?.enabled) {
+    // Check waveform layer - only when already selected
+    if (waveformConfig?.enabled && waveformConfig.isEditing) {
       const waveformHandle = getHandleAtPoint(coords.x, coords.y, waveformConfig.position);
       if (waveformHandle) {
         activeLayer = 'waveform';
