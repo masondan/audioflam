@@ -327,13 +327,20 @@ export async function exportCanvasVideoLegacy(
         }
       } else {
         // Safari fallback: Use Web Audio API to route audio to MediaStreamDestination
+        // We need a fresh audio element because createMediaElementSource can only be called once per element
         console.log('[VideoExport] captureStream not available, using Web Audio API fallback');
+        
+        // Create a clone of the audio element to avoid "already associated" error
+        const audioClone = new Audio(audioElement.src);
+        audioClone.crossOrigin = 'anonymous';
+        audioClone.currentTime = audioElement.currentTime;
+        audioClone.load();
         
         audioContextForExport = new (window.AudioContext || (window as any).webkitAudioContext)();
         mediaStreamDestination = audioContextForExport.createMediaStreamDestination();
         
-        // Create a source from the audio element
-        audioSource = audioContextForExport.createMediaElementSource(audioElement);
+        // Create a source from the cloned audio element
+        audioSource = audioContextForExport.createMediaElementSource(audioClone);
         
         // Connect to both destination (for export) and speakers (so we hear it during export)
         audioSource.connect(mediaStreamDestination);
@@ -345,6 +352,21 @@ export async function exportCanvasVideoLegacy(
         if (audioTracks.length > 0) {
           canvasStream.addTrack(audioTracks[0]);
           console.log('[VideoExport] Audio track added successfully (Web Audio API)');
+          
+          // Start the cloned audio when recording starts (sync with main audio)
+          // We'll start it when startAudioPlayback is called
+          const originalStartAudioPlayback = startAudioPlayback;
+          startAudioPlayback = () => {
+            originalStartAudioPlayback?.();
+            audioClone.currentTime = audioElement.currentTime;
+            audioClone.play().catch(e => console.warn('[VideoExport] Could not play audio clone:', e));
+          };
+          
+          const originalStopAudioPlayback = stopAudioPlayback;
+          stopAudioPlayback = () => {
+            originalStopAudioPlayback?.();
+            audioClone.pause();
+          };
         }
       }
     } catch (err) {
