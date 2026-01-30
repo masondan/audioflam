@@ -180,9 +180,21 @@ async function waitForMp4(authHeader: string, videoId: string, maxWaitMs = 12000
 
 		const video = await statusResponse.json();
 		
-		// Check if MP4 asset is ready
+		// Check if MP4 asset URL is available
 		if (video.assets?.mp4) {
-			return video.assets.mp4;
+			// api.video sometimes returns the URL before it's actually downloadable
+			// Verify the MP4 is actually accessible with a HEAD request
+			const mp4Url = video.assets.mp4;
+			console.log('[Transcode] MP4 URL reported:', mp4Url, '- verifying accessibility...');
+			
+			const headResponse = await fetch(mp4Url, { method: 'HEAD' });
+			if (headResponse.ok) {
+				console.log('[Transcode] MP4 verified accessible');
+				return mp4Url;
+			} else {
+				console.log('[Transcode] MP4 not yet accessible (status:', headResponse.status, '), continuing to poll...');
+				// Don't return yet, keep polling
+			}
 		}
 
 		// Check encoding status
