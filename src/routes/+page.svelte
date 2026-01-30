@@ -82,7 +82,7 @@
     const year = String(now.getFullYear()).slice(-2);
     const hours = String(now.getHours()).padStart(2, '0');
     const minutes = String(now.getMinutes()).padStart(2, '0');
-    return `audioflam-${day}${month}${year}-${hours}${minutes}`;
+    return `audioflam-${day}${month}${year}-${hours}${minutes}.mp3`;
   }
 
   function openDownloadModal() {
@@ -98,7 +98,7 @@
     if (!audioUrl) return;
     
     try {
-      const filename = downloadFilename.trim() || generateDefaultFilename();
+      let filename = downloadFilename.trim() || generateDefaultFilename();
       const response = await fetch(audioUrl);
       
       // Check if we need to apply time stretch (speed adjustment)
@@ -116,17 +116,23 @@
         audioBuffer = await timeStretch(audioBuffer, currentSpeed);
         downloadBlob = audioBufferToWav(audioBuffer);
         extension = 'wav'; // Time-stretched audio is always WAV
+        // Remove .mp3 extension and add .wav
+        filename = filename.replace(/\.mp3$/i, '.wav');
       } else {
         // No time stretch needed - use original format
         downloadBlob = await response.blob();
         extension = twoSpeakerMode ? 'wav' : 'mp3';
+        // Ensure correct extension for two-speaker mode
+        if (twoSpeakerMode && !filename.endsWith('.wav')) {
+          filename = filename.replace(/\.mp3$/i, '.wav');
+        }
       }
       
       const blobUrl = URL.createObjectURL(downloadBlob);
       
       const a = document.createElement('a');
       a.href = blobUrl;
-      a.download = `${filename}.${extension}`;
+      a.download = filename;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);

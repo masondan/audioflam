@@ -639,7 +639,7 @@ export function generateFilename(mimeType: string = 'video/webm'): string {
   const year = String(now.getFullYear()).slice(-2);
   const hours = String(now.getHours()).padStart(2, '0');
   const minutes = String(now.getMinutes()).padStart(2, '0');
-  return `audioflam-audiogram-${day}${month}${year}-${hours}${minutes}.${extension}`;
+  return `audiogram-${day}${month}${year}-${hours}${minutes}.${extension}`;
 }
 
 /**
