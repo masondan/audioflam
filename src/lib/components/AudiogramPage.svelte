@@ -100,7 +100,7 @@
   let titleFont = $state<TitleFont>('Inter');
   let titleAlign = $state<TitleAlign>('center');
   let titleBold = $state(true);
-  let titleLineHeight = $state(1);
+  let titleLineHeight = $state(1.1);
   let titleLetterSpacing = $state(0);
   let titleColor = $state('#ffffff');
   let labelEnabled = $state(true);

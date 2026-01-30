@@ -136,7 +136,7 @@
             onclick={() => onFontChange(font.id)}
             aria-pressed={selectedFont === font.id}
             aria-label={font.id}
-            style="font-family: {font.family}; font-weight: {font.id === 'Bebas Neue' ? 400 : 400};"
+            style="font-family: {font.family}; font-weight: {font.id === 'Inter' ? 700 : font.id === 'Bebas Neue' ? 400 : 400};"
           >
             {font.label}
           </button>

@@ -14,19 +14,19 @@
   type SpeedLevel = 'default' | 'lively' | 'fast';
   type ActiveTab = 'tts' | 'audiogram';
 
-  // Navigation state
+  // Navigation state - restore from localStorage on mount
   let activeTab = $state<ActiveTab>('tts');
-
-  // Persist active tab across refreshes
-  $effect(() => {
-    localStorage.setItem('activeTab', activeTab);
-  });
 
   onMount(() => {
     const saved = localStorage.getItem('activeTab');
     if (saved === 'tts' || saved === 'audiogram') {
       activeTab = saved;
     }
+  });
+
+  // Persist active tab across refreshes
+  $effect(() => {
+    localStorage.setItem('activeTab', activeTab);
   });
 
   // App state
