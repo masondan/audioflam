@@ -298,29 +298,54 @@ export async function exportCanvasVideoLegacy(
        console.log('[VideoExport] Enabled disabled video track');
      }
     
-    // Capture audio stream directly from the audio element
-    // This avoids conflicts with existing AudioContext connections
+    // Capture audio stream - try multiple methods for browser compatibility
+    // Safari doesn't support captureStream() on audio elements, so we use Web Audio API
+    let audioContextForExport: AudioContext | null = null;
+    let mediaStreamDestination: MediaStreamAudioDestinationNode | null = null;
+    let audioSource: MediaElementAudioSourceNode | null = null;
+    
     try {
-      const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
-      const audioTracks = audioStream.getAudioTracks();
-      console.log('[VideoExport] Audio stream tracks:', audioTracks.length);
-      
-      if (audioTracks.length > 0) {
-        const audioTrack = audioTracks[0];
-        console.log('[VideoExport] Audio track state:', { 
-          readyState: audioTrack.readyState,
-          enabled: audioTrack.enabled 
-        });
+      // Check if captureStream is available (Chrome, Firefox)
+      if (typeof (audioElement as any).captureStream === 'function') {
+        const audioStream = (audioElement as HTMLMediaElement & { captureStream(): MediaStream }).captureStream();
+        const audioTracks = audioStream.getAudioTracks();
+        console.log('[VideoExport] Audio stream tracks (captureStream):', audioTracks.length);
         
-        // Only add track if it's in a valid state
-        if (audioTrack.readyState === 'live') {
-          canvasStream.addTrack(audioTrack);
-          console.log('[VideoExport] Audio track added successfully');
-        } else {
-          console.warn('[VideoExport] Audio track not live, skipping audio');
+        if (audioTracks.length > 0) {
+          const audioTrack = audioTracks[0];
+          console.log('[VideoExport] Audio track state:', { 
+            readyState: audioTrack.readyState,
+            enabled: audioTrack.enabled 
+          });
+          
+          if (audioTrack.readyState === 'live') {
+            canvasStream.addTrack(audioTrack);
+            console.log('[VideoExport] Audio track added successfully (captureStream)');
+          } else {
+            console.warn('[VideoExport] Audio track not live, skipping audio');
+          }
         }
       } else {
-        console.warn('[VideoExport] No audio tracks in audio stream');
+        // Safari fallback: Use Web Audio API to route audio to MediaStreamDestination
+        console.log('[VideoExport] captureStream not available, using Web Audio API fallback');
+        
+        audioContextForExport = new (window.AudioContext || (window as any).webkitAudioContext)();
+        mediaStreamDestination = audioContextForExport.createMediaStreamDestination();
+        
+        // Create a source from the audio element
+        audioSource = audioContextForExport.createMediaElementSource(audioElement);
+        
+        // Connect to both destination (for export) and speakers (so we hear it during export)
+        audioSource.connect(mediaStreamDestination);
+        audioSource.connect(audioContextForExport.destination);
+        
+        const audioTracks = mediaStreamDestination.stream.getAudioTracks();
+        console.log('[VideoExport] Audio stream tracks (Web Audio API):', audioTracks.length);
+        
+        if (audioTracks.length > 0) {
+          canvasStream.addTrack(audioTracks[0]);
+          console.log('[VideoExport] Audio track added successfully (Web Audio API)');
+        }
       }
     } catch (err) {
       console.warn('[VideoExport] Could not capture audio, exporting video only:', err);
@@ -540,6 +565,12 @@ export async function exportCanvasVideoLegacy(
         
         // Stop all tracks
         canvasStream.getTracks().forEach(track => track.stop());
+        
+        // Clean up Web Audio API resources if used (Safari fallback)
+        if (audioContextForExport) {
+          audioContextForExport.close().catch(() => {});
+          console.log('[VideoExport] Closed audio context for export');
+        }
         
         // Fallback: if onstop doesn't fire within 2 seconds, finalize anyway
         setTimeout(() => {
