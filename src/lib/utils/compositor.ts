@@ -209,7 +209,9 @@ function drawBarsWaveform(
   for (let i = 0; i < barCount; i++) {
     const barX = x + i * totalBarSpace + gap / 2;
     const normalized = data[Math.floor(i * data.length / barCount)] / 255;
-    const barHeight = Math.max(6, normalized * maxBarHeight);
+    // Apply power curve to reduce overall height and increase peaks/troughs variation
+    const scaled = Math.pow(normalized, 1.8) * 0.7;
+    const barHeight = Math.max(6, scaled * maxBarHeight);
     const radius = Math.min(barWidth / 2, 4);
 
     // Single continuous bar spanning both directions from center
@@ -240,7 +242,9 @@ function drawThinWaveform(
   for (let i = 0; i < lineCount; i++) {
     const lineX = x + i * spacing + (spacing - barWidth) / 2;
     const normalized = data[Math.floor(i * data.length / lineCount)] / 255;
-    const lineHeight = Math.max(4, normalized * maxLineHeight);
+    // Apply power curve to reduce overall height and increase peaks/troughs variation
+    const scaled = Math.pow(normalized, 1.8) * 0.7;
+    const lineHeight = Math.max(4, scaled * maxLineHeight);
     const radius = Math.min(barWidth / 2, 1);
 
     // Single continuous bar spanning both directions from center
@@ -273,7 +277,9 @@ function drawBlocksWaveform(
   for (let i = 0; i < columnCount; i++) {
     const colX = x + i * totalColumnSpace + columnGap / 2;
     const normalized = data[Math.floor(i * data.length / columnCount)] / 255;
-    const segments = Math.max(1, Math.round(normalized * maxSegments));
+    // Apply power curve to reduce overall height and increase peaks/troughs variation
+    const scaled = Math.pow(normalized, 1.8) * 0.7;
+    const segments = Math.max(1, Math.round(scaled * maxSegments));
 
     for (let j = 0; j < segments; j++) {
       const segY = y + height - (j + 1) * (segmentHeight + segmentGap) + segmentGap;
