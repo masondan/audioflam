@@ -66,6 +66,7 @@ export async function smartExportVideo(
   // Legacy renderFrame wrapper (doesn't receive currentTime)
   const legacyRenderFrame = renderFrame ? () => renderFrame(0) : undefined;
   
+  // When forceCloudTranscode is true, use WebM to avoid Android H.264 encoding errors
   const localResult = await exportCanvasVideoLegacy(
     canvas,
     audioElement,
@@ -73,7 +74,8 @@ export async function smartExportVideo(
     onProgress,
     legacyRenderFrame,
     startAudioPlayback,
-    stopAudioPlayback
+    stopAudioPlayback,
+    forceCloudTranscode // Pass as forceWebM
   );
 
   // If we got MP4 locally, we're done
@@ -255,7 +257,8 @@ export async function exportCanvasVideoLegacy(
    onProgress?: ProgressCallback,
    renderFrame?: () => void,
    startAudioPlayback?: () => void,
-   stopAudioPlayback?: () => void
+   stopAudioPlayback?: () => void,
+   forceWebM?: boolean // Skip H.264 attempts, go straight to WebM (for cloud transcode testing)
 ): Promise<ExportResult> {
    return new Promise((resolve, reject) => {
      onProgress?.({
@@ -398,21 +401,25 @@ export async function exportCanvasVideoLegacy(
     
     let mimeType = '';
     
-    // Try H.264 first
-    for (const type of h264Types) {
-      if (MediaRecorder.isTypeSupported(type)) {
-        mimeType = type;
-        console.log('[VideoExport] Selected mime type (H.264):', mimeType);
-        break;
+    // Try H.264 first (unless forceWebM is true - used for cloud transcode testing)
+    if (!forceWebM) {
+      for (const type of h264Types) {
+        if (MediaRecorder.isTypeSupported(type)) {
+          mimeType = type;
+          console.log('[VideoExport] Selected mime type (H.264):', mimeType);
+          break;
+        }
       }
+    } else {
+      console.log('[VideoExport] forceWebM enabled, skipping H.264');
     }
     
-    // If H.264 not supported, try WebM
+    // If H.264 not supported (or forceWebM), try WebM
     if (!mimeType) {
       for (const type of webmTypes) {
         if (MediaRecorder.isTypeSupported(type)) {
           mimeType = type;
-          console.log('[VideoExport] H.264 not supported, falling back to WebM:', mimeType);
+          console.log('[VideoExport] Using WebM:', mimeType);
           break;
         }
       }
