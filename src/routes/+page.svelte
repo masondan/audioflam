@@ -17,6 +17,18 @@
   // Navigation state
   let activeTab = $state<ActiveTab>('tts');
 
+  // Persist active tab across refreshes
+  $effect(() => {
+    localStorage.setItem('activeTab', activeTab);
+  });
+
+  onMount(() => {
+    const saved = localStorage.getItem('activeTab');
+    if (saved === 'tts' || saved === 'audiogram') {
+      activeTab = saved;
+    }
+  });
+
   // App state
   let hasTextInput = $state(false);
   let loading = $state(false);
@@ -1153,7 +1165,7 @@
   }
 
   .app-header {
-    padding: var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-lg);
     border-bottom: 1px solid var(--color-border-dark);
     display: flex;
     justify-content: space-between;
