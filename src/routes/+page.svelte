@@ -45,12 +45,14 @@
   let generationAbortController = $state<AbortController | null>(null);
   
   let twoSpeakerMode = $state(false);
+  let twoSpeakerCardOpen = $state(true);
   let speaker1 = $state<VoiceOption | null>(null);
   let speaker2 = $state<VoiceOption | null>(null);
   let speaker1Open = $state(false);
   let speaker2Open = $state(false);
   let speakerPreviewPlaying = $state<string | null>(null);
   let speakerPreviewAudio: HTMLAudioElement | null = null;
+  let twoSpeakerRef: HTMLDivElement;
   
   let audioPlaylist = $state<PlaylistSegment[]>([]);
   let currentTrackIndex = $state(0);
@@ -238,6 +240,12 @@
 
   function closeSpeeedBlockModal() {
     showSpeedBlockModal = false;
+  }
+
+  function handleClickOutside(event: MouseEvent | TouchEvent) {
+    if (twoSpeakerRef && !twoSpeakerRef.contains(event.target as Node)) {
+      twoSpeakerCardOpen = false;
+    }
   }
 
   function handleSpeedLevelChange(level: SpeedLevel) {
@@ -812,6 +820,8 @@
   }
 </script>
 
+<svelte:window onmousedown={handleClickOutside} ontouchstart={handleClickOutside} />
+
 <div class="app-container">
   <header class="app-header">
     <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
@@ -948,23 +958,41 @@
         />
       {/if}
 
-      <div class="two-speaker-section">
-        <div class="two-speaker-toggle-row">
-          <span class="two-speaker-label">Two speakers</span>
-          <button
-            type="button"
-            class="toggle-switch"
-            class:active={twoSpeakerMode}
-            onclick={() => twoSpeakerMode = !twoSpeakerMode}
-            aria-pressed={twoSpeakerMode}
-            aria-label="Toggle two speaker mode"
-          >
-            <span class="toggle-thumb"></span>
-          </button>
-        </div>
+      <div class="two-speaker-section" bind:this={twoSpeakerRef}>
+         <div class="two-speaker-toggle-row" onmousedown={(e) => e.stopPropagation()} ontouchstart={(e) => e.stopPropagation()}>
+           <button
+             type="button"
+             class="chevron-btn"
+             class:disabled={!twoSpeakerMode}
+             onclick={() => twoSpeakerCardOpen = !twoSpeakerCardOpen}
+             aria-expanded={twoSpeakerCardOpen}
+             aria-label="Toggle two speakers panel"
+             aria-disabled={!twoSpeakerMode}
+           >
+             <img
+               src={twoSpeakerCardOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+               alt=""
+               class="chevron-icon"
+             />
+           </button>
+           <span class="two-speaker-label">Two speakers</span>
+           <button
+             type="button"
+             class="toggle-switch"
+             class:active={twoSpeakerMode}
+             onclick={() => {
+               twoSpeakerMode = !twoSpeakerMode;
+               twoSpeakerCardOpen = twoSpeakerMode;
+             }}
+             aria-pressed={twoSpeakerMode}
+             aria-label="Toggle two speaker mode"
+           >
+             <span class="toggle-thumb"></span>
+           </button>
+         </div>
 
-        {#if twoSpeakerMode}
-          <div class="two-speaker-divider"></div>
+         {#if twoSpeakerMode && twoSpeakerCardOpen}
+           <div class="two-speaker-divider"></div>
           <div class="speaker-dropdowns-row">
             <div class="speaker-dropdown" data-speaker="1">
               <button
@@ -1636,12 +1664,42 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .two-speaker-toggle-row .chevron-btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 0;
+    flex-shrink: 0;
+  }
+
+  .two-speaker-toggle-row .chevron-btn.disabled {
+    cursor: default;
+  }
+
+  .two-speaker-toggle-row .chevron-btn.disabled .chevron-icon {
+    opacity: 0.3;
+  }
+
+  .two-speaker-toggle-row .chevron-icon {
+    width: 16px;
+    height: 16px;
+    filter: invert(0);
+    transition: transform var(--transition-fast), opacity var(--transition-fast);
   }
 
   .two-speaker-label {
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     font-weight: 500;
+    flex: 1;
   }
 
   .toggle-switch {
