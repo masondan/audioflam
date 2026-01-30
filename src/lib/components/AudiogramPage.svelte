@@ -2141,7 +2141,7 @@
     align-self: flex-end;
     background: none;
     border: none;
-    padding: var(--spacing-xs) 0;
+    padding: var(--spacing-sm) 0;
     font-size: var(--font-size-xs);
     font-weight: 500;
     color: var(--color-text-secondary);
