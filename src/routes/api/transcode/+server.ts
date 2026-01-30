@@ -27,7 +27,7 @@ function getAuthHeader(apiKey: string): string {
 }
 
 export const POST: RequestHandler = async ({ request }) => {
-	const API_KEY = env.APIVIDEO0_API_KEY?.trim();
+	const API_KEY = env.APIVIDEO_API_KEY?.trim();
 	
 	if (!API_KEY) {
 		console.error('[Transcode] api.video API key not configured');
@@ -123,7 +123,7 @@ export const POST: RequestHandler = async ({ request }) => {
  * This keeps api.video storage costs at zero
  */
 export const DELETE: RequestHandler = async ({ request }) => {
-	const API_KEY = env.APIVIDEO0_API_KEY?.trim();
+	const API_KEY = env.APIVIDEO_API_KEY?.trim();
 	
 	if (!API_KEY) {
 		return json({ error: 'Service not configured' }, { status: 500 });
