@@ -87,12 +87,6 @@
     class="silence-slider"
   />
   
-  <div class="slider-labels">
-    {#each silenceSteps as step}
-      <span class="slider-label" class:active={level === step}>{silenceLabels[step]}</span>
-    {/each}
-  </div>
-  
   {#if isDragging && isActive}
     <div class="silence-label-popup">{silenceLabels[level]}</div>
   {/if}

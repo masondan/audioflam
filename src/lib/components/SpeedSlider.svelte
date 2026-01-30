@@ -92,12 +92,6 @@
     class="speed-slider"
   />
   
-  <div class="slider-labels">
-    {#each speedSteps as step}
-      <span class="slider-label" class:active={getCurrentLevel(speed) === step.level}>{step.label}</span>
-    {/each}
-  </div>
-  
   {#if isDragging && isActive}
     <div class="speed-label-popup">{speedSteps.find(s => s.value === speed)?.label ?? 'Default'}</div>
   {/if}

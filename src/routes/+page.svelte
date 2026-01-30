@@ -871,8 +871,8 @@
           aria-labelledby="text-label"
         ></div>
         {#if twoSpeakerMode && !hasTextInput}
-          <span class="text-placeholder">Use : to identify speakers (eg Regina:)</span>
-        {/if}
+           <span class="text-placeholder">Use : to separate speakers. Example ...<br>Speaker 1: Hello<br>Speaker 2: Hello</span>
+         {/if}
       </div>
       <div class="text-footer">
         {#if audioUrl && duration > 0}
