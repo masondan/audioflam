@@ -1,61 +1,33 @@
-# AudioFlam
+# AudioFlam - AI Agent Reference
 
-**Purpose:** Technical reference for AI agents working on AudioFlam.  
-**Status:** Production (Step 15 - Smart Export & Polish Phase)  
-**Updated:** January 2026
-
----
-
-## Project Overview
-
-**AudioFlam** is a mobile-first web app combining two features:
-
-1. **TTS Conversion:** Text scripts → audio (Nigerian/British English voices)
-2. **Audiogram Creation:** Image + audio + waveform + title + effects → MP4 video
-
-Built for journalism training in Nigeria. Non-commercial, educational use only.
-
-- **No auth required** - public URL, hidden from search engines
-- **2000 character limit** per TTS generation
-- **Dual-tab interface:** Toggle between TTS and Audiogram creation
+**Purpose:** Single-source-of-truth for AI agents working on AudioFlam  
+**Status:** Production (Step 15 - Smart Export & UX Polish)  
+**Updated:** February 2026
 
 ---
 
-## Current Project Phase
+## Quick Start
 
-**Phase:** Step 15 - Smart Export & UX Polish  
-**Status:** 🎯 MP4 export working on Android and desktop. Polish and edge cases remaining.
+**What is AudioFlam?** A mobile-first web app that converts text scripts to audio (TTS) and creates audiograms (image + audio + waveform + effects → MP4).
 
-**What's Complete:**
-- ✅ TTS: Azure Speech + YarnGPT integration
-- ✅ Audiogram: Full creation pipeline (image, audio, waveform, title, effects)
-- ✅ MP4 Export: WebCodecs-based (native mobile support) + MediaRecorder fallback
-- ✅ WebCodecs support detection with intelligent fallback strategy
+**Tech Stack:**
+- SvelteKit 2 + Svelte 5 (TypeScript)
+- Cloudflare Pages (hosting)
+- Native CSS variables (no Tailwind)
+- WebCodecs API (MP4 encoding on Android)
+- MediaRecorder fallback (iOS/Firefox → cloud transcoding)
 
-**Current Focus:**
-- Edge case testing and UX polish
-- Ensure smooth export experience across browsers
-- Potential Phase 2: iOS fallback (Cloudinary/api.video transcoding)
-
----
-
-## Tech Stack
-
-| Layer | Technology |
-|-------|------------|
-| Framework | SvelteKit 2 + Svelte 5 (TypeScript) |
-| Styling | Native CSS variables (no Tailwind) |
-| Hosting | Cloudflare Pages |
-| TTS Providers | Azure Speech (fast ~3s), YarnGPT (native Nigerian ~30s) |
+**Key Constraint:** Non-commercial, educational use. No authentication. Hidden from search engines.
 
 ---
 
 ## Commands
 
 ```bash
-npm run dev        # Local development
-npm run build      # Production build
-npm run check      # TypeScript/Svelte checks
+npm run dev          # Local development
+npm run build        # Production build
+npm run check        # TypeScript/Svelte checks
+npm run check:watch  # Watch mode
 ```
 
 ---
@@ -65,36 +37,41 @@ npm run check      # TypeScript/Svelte checks
 ```
 src/
 ├── routes/
-│   ├── +page.svelte              # Header + TTS/Audiogram tab switching
+│   ├── +page.svelte              # Header + TTS/Audiogram tab
 │   ├── +layout.svelte            # Root layout
 │   └── api/
-│       └── tts/
-│           └── +server.ts        # TTS API endpoint (Azure + YarnGPT)
+│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT)
+│       └── transcode/+server.ts  # Cloud video transcoding (NEW)
 ├── lib/
-│   ├── stores.ts                 # Voice definitions, app state, audiogram state
+│   ├── stores.ts                 # Voice definitions, app state
 │   ├── components/
 │   │   ├── VoiceDropdown.svelte  # Voice selector
-│   │   ├── Dropdown.svelte       # Generic dropdown
-│   │   ├── AudiogramPage.svelte  # Main audiogram container
-│   │   ├── ImageUpload.svelte    # Image upload & display
-│   │   ├── ImageCropDrawer.svelte # Full-screen image crop overlay
-│   │   ├── AudioImport.svelte    # Audio upload/record + waveform
-│   │   ├── CompositionCanvas.svelte # Canvas preview + export rendering
-│   │   ├── TogglePanel.svelte    # Reusable collapsible panel
-│   │   ├── WaveformPanel.svelte  # Waveform style/color options
-│   │   ├── TitlePanel.svelte     # Title text/font/style options
-│   │   ├── LightEffectPanel.svelte # Bokeh effect opacity/speed
-│   │   └── ColorPicker.svelte    # HSB color picker
+│   │   ├── AudiogramPage.svelte  # Main audiogram UI
+│   │   ├── CompositionCanvas.svelte # Canvas preview/export
+│   │   ├── ImageCropDrawer.svelte # Image crop overlay
+│   │   ├── AudioImport.svelte    # Audio upload + waveform
+│   │   ├── WaveformPanel.svelte  # Waveform settings
+│   │   ├── TitlePanel.svelte     # Title text/font/style
+│   │   ├── LightEffectPanel.svelte # Bokeh effect controls
+│   │   ├── ColorPicker.svelte    # HSB color picker
+│   │   ├── TogglePanel.svelte    # Collapsible panel (reusable)
+│   │   ├── SpeedSlider.svelte    # Audio speed control
+│   │   ├── SpeedSilenceControls.svelte # Speed + silence trim
+│   │   ├── SilenceSlider.svelte  # Silence detection
+│   │   ├── SpeedBlockModal.svelte # Speed warning modal
+│   │   └── [other UI components]
 │   └── utils/
-│       ├── waveform.ts           # Waveform amplitude extraction + rendering
+│       ├── waveform.ts           # Amplitude extraction + rendering
 │       ├── recording.ts          # MediaRecorder wrapper
-│       ├── compositor.ts         # Canvas layer composition (image, waveform, title, effects)
-│       └── video-export.ts       # FFmpeg.wasm wrapper, MP4 encoding
-├── app.css                       # Global styles, CSS variables
+│       ├── compositor.ts         # Canvas layer composition
+│       ├── video-export.ts       # Smart export orchestration
+│       ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
+│       └── [audio utilities]
+├── app.css                       # Global styles + CSS variables
 └── app.html                      # HTML template
 
 static/
-├── icons/                        # App icons (22 total for audiogram)
+├── icons/                        # SVG icons (22 for audiogram)
 └── robots.txt                    # Disallow: / (no indexing)
 ```
 
@@ -102,30 +79,37 @@ static/
 
 ## TTS Providers
 
-### Azure Speech (recommended)
+### Azure Speech (Recommended)
 - **Speed:** ~3 seconds
-- **Auth:** Subscription key via `Ocp-Apim-Subscription-Key` header
-- **Critical:** Must include `Host` header in Cloudflare Workers
-- **Nigerian English Voices:**
-  - `en-NG-AbeoNeural` (male)
-  - `en-NG-EzinneNeural` (female)
-- **British English Voices:**
-  - `en-GB-OllieNeural` (male)
-  - `en-GB-RyanNeural` (male)
-  - `en-GB-AbbiNeural` (female)
-  - `en-GB-BellaNeural` (female)
-  - `en-GB-HollieNeural` (female)
-  - `en-GB-OliverNeural` (male)
-  - `en-GB-SoniaNeural` (female)
+- **Auth:** API key via `Ocp-Apim-Subscription-Key` header
+- **Critical:** Cloudflare Workers require explicit `Host` header
+- **Voices:**
+  - Nigerian: `en-NG-AbeoNeural` (M), `en-NG-EzinneNeural` (F)
+  - British: `en-GB-RyanNeural` (M), `en-GB-BellaNeural` (F), `en-GB-HollieNeural` (F), `en-GB-OliverNeural` (M)
 
-### YarnGPT
-- **Voices:** 4 native Nigerian voices
-  - Female: Idera, Regina
-  - Male: Tayo, Femi
+### YarnGPT (Native Nigerian)
 - **Speed:** ~30 seconds
 - **Auth:** Bearer token
+- **Voices:** Idera (F), Regina (F), Tayo (M), Femi (M)
 - **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
+
+### API Endpoint: POST `/api/tts`
+
+```json
+Request:
+{
+  "text": "Hello world",
+  "voiceName": "en-NG-AbeoNeural",
+  "provider": "azure"
+}
+
+Response:
+{
+  "audioContent": "<base64-encoded MP3>",
+  "format": "mp3"
+}
+```
 
 ---
 
@@ -134,35 +118,78 @@ static/
 Set in Cloudflare Pages → Settings → Environment variables:
 
 ```env
-AZURE_SPEECH_KEY=<84-char Azure Speech key>
+AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
-YARNGPT_API_KEY=<YarnGPT API key>
+YARNGPT_API_KEY=<API key>
 ```
 
-**Important:** After updating env vars, trigger a new deployment.
+**Important:** After updating env vars, deploy to activate.
 
 ---
 
-## API Endpoint
+## MP4 Export Architecture
 
-`POST /api/tts`
+### The Challenge
+Android Chrome claims H.264 support but fails when actually encoding. Affects 85% of users.
 
-**Request:**
-```json
-{
-  "text": "Hello world",
-  "voiceName": "en-NG-AbeoNeural",
-  "provider": "azure"
-}
+### The Solution: Three-Tier Strategy
+
+```
+Export Button
+├─ Tier 1: WebCodecs + Mediabunny (Android, Chrome Desktop)
+│  └─ H.264 encoding locally → MP4 direct download
+├─ Tier 2: MediaRecorder (iOS Safari, Firefox)
+│  └─ WebM locally → No cloud needed, direct download
+└─ Tier 3: Cloud transcoding (if Tier 2 fails or forced)
+   └─ Upload WebM to api.video → Get MP4 → Download
 ```
 
-**Response:**
-```json
-{
-  "audioContent": "<base64-encoded MP3>",
-  "format": "mp3"
-}
-```
+### Implementation Details
+
+**Smart Export Function:** `smartExportVideo()` (video-export.ts)
+- Checks WebCodecs support first
+- Falls back to MediaRecorder if unavailable
+- Triggers cloud transcoding only if needed
+
+**WebCodecs Path** (webcodecs-export.ts):
+- Uses Mediabunny library (17KB, pure JS MP4 muxer)
+- Encodes frames as H.264, audio as AAC
+- 24 fps, 2 Mbps video bitrate, 96 kbps audio
+- Codec: `avc1.42001f` (Baseline profile, level 3.1 for max compatibility)
+- **Critical Design Decision:** Audio is encoded from AudioBuffer, NOT played during export (avoids stuttering from CPU load)
+
+**MediaRecorder Path** (video-export.ts):
+- Falls back to WebM if H.264 unavailable
+- Includes internal RAF loop for continuous frame delivery (tightly coupled to MediaRecorder)
+- Handles audio playback during recording
+
+**Cloud Transcoding Path** (video-export.ts + api/transcode):
+- Uploads WebM to api.video
+- api.video transcodes to MP4 automatically
+- Cost: Free encoding, ~$0.003/video for storage/delivery (negligible for ~200 videos/year)
+- Cloudflare Worker proxies requests (avoids CORS, protects API key)
+- Auto-deletes video after download
+
+### Browser Support Matrix
+
+| Browser | Method | Output |
+|---------|--------|--------|
+| Chrome Android | WebCodecs | MP4 ✅ |
+| Chrome Desktop | WebCodecs | MP4 ✅ |
+| Safari iOS | MediaRecorder | WebM ⚠️ |
+| Firefox | MediaRecorder | WebM ⚠️ |
+
+### Performance
+- WebCodecs: 10-40s for 60s video (device-dependent)
+- MediaRecorder: Similar or slower
+- Cloud transcode: +10-20s (upload + transcoding time)
+
+### Key Files
+- `src/lib/utils/video-export.ts` - Main orchestration
+- `src/lib/utils/webcodecs-export.ts` - H.264 encoding via Mediabunny
+- `src/routes/api/transcode/+server.ts` - Cloud transcoding proxy
+- `src/lib/components/AudiogramPage.svelte` - Export button integration
+- `src/lib/components/CompositionCanvas.svelte` - Canvas rendering
 
 ---
 
@@ -176,203 +203,273 @@ YARNGPT_API_KEY=<YarnGPT API key>
 | `--color-lavender-veil` | `#f0e6f7` | Highlights |
 | `--color-text-primary` | `#333333` | Body text |
 | `--color-text-secondary` | `#777777` | Hints, labels |
-| `--color-white` / `--color-surface` | `#ffffff` | Cards, surfaces |
-| `--color-app-bg` / `--color-background` | `#efefef` | App background |
+| `--color-white` | `#ffffff` | Cards, surfaces |
+| `--color-app-bg` | `#efefef` | App background |
 | `--color-border` | `#e0e0e0` | Light borders |
 | `--color-border-dark` | `#777777` | Dark borders |
 
 ### Typography & Spacing
 
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--font-family-base` | Inter, sans-serif | All text |
-| `--font-size-xs` | 0.75rem | Small labels |
-| `--font-size-sm` | 0.875rem | Helper text |
-| `--font-size-base` | 1rem | Body text |
-| `--font-size-lg` | 1.125rem | Headings |
+| Token | Value |
+|-------|-------|
+| `--font-family-base` | Inter, sans-serif |
+| `--font-size-base` | 1rem |
+| `--spacing-md` | 16px |
+| `--radius-md` | 8px |
+| `--transition-normal` | 200ms ease |
 
-### Spacing & Layout
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--spacing-xs` | 4px | Tight spacing |
-| `--spacing-sm` | 8px | Compact spacing |
-| `--spacing-md` | 16px | Default spacing |
-| `--spacing-lg` | 24px | Generous spacing |
-| `--spacing-xl` | 32px | Extra large spacing |
-| `--radius-sm` | 4px | Small corners |
-| `--radius-md` | 8px | Default corners |
-| `--radius-lg` | 12px | Larger corners |
-| `--radius-full` | 9999px | Pill shape |
-
-### Effects
-
-| Token | Value | Usage |
-|-------|-------|-------|
-| `--shadow-sm` | 0 1px 2px 0 rgb(0 0 0 / 0.05) | Subtle elevation |
-| `--shadow-md` | 0 4px 6px -1px rgb(0 0 0 / 0.1) | Standard elevation |
-| `--shadow-lg` | 0 10px 15px -3px rgb(0 0 0 / 0.1) | High elevation |
-| `--transition-fast` | 150ms ease | UI animations |
-| `--transition-normal` | 200ms ease | Standard transitions |
-
-**Typography:** Inter (Google Fonts)
+All CSS variables defined in `src/app.css`.
 
 ---
 
-## Future Development: Phase 2 - iOS Fallback & TTS→Audiogram Integration
+## Critical Rules & Gotchas
 
-### iOS MP4 Export Fallback
+### DO NOT Break These
 
-**Context:** iOS Safari and Firefox don't support WebCodecs H.264 encoding natively. For Phase 2, we'll add cloud-based transcoding:
+1. **Simplicity first** - Single-purpose tool, don't over-engineer
+2. **No auth system** - Public URL, hidden from search engines
+3. **2000 character limit** - TTS generation per request
+4. **Base64 encoding** - Use `btoa()` not `Buffer` (Cloudflare compatibility)
+5. **XML escaping** - Always escape user text before embedding in SSML (prevents injection)
+6. **Host header required** - Azure requests in Cloudflare Workers need explicit `Host` header
+7. **Audio format consistency** - All responses must include `format: 'mp3'` field
 
-**Recommended Approach: Cloudflare Worker → api.video**
-- Export WebM locally (works everywhere) → Upload to api.video via Cloudflare Worker
-- Cost: Free encoding + ~$0.003/video for storage/delivery (~$0.60/year for 200 videos)
-- Better than Cloudinary (cheaper, free encoding)
-- Cloudflare Worker acts as proxy to avoid CORS issues
+### Export-Specific Gotchas
 
-**Implementation Pattern:**
-```typescript
-// Browser-side: Check WebCodecs support
-if (support.hasH264) {
-  // Fast path: Use WebCodecs MP4
-  return exportWithWebCodecs(config);
-} else {
-  // Fallback: Export WebM, upload to cloud
-  const webmBlob = await exportCanvasVideoLegacy(config);
-  return await transcodeViaWorker(webmBlob);
-}
-```
+- **WebCodecs audio NOT played during export** - Rendering uses time-based animation, not live playback analysis
+- **H.264 requires even dimensions** - Canvas auto-corrected in webcodecs-export.ts (lines 194-196)
+- **Canvas copy needed** - Offscreen canvas required to handle dimension correction
+- **Audio mono→stereo conversion** - Many mobile AAC encoders reject mono; code converts automatically
+- **Mediabunny lazy-load** - Loaded dynamically to keep initial bundle small
+- **Type assertions risky** - `video-export.ts:445` has unchecked type assertion; add guard if changing
 
-### TTS→Audiogram Integration (Smart Audio Import)
+### TTS Gotchas
 
-**Vision:** Allow users to generate TTS audio, then seamlessly push it into the Audiogram creation tab without manual download/upload.
-
-**Current Flow:** TTS page → download MP3 → return to Audiogram → manually upload
-
-**Future Flow:** TTS page → "Create Audiogram" button → auto-load into Audiogram tab
-
-**Implementation Strategy:**
-1. Add `createAudiogramWithTTS()` action that:
-   - Takes generated audio buffer from TTS
-   - Switches to Audiogram tab
-   - Auto-populates audio in AudioImport component
-   - Pre-generates waveform visualization
-   
-2. Store audio state in global store (`stores.ts`):
-   - `lastGeneratedAudio: AudioBuffer | null`
-   - `lastGeneratedVoice: string`
-   
-3. AudioImport component checks for pre-loaded audio on mount:
-   ```typescript
-   onMount(() => {
-     const preloaded = get(generatedAudioStore);
-     if (preloaded) {
-       audioBuffer = preloaded;
-       renderWaveform();
-       clearPreloadedAudio();
-     }
-   });
-   ```
-
-4. Workflow improvements:
-   - Show "Generate & Create Audiogram" button variant in TTS
-   - Auto-switch tabs after TTS generation
-   - Preserve audio quality through the pipeline
-   - Keep MediaRecorder recording option available
-
-**Files to Modify:**
-- `src/lib/stores.ts` - Add audio preload state
-- `src/routes/+page.svelte` - Tab switching logic for seamless UX
-- `src/lib/components/TtsPanel.svelte` (or equivalent) - Add quick-action button
-- `src/lib/components/AudioImport.svelte` - Check for preloaded audio
-
-**Benefits:**
-- Dramatically improves user experience (one-click workflow)
-- Keeps both TTS and Audiogram as independent features
-- Maintains flexibility (users can still record audio directly)
-- No backend changes required
+- **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
+- **Azure faster but slightly accented** - 3s generation but international accent
+- **Error handling loose** - If API fails, user gets generic "error" message (see Improvements below)
 
 ---
 
-## Critical Rules
+## Current Phase Focus
 
-1. **Simplicity first** - single-purpose tool, don't over-engineer
-2. **No auth** - no login system
-3. **No indexing** - `robots.txt` blocks crawlers
-4. **Cloudflare Workers quirk** - Azure requests require explicit `Host` header
-5. **Base64 encoding** - use `btoa()` not `Buffer` (Cloudflare compatibility)
-6. **XML escaping** - always escape user text before embedding in SSML
+**Step 15 - Smart Export & UX Polish**
+
+✅ **Complete:**
+- TTS with Azure + YarnGPT
+- Full Audiogram creation (image, audio, waveform, title, effects)
+- MP4 export via WebCodecs (Android)
+- MediaRecorder fallback (iOS/Firefox)
+- Cloud transcoding via api.video
+
+**In Progress:**
+- Edge case testing
+- UX polish (error messages, loading states)
+- Mobile device compatibility
+
+**Next Phase (Phase 2 - Future):**
+- TTS→Audiogram one-click integration (store exists, UI not wired)
+- Enhanced iOS fallback with better error guidance
+- Performance optimization (OffscreenCanvas for preview)
 
 ---
 
-## MP4 Export Implementation
+## Architecture Decision Log
 
-### The Challenge
-Mobile browsers (especially Android Chrome) return `true` for `MediaRecorder.isTypeSupported('video/mp4')` but fail when actually trying to encode H.264. This caused black-screen exports and silent failures on devices representing ~85% of user base.
+### Why WebCodecs + Mediabunny Instead of MediaRecorder?
 
-### The Solution: WebCodecs + Mediabunny (Phase 1 - COMPLETE)
+**Context:** August 2025 - Android Chrome was producing black-screen videos with MediaRecorder H.264
 
-Instead of relying on MediaRecorder's unreliable H.264 support, we:
+**Options Considered:**
+1. MediaRecorder only → Doesn't work reliably on Android
+2. FFmpeg.wasm → Heavy (~5MB), slow, overkill for simple MP4
+3. WebCodecs + Mediabunny → Lightweight, native H.264 support, Mediabunny is 17KB pure JS
 
-1. **Detect availability** - Check if WebCodecs API + H.264 encoder available
-2. **Encode directly** - Use WebCodecs `VideoEncoder` (H.264) + `AudioEncoder` (AAC)
-3. **Mux to MP4** - Use Mediabunny library (17KB) to write MP4 container
-4. **Fallback gracefully** - Use MediaRecorder for iOS/Firefox (produces WebM)
+**Decision:** Go with #3 (WebCodecs + Mediabunny)
 
-**Smart Export Pipeline:**
-```
-Export Button → checkWebCodecsSupport()
-├── WebCodecs + H.264 available (85% Android, Chrome Desktop)
-│   └── exportWithWebCodecs() → MP4 file direct to user
-└── WebCodecs unavailable (iOS Safari, Firefox)
-    └── exportCanvasVideoLegacy() → WebM (MediaRecorder fallback)
-```
+**Why:** Direct H.264 encoding bypasses MediaRecorder's browser implementation bugs. Mediabunny proved more reliable than larger alternatives in testing.
 
-### Key Implementation Details
+**Document:** See `docs/archive/EXPORT_TECH_PLAN.md` for full analysis.
 
-**Frame Capture Redesign (took multiple iterations to fix):**
-- Problem: Initial approach had external render loop start/stop callbacks
-- Solution: Moved RAF render loop **inside** `exportCanvasVideo()` 
-- Result: Tight coupling ensures frames actively rendering when MediaRecorder starts
-- Impact: Fixed black-screen on mobile, eliminated frame delivery gaps
+### Why Cloud Transcoding Instead of Browser WebM Only?
 
-**Audio Handling:**
-- WebCodecs: Uses decoded AudioBuffer directly (no playback needed during export)
-- Mediabunny: Mono audio converted to stereo (AAC encoder compatibility)
-- Audio trimmed to match video duration exactly
-- Bitrate: 96 kbps stereo AAC (good quality, widely supported)
+**Context:** iOS Safari doesn't support WebCodecs. Users want MP4, not WebM.
 
-**H.264 Configuration:**
-- Uses conservative codec profile: `avc1.42001f` (Baseline profile, level 3.1)
-- Tests multiple profiles for maximum device compatibility
-- Canvas dimensions auto-corrected to even numbers (H.264 requirement)
-- 24 fps (smooth waveform animation)
-- Export resolution: 1280x720 (horizontal), 720x1280 (vertical), 720x720 (square)
-- Preview canvas uses container width; export uses high-resolution canvas
-- 2 Mbps video bitrate (balanced quality/file size for mobile)
+**Options:**
+1. WebM only for all browsers → Users unhappy with non-standard format
+2. Cloud transcoding via Cloudinary → Already used for images, but expensive (~$0.06/video)
+3. Cloud transcoding via api.video → Cheap (~$0.003/video), free encoding
 
-**Files Involved:**
-- `src/lib/utils/webcodecs-export.ts` - WebCodecs + Mediabunny encoding engine
-- `src/lib/utils/video-export.ts` - Smart export orchestration + MediaRecorder fallback
-- `src/lib/components/AudiogramPage.svelte` - Export button integration
-- `src/lib/components/CompositionCanvas.svelte` - Canvas rendering export
+**Decision:** api.video with Cloudflare Worker proxy
 
-**Key Functions:**
-- `checkWebCodecsSupport()` - Feature detection (returns codec availability)
-- `exportWithWebCodecs(config)` - MP4 encoding via Mediabunny
-- `smartExportVideo()` - Intelligent method selection + fallback
-- `exportCanvasVideoLegacy()` - MediaRecorder with decoupled render loop
+**Why:** Free encoding + negligible storage cost. Cloudflare Worker avoids CORS issues and keeps API key server-side.
 
-### Browser Support
-| Browser | Method | Output |
-|---------|--------|--------|
-| Chrome Android | WebCodecs | MP4 ✅ |
-| Chrome Desktop | WebCodecs | MP4 ✅ |
-| Safari iOS | MediaRecorder | WebM ⚠️ |
-| Firefox | MediaRecorder | WebM ⚠️ |
+**Limitation:** Requires internet connection for iOS users (unavoidable architectural constraint).
 
-### Performance
-- MP4 export: 10-40 seconds for 60-second video (depends on device)
-- 24 fps encoding (smooth waveform animation)
-- Progress feedback via onProgress callback
+### Why NOT Play Audio During WebCodecs Export?
+
+**Context:** WebCodecs encoding is CPU-intensive. Playing audio during export causes stuttering.
+
+**Decision:** Encode audio from AudioBuffer (no playback), use time-based frame rendering
+
+**Why:** Guarantees smooth 24fps export without competing for CPU with Web Audio playback
+
+**Trade-off:** Waveform animation must be time-synchronized, not frequency-analyzed from live playback
+
+**Implementation:** `renderFrame(currentTime)` callback passes time to animation logic, not live audio data.
+
+---
+
+## Common Pitfalls for Agents
+
+### 1. Assuming MediaRecorder H.264 Works on All Android
+**Reality:** It claims support but fails in practice. Always check WebCodecs first.
+
+### 2. Forgetting Audio MIME Type Field
+**Reality:** Both TTS providers must return `{ audioContent, format: 'mp3' }`. YarnGPT was fixed to match Azure response format.
+
+**File:** `src/routes/api/tts/+server.ts`
+
+### 3. Not Handling Mono Audio in WebCodecs
+**Reality:** AAC encoder on mobile browsers rejects mono. Code auto-converts mono→stereo.
+
+**File:** `src/lib/utils/webcodecs-export.ts:277-294`
+
+### 4. Type Assertions Without Guards
+**Reality:** `video-export.ts:445` does unchecked type assertion on Mediabunny target. Could fail silently if target changes.
+
+**Fix:** Add runtime check before assertion.
+
+### 5. Forgetting Cloudflare Workers Host Header
+**Reality:** Azure Speech API requires explicit `Host` header in Cloudflare environment.
+
+**File:** `src/routes/api/tts/+server.ts` - Header correctly set.
+
+### 6. Breaking XML Escaping in SSML
+**Reality:** User text embedded in SSML XML without escaping = potential injection. Function exists to fix this.
+
+**File:** Check TTS handler for `escapeXml()` or equivalent.
+
+---
+
+## Testing Checklist
+
+### TTS Pipeline
+- [ ] Azure Nigerian voice: fast (~3s), clear
+- [ ] YarnGPT voice: slow (~30s), natural
+- [ ] Error handling: Invalid API key shows helpful message
+- [ ] Base64 decoding: Audio plays without skips/artifacts
+- [ ] 2000 char limit: Enforced UI-side, rejected server-side if exceeded
+
+### Audiogram Export
+- [ ] Image upload: Accepts JPG, PNG; auto-resizes
+- [ ] Audio import: Accepts MP3, WAV; waveform renders
+- [ ] Composition: Image + audio + waveform sync visually
+- [ ] Export Android: MP4 downloads via WebCodecs (no cloud needed)
+- [ ] Export iOS: WebM downloads locally (acceptable fallback)
+- [ ] Export desktop Chrome: MP4 via WebCodecs
+- [ ] Export desktop Firefox: WebM locally
+
+### Edge Cases
+- [ ] Very long audio (5+ min): Export doesn't timeout
+- [ ] Very large image (10MB+): Upload handles gracefully
+- [ ] Slow network: Cloud transcode retries on 404 (api.video timing)
+- [ ] Rapid successive exports: No race conditions
+- [ ] Browser back button: State preserved (or gracefully cleared)
+
+---
+
+## How to Navigate This Codebase
+
+### For TTS Changes
+1. Start: `src/routes/api/tts/+server.ts` (handler)
+2. Test: `src/routes/+page.svelte` (UI)
+3. Reference: `src/lib/stores.ts` (voice definitions)
+
+### For Audiogram Changes
+1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
+2. UI logic: Individual panel components (WaveformPanel, TitlePanel, etc.)
+3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
+4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
+
+### For Export Changes
+1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
+2. Branch A (WebCodecs): `src/lib/utils/webcodecs-export.ts`
+3. Branch B (MediaRecorder): `src/lib/utils/video-export.ts:exportCanvasVideoLegacy()`
+4. Branch C (Cloud): `src/routes/api/transcode/+server.ts`
+
+### For Design Changes
+1. Colors/spacing: `src/app.css` (CSS variables)
+2. Icons: `static/icons/` (SVG files)
+3. Components: Individual `.svelte` files (use design tokens)
+
+---
+
+## Debugging Tips
+
+### Export Black Screen
+1. Check console for `[WebCodecs]` or `[VideoExport]` logs
+2. Verify image is rendering in preview canvas
+3. If WebCodecs fails, check `checkWebCodecsSupport()` output
+4. On mobile, ensure MediaRecorder fallback triggers
+
+### Audio Not Playing After TTS Generation
+1. Check Base64 decoding in `src/routes/+page.svelte:554-560`
+2. Verify MIME type is `audio/mp3`
+3. Check audio element `loadedmetadata` event fires
+4. Check browser console for CORS errors
+
+### Waveform Not Rendering
+1. Check audio decode success (AudioContext.decodeAudioData)
+2. Verify canvas context available
+3. Check `waveform.ts:extractAmplitude()` returns data
+4. Verify container has dimensions
+
+---
+
+## Useful References
+
+**Most Helpful:**
+- **`docs/CHALLENGES_AND_FIXES.md`** - Consolidated reference for known issues, root causes, and fixes applied (audio pipeline, export reliability, mobile compatibility)
+
+**Deep Dives:**
+- **`docs/ARCHITECTURE.md`** - Visual diagrams and data flow
+- **`docs/TROUBLESHOOTING.md`** - Quick reference for debugging (TTS, export, mobile-specific issues)
+
+**Historical Context** (see `docs/archive/MANIFEST.md` for full index):
+- `EXPORT_TECH_PLAN.md` - Why WebCodecs + Mediabunny was chosen
+- `MOBILE_EXPORT_FIX.md` - Diagnostic approach for black-screen issue
+- `EXPORT_FIX_IMPLEMENTATION.md` - How the RAF loop fix works
+- `AUDIT_REPORT.md` - Performance issues that were fixed
+- `ROADMAP.md` - Original implementation roadmap
+
+---
+
+## Phase 2 Future: TTS→Audiogram Integration
+
+**Vision:** Users generate TTS audio, then one-click to create audiogram without manual download/upload cycle.
+
+**Current State:** `preloadedTTSAudio` store exists in `src/lib/stores.ts`, but UI logic not wired up.
+
+**Implementation:** When user clicks "Generate & Create Audiogram" button (future):
+1. TTS generates audio, stores in `preloadedTTSAudio` store
+2. Auto-switch to Audiogram tab
+3. AudioImport component detects preloaded audio on mount
+4. Pre-populate waveform visualization
+
+**Files to Modify:** `src/lib/components/AudiogramPage.svelte`, TTS panel component (not yet named)
+
+---
+
+## Questions? Need Clarification?
+
+This document should answer 90% of questions. If not, check:
+1. **Architecture**: `docs/ARCHITECTURE.md`
+2. **Troubleshooting**: `docs/TROUBLESHOOTING.md`
+3. **History**: `docs/archive/` (for why decisions were made)
+4. **Code**: Grep for `[WebCodecs]`, `[VideoExport]`, `[TTS]` log prefixes to trace execution
+
+---
+
+**Last Updated:** February 2026  
+**Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete.
