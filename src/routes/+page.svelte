@@ -29,6 +29,40 @@
     localStorage.setItem('activeTab', activeTab);
   });
 
+  // Reset audio when switching between single and two-speaker modes
+  let previousTwoSpeakerMode = $state(false);
+  
+  $effect(() => {
+    if (twoSpeakerMode !== previousTwoSpeakerMode) {
+      previousTwoSpeakerMode = twoSpeakerMode;
+      
+      // Stop playback
+      if (audioElement) {
+        audioElement.pause();
+        audioElement = null;
+      }
+      // Clear audio
+      audioUrl = null;
+      duration = 0;
+      isPlaying = false;
+      audioPlaylist = [];
+      currentTrackIndex = 0;
+      mergedAudioBase64 = null;
+      // Reset controls
+      singleSpeakerSpeed = 1.0;
+      speaker1Speed = 1.0;
+      speaker2Speed = 1.0;
+      speaker1SilenceLevel = 'default';
+      speaker2SilenceLevel = 'default';
+      speedLevel = 'default';
+      silenceLevel = 'default';
+    }
+  });
+  
+  function handleTwoSpeakerToggle() {
+    twoSpeakerMode = !twoSpeakerMode;
+  }
+
   // App state
   let hasTextInput = $state(false);
   let loading = $state(false);
@@ -62,6 +96,7 @@
   let speaker2Speed = $state(1.0);
   let speaker1SilenceLevel = $state<SilenceLevel>('default');
   let speaker2SilenceLevel = $state<SilenceLevel>('default');
+  let mergedAudioBase64 = $state<string | null>(null);
   
   let speedLevel = $state<SpeedLevel>('default');
   let silenceLevel = $state<SilenceLevel>('default');
@@ -222,20 +257,90 @@
     speaker2Speed = speed;
   }
 
-  function handleSpeaker1SilenceChange(level: SilenceLevel) {
+  async function handleSpeaker1SilenceChange(level: SilenceLevel) {
     if (audioUrl === null) {
       showSpeedBlockModal = true;
       return;
     }
-    speaker1SilenceLevel = level;
+    await applyMergedAudioSilenceRemoval('speaker1', level);
   }
 
-  function handleSpeaker2SilenceChange(level: SilenceLevel) {
+  async function handleSpeaker2SilenceChange(level: SilenceLevel) {
     if (audioUrl === null) {
       showSpeedBlockModal = true;
       return;
     }
-    speaker2SilenceLevel = level;
+    await applyMergedAudioSilenceRemoval('speaker2', level);
+  }
+
+  async function applyMergedAudioSilenceRemoval(speaker: 'speaker1' | 'speaker2', level: SilenceLevel) {
+    if (!mergedAudioBase64) return;
+    
+    const previousLevel = speaker === 'speaker1' ? speaker1SilenceLevel : speaker2SilenceLevel;
+    
+    try {
+      loading = true;
+      
+      // Stop any currently playing audio to avoid overlapping tracks
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
+      
+      // Process the merged audio with the new silence level
+      const result = await removeSilence(mergedAudioBase64, level);
+      
+      // Update merged audio base64 for future adjustments
+      mergedAudioBase64 = result.base64Audio;
+      
+      // Clean up old URL
+      if (audioUrl) {
+        URL.revokeObjectURL(audioUrl);
+      }
+      
+      // Create new blob and URL from processed audio
+      audioUrl = URL.createObjectURL(result.blob);
+      
+      // Create new audio element
+      const newAudioElement = new Audio(audioUrl);
+      const playbackRate = speaker === 'speaker1' ? speaker1Speed : speaker2Speed;
+      newAudioElement.playbackRate = playbackRate;
+      
+      newAudioElement.addEventListener('loadedmetadata', () => {
+        duration = newAudioElement.duration || 0;
+        errorMsg = null; // Clear any previous errors once metadata loads
+      });
+      newAudioElement.addEventListener('ended', () => {
+        isPlaying = false;
+      });
+      newAudioElement.addEventListener('error', (e) => {
+        // Only show error if we're actually trying to play
+        if (isPlaying) {
+          errorMsg = 'Failed to load audio';
+          isPlaying = false;
+        }
+      });
+      
+      audioElement = newAudioElement;
+      
+      // Update the appropriate silence level
+      if (speaker === 'speaker1') {
+        speaker1SilenceLevel = level;
+      } else {
+        speaker2SilenceLevel = level;
+      }
+    } catch (err) {
+      console.error('Silence processing failed:', err);
+      errorMsg = 'Failed to process silence removal';
+      // Revert to previous level
+      if (speaker === 'speaker1') {
+        speaker1SilenceLevel = previousLevel;
+      } else {
+        speaker2SilenceLevel = previousLevel;
+      }
+    } finally {
+      loading = false;
+    }
   }
 
   function closeSpeeedBlockModal() {
@@ -244,7 +349,15 @@
 
   function handleClickOutside(event: MouseEvent | TouchEvent) {
     if (twoSpeakerRef && !twoSpeakerRef.contains(event.target as Node)) {
-      twoSpeakerCardOpen = false;
+      // Don't close if click is on the Play or Skip buttons
+      const target = event.target as Node;
+      const isControlButton = 
+        (target instanceof Element && target.closest('.play-btn')) ||
+        (target instanceof Element && target.closest('.skip-btn'));
+      
+      if (!isControlButton) {
+        twoSpeakerCardOpen = false;
+      }
     }
   }
 
@@ -266,6 +379,12 @@
       loading = true;
       
       try {
+        // Stop any currently playing audio to avoid overlapping tracks
+        if (audioElement) {
+          audioElement.pause();
+          audioElement.currentTime = 0;
+        }
+        
         // Process audio client-side using Web Audio API
         const result = await removeSilence(originalAudioBase64, level);
         
@@ -281,13 +400,17 @@
         
         newAudioElement.addEventListener('loadedmetadata', () => {
           duration = newAudioElement.duration || 0;
+          errorMsg = null; // Clear any previous errors once metadata loads
         });
         newAudioElement.addEventListener('ended', () => {
           isPlaying = false;
         });
-        newAudioElement.addEventListener('error', () => {
-          errorMsg = 'Failed to load audio';
-          isPlaying = false;
+        newAudioElement.addEventListener('error', (e) => {
+          // Only show error if we're actually trying to play
+          if (isPlaying) {
+            errorMsg = 'Failed to load audio';
+            isPlaying = false;
+          }
         });
         
         audioElement = newAudioElement;
@@ -320,11 +443,14 @@
       isPlaying = false;
       lastGeneratedText = '';
       originalAudioBase64 = null;
+      mergedAudioBase64 = null;
       audioPlaylist = [];
       currentTrackIndex = 0;
       singleSpeakerSpeed = 1.0;
       speaker1Speed = 1.0;
       speaker2Speed = 1.0;
+      speaker1SilenceLevel = 'default';
+      speaker2SilenceLevel = 'default';
       speedLevel = 'default';
       silenceLevel = 'default';
     }
@@ -608,10 +734,38 @@
     const mergedBlob = await concatenateAudioSegments(normalizedAudios.map(a => a.base64Audio));
     const mergedUrl = URL.createObjectURL(mergedBlob);
     
-    return { segments, mergedUrl, totalDuration };
-  }
+    // Convert merged blob to base64 for later silence removal
+    const mergedArrayBuffer = await mergedBlob.arrayBuffer();
+    const mergedUint8Array = new Uint8Array(mergedArrayBuffer);
+    
+    // Use chunked conversion to avoid "Maximum call stack size exceeded"
+    let mergedBinaryString = '';
+    const chunkSize = 8192;
+    for (let i = 0; i < mergedUint8Array.length; i += chunkSize) {
+      const chunk = mergedUint8Array.subarray(i, i + chunkSize);
+      mergedBinaryString += String.fromCharCode(...chunk);
+    }
+    const mergedBase64 = btoa(mergedBinaryString);
+    
+    return { segments, mergedUrl, totalDuration, mergedBase64 };
+    }
 
   function playNextTrack() {
+    // Check if silence has been applied to two-speaker audio
+    const hasSilenceAdjustment = twoSpeakerMode && 
+      (speaker1SilenceLevel !== 'default' || speaker2SilenceLevel !== 'default');
+    
+    // If silence adjustment is active, play merged audio instead of segments
+    if (hasSilenceAdjustment && audioUrl) {
+      audioElement = new Audio(audioUrl);
+      audioElement.addEventListener('ended', () => {
+        isPlaying = false;
+        currentTrackIndex = 0;
+      });
+      audioElement.play();
+      return;
+    }
+    
     if (currentTrackIndex < audioPlaylist.length) {
       const segment = audioPlaylist[currentTrackIndex];
       audioElement = new Audio(segment.url);
@@ -663,16 +817,36 @@
       return;
     }
     
-    loading = true;
-    errorMsg = null;
-    audioUrl = null;
-    audioPlaylist = [];
-    generationAbortController = new AbortController();
+    // Only reset if generating new audio (not replaying existing)
+    const isNewGeneration = lastGeneratedText !== $textInput.trim();
     
-    // Reset speed sliders to 1.0 when generating new audio
-    singleSpeakerSpeed = 1.0;
-    speaker1Speed = 1.0;
-    speaker2Speed = 1.0;
+    if (isNewGeneration) {
+      loading = true;
+      errorMsg = null;
+      audioUrl = null;
+      audioPlaylist = [];
+      mergedAudioBase64 = null;
+      currentTrackIndex = 0;
+      
+      // Reset speed and silence controls when generating new audio
+      singleSpeakerSpeed = 1.0;
+      speaker1Speed = 1.0;
+      speaker2Speed = 1.0;
+      speaker1SilenceLevel = 'default';
+      speaker2SilenceLevel = 'default';
+      speedLevel = 'default';
+      silenceLevel = 'default';
+    } else {
+      // Replaying existing audio - just update play state
+      if (isPlaying && audioElement) {
+        audioElement.pause();
+        isPlaying = false;
+        return;
+      }
+      isPlaying = true;
+    }
+    
+    generationAbortController = new AbortController();
     
     try {
       if (twoSpeakerMode) {
@@ -691,6 +865,7 @@
         audioPlaylist = result.segments;
         audioUrl = result.mergedUrl;
         duration = result.totalDuration;
+        mergedAudioBase64 = result.mergedBase64;
         currentTrackIndex = 0;
         lastGeneratedText = $textInput.trim();
         isPlaying = true;
@@ -780,9 +955,12 @@
     duration = 0;
     lastGeneratedText = '';
     originalAudioBase64 = null;
+    mergedAudioBase64 = null;
     singleSpeakerSpeed = 1.0;
     speaker1Speed = 1.0;
     speaker2Speed = 1.0;
+    speaker1SilenceLevel = 'default';
+    speaker2SilenceLevel = 'default';
     speedLevel = 'default';
     silenceLevel = 'default';
   }
@@ -981,7 +1159,7 @@
              class="toggle-switch"
              class:active={twoSpeakerMode}
              onclick={() => {
-               twoSpeakerMode = !twoSpeakerMode;
+               handleTwoSpeakerToggle();
                twoSpeakerCardOpen = twoSpeakerMode;
              }}
              aria-pressed={twoSpeakerMode}
@@ -1095,13 +1273,13 @@
               <div class="speaker-speeds-row">
                 <SpeedSlider
                   speed={speaker1Speed}
-                  isActive={audioUrl !== null}
+                  isActive={audioUrl !== null && !isPlaying}
                   onSpeedChange={handleSpeaker1SpeedChange}
                   size="small"
                 />
                 <SpeedSlider
                   speed={speaker2Speed}
-                  isActive={audioUrl !== null}
+                  isActive={audioUrl !== null && !isPlaying}
                   onSpeedChange={handleSpeaker2SpeedChange}
                   size="small"
                 />
@@ -1112,13 +1290,13 @@
               <div class="speaker-speeds-row">
                 <SilenceSlider
                   level={speaker1SilenceLevel}
-                  isActive={audioUrl !== null}
+                  isActive={audioUrl !== null && !isPlaying}
                   onLevelChange={handleSpeaker1SilenceChange}
                   size="small"
                 />
                 <SilenceSlider
                   level={speaker2SilenceLevel}
-                  isActive={audioUrl !== null}
+                  isActive={audioUrl !== null && !isPlaying}
                   onLevelChange={handleSpeaker2SilenceChange}
                   size="small"
                 />

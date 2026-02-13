@@ -19,6 +19,7 @@
 
   let isDragging = $state(false);
   let sliderRef: HTMLInputElement;
+  let draggingValue = $state<number>(0);
 
   function getLevelIndex(lvl: SilenceLevel): number {
     return silenceSteps.indexOf(lvl);
@@ -27,6 +28,7 @@
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;
     const value = parseInt(target.value);
+    draggingValue = value;
     const step = silenceSteps[value];
     if (step) {
       onLevelChange(step);
@@ -88,7 +90,7 @@
   />
   
   {#if isDragging && isActive}
-    <div class="silence-label-popup">{silenceLabels[level]}</div>
+    <div class="silence-label-popup">{silenceLabels[silenceSteps[draggingValue]]}</div>
   {/if}
 </div>
 
