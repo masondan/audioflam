@@ -176,7 +176,7 @@
 
   .control-panel {
     flex: 1;
-    border: 1px solid var(--color-border);
+    border: 1px solid #777777;
     border-radius: var(--radius-md);
     background: var(--color-white);
     overflow: hidden;
@@ -184,7 +184,7 @@
   }
 
   .control-panel.open {
-    border-color: var(--color-primary);
+    border-color: #555555;
   }
 
   .panel-header {
@@ -212,7 +212,11 @@
   .panel-chevron {
     width: 16px;
     height: 16px;
-    filter: brightness(0) saturate(100%) invert(60%);
+    filter: brightness(0) saturate(100%) invert(47%);
+  }
+
+  .control-panel.open .panel-chevron {
+    filter: brightness(0) saturate(100%) invert(33%);
   }
 
   .panel-content {
@@ -235,7 +239,7 @@
     width: 100%;
     height: 6px;
     border-radius: var(--radius-full);
-    background: #efefef;
+    background: #dcdcdc;
     outline: none;
     -webkit-appearance: none;
     appearance: none;
@@ -249,7 +253,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #666666;
+    background: #5422b0;
     cursor: pointer;
     border: none;
     transform: translateY(-7px);
@@ -259,7 +263,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: #666666;
+    background: #5422b0;
     cursor: pointer;
     border: none;
   }

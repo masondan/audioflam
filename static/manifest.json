@@ -1,7 +1,7 @@
 {
   "name": "AudioFlam",
   "short_name": "AudioFlam",
-  "description": "A free, mobile-first text-to-voice app to support AI training for journalists and content creators.",
+  "description": "A mobile-first, text-to-voice and audiogram app to support training for journalists and content creators.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

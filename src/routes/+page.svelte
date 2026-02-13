@@ -1207,7 +1207,7 @@
   }
 
   .logotype {
-    height: 22px;
+    height: 30px;
     width: auto;
   }
 
@@ -1239,8 +1239,8 @@
   }
 
   .nav-tab-icon {
-    width: 20px;
-    height: 20px;
+    width: 24px;
+    height: 24px;
     filter: invert(0.46);
   }
 
@@ -1277,13 +1277,13 @@
 
   .text-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #555555;
     font-weight: 500;
   }
 
   .char-count {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: #777777;
   }
 
   .char-count.warning {
@@ -1307,7 +1307,7 @@
   .text-editor {
     min-height: 150px;
     padding: var(--spacing-md);
-    border: 1px solid var(--color-border);
+    border: 1px solid #555555;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
     line-height: 1.6;
@@ -1356,7 +1356,7 @@
   }
 
   .clear-btn:hover:not(:disabled) {
-    color: var(--color-primary);
+    color: #555555;
   }
 
   .clear-btn.inactive {
@@ -1407,12 +1407,12 @@
   .skip-btn img {
     width: 32px;
     height: 32px;
-    filter: brightness(0) saturate(100%) invert(60%);
+    filter: brightness(0) saturate(100%) invert(47%);
     transition: filter var(--transition-fast);
   }
 
   .skip-btn:hover:not(:disabled) img {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    filter: brightness(0) saturate(100%) invert(33%);
   }
 
   .skip-btn:disabled {
@@ -1430,7 +1430,7 @@
     align-items: center;
     justify-content: center;
     background: var(--color-white);
-    border: 3px solid #999999 !important;
+    border: 3px solid #777777 !important;
     border-radius: 50%;
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
@@ -1444,12 +1444,12 @@
   .play-btn .play-icon {
     width: 40px;
     height: 40px;
-    filter: brightness(0) saturate(100%) invert(70%);
+    filter: brightness(0) saturate(100%) invert(47%);
     transition: filter var(--transition-fast);
     position: relative;
     z-index: 2;
     display: block;
-    -webkit-filter: brightness(0) saturate(100%) invert(70%);
+    -webkit-filter: brightness(0) saturate(100%) invert(47%);
   }
 
   .play-btn.active {
@@ -1654,7 +1654,7 @@
   }
 
   .two-speaker-section {
-    border: 1px solid var(--color-border);
+    border: 1px solid #777777;
     border-radius: var(--radius-md);
     padding: 12px var(--spacing-md);
     background: var(--color-white);
@@ -1697,7 +1697,7 @@
 
   .two-speaker-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     font-weight: 500;
     flex: 1;
   }
@@ -1756,17 +1756,18 @@
     justify-content: space-between;
     align-items: center;
     padding: var(--spacing-sm) var(--spacing-md);
-    border: 1px solid var(--color-border);
+    border: 1px solid #777777;
     border-radius: var(--radius-md);
     background: var(--color-white);
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
 
   .speaker-dropdown-btn:hover {
-    border-color: var(--color-primary);
+    border-color: #555555;
+    color: #555555;
   }
 
   .chevron-icon {
@@ -1871,7 +1872,7 @@
   .speaker-speeds-label {
     display: block;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     font-weight: 500;
     margin-bottom: var(--spacing-sm);
   }

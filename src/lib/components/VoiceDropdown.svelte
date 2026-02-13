@@ -160,7 +160,7 @@
   .dropdown-label {
     display: block;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #555555;
     font-weight: 500;
     margin-bottom: var(--spacing-xs);
   }
@@ -172,10 +172,10 @@
     justify-content: space-between;
     padding: 12px var(--spacing-md);
     background: var(--color-white);
-    border: 1px solid var(--color-border);
+    border: 1px solid #555555;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
-    color: var(--color-text-primary);
+    color: #555555;
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
@@ -202,7 +202,7 @@
     width: 20px;
     height: 20px;
     flex-shrink: 0;
-    filter: invert(0.43);
+    filter: invert(0.33);
   }
 
   .dropdown-menu {
