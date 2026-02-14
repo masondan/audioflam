@@ -93,7 +93,9 @@
 </script>
 
 <div class="dropdown" bind:this={dropdownRef}>
-  <span class="dropdown-label" id="voice-dropdown-label">{label}</span>
+  {#if label}
+    <span class="dropdown-label" id="voice-dropdown-label">{label}</span>
+  {/if}
   <button 
     type="button" 
     class="dropdown-trigger" 
@@ -174,7 +176,9 @@
     background: var(--color-white);
     border: 1px solid #555555;
     border-radius: var(--radius-md);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1.5;
     color: #555555;
     cursor: pointer;
     transition: border-color var(--transition-fast);
@@ -244,7 +248,8 @@
     padding: 12px var(--spacing-md);
     background: none;
     border: none;
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-sm);
+    font-weight: 500;
     color: var(--color-text-primary);
     cursor: pointer;
     text-align: left;

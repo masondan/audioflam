@@ -79,14 +79,12 @@
   let generationAbortController = $state<AbortController | null>(null);
   
   let twoSpeakerMode = $state(false);
-  let twoSpeakerCardOpen = $state(true);
   let speaker1 = $state<VoiceOption | null>(null);
   let speaker2 = $state<VoiceOption | null>(null);
   let speaker1Open = $state(false);
   let speaker2Open = $state(false);
   let speakerPreviewPlaying = $state<string | null>(null);
   let speakerPreviewAudio: HTMLAudioElement | null = null;
-  let twoSpeakerRef: HTMLDivElement;
   
   let audioPlaylist = $state<PlaylistSegment[]>([]);
   let currentTrackIndex = $state(0);
@@ -100,6 +98,8 @@
   
   let speedLevel = $state<SpeedLevel>('default');
   let silenceLevel = $state<SilenceLevel>('default');
+  
+  let adjustAudioOpen = $state(false);
   
   const speedLevelValues: Record<SpeedLevel, number> = {
     default: 1.0,
@@ -345,20 +345,6 @@
 
   function closeSpeeedBlockModal() {
     showSpeedBlockModal = false;
-  }
-
-  function handleClickOutside(event: MouseEvent | TouchEvent) {
-    if (twoSpeakerRef && !twoSpeakerRef.contains(event.target as Node)) {
-      // Don't close if click is on the Play or Skip buttons
-      const target = event.target as Node;
-      const isControlButton = 
-        (target instanceof Element && target.closest('.play-btn')) ||
-        (target instanceof Element && target.closest('.skip-btn'));
-      
-      if (!isControlButton) {
-        twoSpeakerCardOpen = false;
-      }
-    }
   }
 
   function handleSpeedLevelChange(level: SpeedLevel) {
@@ -998,7 +984,7 @@
   }
 </script>
 
-<svelte:window onmousedown={handleClickOutside} ontouchstart={handleClickOutside} />
+
 
 <div class="app-container">
   <header class="app-header">
@@ -1029,16 +1015,152 @@
 
   <main class="main-content">
     <div class="tab-panel" class:hidden={activeTab !== 'tts'}>
-    <div class="dropdowns-section">
-      <VoiceDropdown
-        label="Voice"
-        voices={ALL_VOICES}
-        value={$selectedVoice}
-        onchange={handleVoiceChange}
-        onopen={handleVoiceDropdownOpen}
-      />
-
+    
+    <!-- Mode Toggle at Top -->
+    <div class="mode-toggle-container">
+      <button
+        type="button"
+        class="mode-toggle-btn"
+        class:active={!twoSpeakerMode}
+        onclick={() => {
+          if (twoSpeakerMode) {
+            handleTwoSpeakerToggle();
+            adjustAudioOpen = false;
+          }
+        }}
+        aria-pressed={!twoSpeakerMode}
+        aria-label="One speaker mode"
+      >
+        One speaker
+      </button>
+      <button
+        type="button"
+        class="mode-toggle-btn"
+        class:active={twoSpeakerMode}
+        onclick={() => {
+          if (!twoSpeakerMode) {
+            handleTwoSpeakerToggle();
+            adjustAudioOpen = false;
+          }
+        }}
+        aria-pressed={twoSpeakerMode}
+        aria-label="Two speakers mode"
+      >
+        Two speakers
+      </button>
     </div>
+
+    <!-- ONE SPEAKER MODE -->
+    {#if !twoSpeakerMode}
+      <div class="dropdowns-section">
+        <VoiceDropdown
+          label=""
+          voices={ALL_VOICES}
+          value={$selectedVoice}
+          onchange={handleVoiceChange}
+          onopen={handleVoiceDropdownOpen}
+        />
+      </div>
+    {/if}
+
+    <!-- TWO SPEAKER MODE - Speaker Dropdowns at Top -->
+    {#if twoSpeakerMode}
+      <div class="speaker-dropdowns-row-top">
+        <div class="speaker-dropdown" data-speaker="1">
+          <button
+            type="button"
+            class="speaker-dropdown-btn"
+            onclick={toggleSpeaker1Dropdown}
+          >
+            <span>{speaker1 ? `1: ${getFlagForVoice(speaker1)} ${speaker1.displayName}` : 'Speaker 1'}</span>
+            <img
+              src={speaker1Open ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+              alt=""
+              class="chevron-icon"
+            />
+          </button>
+          {#if speaker1Open}
+            <div class="speaker-dropdown-menu">
+              {#each ALL_VOICES as voice}
+                <div class="speaker-option-row">
+                  <button
+                    type="button"
+                    class="speaker-option"
+                    class:selected={speaker1?.name === voice.name}
+                    onclick={() => handleSpeaker1Change(voice)}
+                  >
+                    <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
+                    {#if voice.provider === 'azure'}
+                      <span class="speed-badge">⚡</span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    class="speaker-preview-btn"
+                    class:playing={speakerPreviewPlaying === voice.name}
+                    onclick={(e) => previewSpeakerVoice(e, voice)}
+                    aria-label={`Preview ${voice.displayName}`}
+                  >
+                    <img 
+                      src={speakerPreviewPlaying === voice.name ? '/icons/icon-speak-fill.svg' : '/icons/icon-speak.svg'} 
+                      alt=""
+                      class="speaker-preview-icon"
+                    />
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+
+        <div class="speaker-dropdown" data-speaker="2">
+          <button
+            type="button"
+            class="speaker-dropdown-btn"
+            onclick={toggleSpeaker2Dropdown}
+          >
+            <span>{speaker2 ? `2: ${getFlagForVoice(speaker2)} ${speaker2.displayName}` : 'Speaker 2'}</span>
+            <img
+              src={speaker2Open ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+              alt=""
+              class="chevron-icon"
+            />
+          </button>
+          {#if speaker2Open}
+            <div class="speaker-dropdown-menu">
+              {#each ALL_VOICES.filter(v => !speaker1 || v.provider === speaker1.provider) as voice}
+                <div class="speaker-option-row">
+                  <button
+                    type="button"
+                    class="speaker-option"
+                    class:selected={speaker2?.name === voice.name}
+                    onclick={() => handleSpeaker2Change(voice)}
+                  >
+                    <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
+                    {#if voice.provider === 'azure'}
+                      <span class="speed-badge">⚡</span>
+                    {/if}
+                  </button>
+                  <button
+                    type="button"
+                    class="speaker-preview-btn"
+                    class:playing={speakerPreviewPlaying === voice.name}
+                    onclick={(e) => previewSpeakerVoice(e, voice)}
+                    aria-label={`Preview ${voice.displayName}`}
+                  >
+                    <img 
+                      src={speakerPreviewPlaying === voice.name ? '/icons/icon-speak-fill.svg' : '/icons/icon-speak.svg'} 
+                      alt=""
+                      class="speaker-preview-icon"
+                    />
+                  </button>
+                </div>
+              {/each}
+            </div>
+          {/if}
+        </div>
+      </div>
+    {/if}
 
     <div class="text-section">
       <div class="text-header">
@@ -1125,184 +1247,134 @@
         <p class="loading-hint">Generating. This could take a minute<span class="loading-dots"></span></p>
       {/if}
 
-      {#if !twoSpeakerMode}
-        <SpeedSilenceControls
-          {speedLevel}
-          {silenceLevel}
-          isActive={audioUrl !== null}
-          onSpeedChange={handleSpeedLevelChange}
-          onSilenceChange={handleSilenceLevelChange}
-          onInactiveClick={handleSpeedSilenceInactiveClick}
-        />
-      {/if}
+      <!-- ADJUST AUDIO SECTION - Both Modes -->
+      <div class="adjust-audio-section" class:inactive={audioUrl === null}>
+        <button
+          type="button"
+          class="adjust-audio-header"
+          class:inactive={audioUrl === null}
+          onclick={() => { if (audioUrl) adjustAudioOpen = !adjustAudioOpen; }}
+          aria-expanded={adjustAudioOpen && audioUrl !== null}
+          disabled={audioUrl === null}
+        >
+          <span class="adjust-audio-label">Adjust audio</span>
+          <img
+            src={adjustAudioOpen && audioUrl ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+            alt=""
+            class="adjust-audio-chevron"
+          />
+        </button>
 
-      <div class="two-speaker-section" bind:this={twoSpeakerRef}>
-         <div class="two-speaker-toggle-row" onmousedown={(e) => e.stopPropagation()} ontouchstart={(e) => e.stopPropagation()}>
-           <button
-             type="button"
-             class="chevron-btn"
-             class:disabled={!twoSpeakerMode}
-             onclick={() => { if (twoSpeakerMode) twoSpeakerCardOpen = !twoSpeakerCardOpen; }}
-             aria-expanded={twoSpeakerCardOpen}
-             aria-label="Toggle two speakers panel"
-             aria-disabled={!twoSpeakerMode}
-           >
-             <img
-               src={twoSpeakerCardOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
-               alt=""
-               class="chevron-icon"
-             />
-           </button>
-           <span class="two-speaker-label">Two speakers</span>
-           <button
-             type="button"
-             class="toggle-switch"
-             class:active={twoSpeakerMode}
-             onclick={() => {
-               handleTwoSpeakerToggle();
-               twoSpeakerCardOpen = twoSpeakerMode;
-             }}
-             aria-pressed={twoSpeakerMode}
-             aria-label="Toggle two speaker mode"
-           >
-             <span class="toggle-thumb"></span>
-           </button>
-         </div>
-
-         {#if twoSpeakerMode && twoSpeakerCardOpen}
-           <div class="two-speaker-divider"></div>
-          <div class="speaker-dropdowns-row">
-            <div class="speaker-dropdown" data-speaker="1">
-              <button
-                type="button"
-                class="speaker-dropdown-btn"
-                onclick={toggleSpeaker1Dropdown}
-              >
-                <span>{speaker1 ? `1: ${getFlagForVoice(speaker1)} ${speaker1.displayName}` : 'Speaker 1'}</span>
-                <img
-                  src={speaker1Open ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
-                  alt=""
-                  class="chevron-icon"
-                />
-              </button>
-              {#if speaker1Open}
-                <div class="speaker-dropdown-menu">
-                  {#each ALL_VOICES as voice}
-                    <div class="speaker-option-row">
-                      <button
-                        type="button"
-                        class="speaker-option"
-                        class:selected={speaker1?.name === voice.name}
-                        onclick={() => handleSpeaker1Change(voice)}
-                      >
-                        <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
-                        {#if voice.provider === 'azure'}
-                          <span class="speed-badge">⚡</span>
-                        {/if}
-                      </button>
-                      <button
-                        type="button"
-                        class="speaker-preview-btn"
-                        class:playing={speakerPreviewPlaying === voice.name}
-                        onclick={(e) => previewSpeakerVoice(e, voice)}
-                        aria-label={`Preview ${voice.displayName}`}
-                      >
-                        <img 
-                          src={speakerPreviewPlaying === voice.name ? '/icons/icon-speak-fill.svg' : '/icons/icon-speak.svg'} 
-                          alt=""
-                          class="speaker-preview-icon"
-                        />
-                      </button>
-                    </div>
-                  {/each}
+        {#if adjustAudioOpen && audioUrl}
+          <div class="adjust-audio-content">
+            {#if !twoSpeakerMode}
+              <!-- ONE SPEAKER: Speed and Silence sliders side-by-side -->
+              <div class="adjust-audio-row">
+                <div class="adjust-audio-slider">
+                  <div class="slider-header">
+                    <span class="slider-label-text">Speed</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="1"
+                    value={['default', 'lively', 'fast'].indexOf(speedLevel)}
+                    oninput={(e) => {
+                      const idx = parseInt((e.target as HTMLInputElement).value);
+                      const levels: SpeedLevel[] = ['default', 'lively', 'fast'];
+                      handleSpeedLevelChange(levels[idx]);
+                    }}
+                    class="discrete-slider"
+                  />
+                  <div class="slider-labels">
+                    <span class="slider-label" class:active={speedLevel === 'default'}>Default</span>
+                    <span class="slider-label" class:active={speedLevel === 'lively'}>Lively</span>
+                    <span class="slider-label" class:active={speedLevel === 'fast'}>Fast</span>
+                  </div>
                 </div>
-              {/if}
-            </div>
 
-            <div class="speaker-dropdown" data-speaker="2">
-               <button
-                 type="button"
-                 class="speaker-dropdown-btn"
-                 onclick={toggleSpeaker2Dropdown}
-               >
-                <span>{speaker2 ? `2: ${getFlagForVoice(speaker2)} ${speaker2.displayName}` : 'Speaker 2'}</span>
-                <img
-                  src={speaker2Open ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
-                  alt=""
-                  class="chevron-icon"
-                />
-              </button>
-              {#if speaker2Open}
-                <div class="speaker-dropdown-menu">
-                  {#each ALL_VOICES.filter(v => !speaker1 || v.provider === speaker1.provider) as voice}
-                    <div class="speaker-option-row">
-                      <button
-                        type="button"
-                        class="speaker-option"
-                        class:selected={speaker2?.name === voice.name}
-                        onclick={() => handleSpeaker2Change(voice)}
-                      >
-                        <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
-                        {#if voice.provider === 'azure'}
-                          <span class="speed-badge">⚡</span>
-                        {/if}
-                      </button>
-                      <button
-                        type="button"
-                        class="speaker-preview-btn"
-                        class:playing={speakerPreviewPlaying === voice.name}
-                        onclick={(e) => previewSpeakerVoice(e, voice)}
-                        aria-label={`Preview ${voice.displayName}`}
-                      >
-                        <img 
-                          src={speakerPreviewPlaying === voice.name ? '/icons/icon-speak-fill.svg' : '/icons/icon-speak.svg'} 
-                          alt=""
-                          class="speaker-preview-icon"
-                        />
-                      </button>
-                    </div>
-                  {/each}
+                <div class="adjust-audio-slider">
+                  <div class="slider-header">
+                    <span class="slider-label-text">Silence</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0"
+                    max="2"
+                    step="1"
+                    value={['default', 'trim', 'tight'].indexOf(silenceLevel)}
+                    oninput={(e) => {
+                      const idx = parseInt((e.target as HTMLInputElement).value);
+                      const levels: SilenceLevel[] = ['default', 'trim', 'tight'];
+                      handleSilenceLevelChange(levels[idx]);
+                    }}
+                    class="discrete-slider"
+                  />
+                  <div class="slider-labels">
+                    <span class="slider-label" class:active={silenceLevel === 'default'}>Default</span>
+                    <span class="slider-label" class:active={silenceLevel === 'trim'}>Trim</span>
+                    <span class="slider-label" class:active={silenceLevel === 'tight'}>Tight</span>
+                  </div>
                 </div>
-              {/if}
-            </div>
+              </div>
+            {:else}
+              <!-- TWO SPEAKER: Speaker 1 and Speaker 2 Speed, then Silence -->
+              <div class="adjust-audio-column">
+                <div class="adjust-audio-row">
+                  <div class="adjust-audio-slider">
+                    <div class="slider-header">
+                      <span class="slider-label-text">Speaker 1 Speed</span>
+                    </div>
+                    <SpeedSlider
+                      speed={speaker1Speed}
+                      isActive={true}
+                      onSpeedChange={handleSpeaker1SpeedChange}
+                      size="small"
+                    />
+                  </div>
+
+                  <div class="adjust-audio-slider">
+                    <div class="slider-header">
+                      <span class="slider-label-text">Speaker 2 Speed</span>
+                    </div>
+                    <SpeedSlider
+                      speed={speaker2Speed}
+                      isActive={true}
+                      onSpeedChange={handleSpeaker2SpeedChange}
+                      size="small"
+                    />
+                  </div>
+                </div>
+
+                <div class="adjust-audio-row">
+                  <div class="adjust-audio-slider">
+                    <div class="slider-header">
+                      <span class="slider-label-text">Speaker 1 Silence</span>
+                    </div>
+                    <SilenceSlider
+                      level={speaker1SilenceLevel}
+                      isActive={true}
+                      onLevelChange={handleSpeaker1SilenceChange}
+                      size="small"
+                    />
+                  </div>
+
+                  <div class="adjust-audio-slider">
+                    <div class="slider-header">
+                      <span class="slider-label-text">Speaker 2 Silence</span>
+                    </div>
+                    <SilenceSlider
+                      level={speaker2SilenceLevel}
+                      isActive={true}
+                      onLevelChange={handleSpeaker2SilenceChange}
+                      size="small"
+                    />
+                  </div>
+                </div>
+              </div>
+            {/if}
           </div>
-
-          {#if twoSpeakerMode}
-            <div class="speaker-speeds-section">
-              <span class="speaker-speeds-label">Speed</span>
-              <div class="speaker-speeds-row">
-                <SpeedSlider
-                  speed={speaker1Speed}
-                  isActive={audioUrl !== null && !isPlaying}
-                  onSpeedChange={handleSpeaker1SpeedChange}
-                  size="small"
-                />
-                <SpeedSlider
-                  speed={speaker2Speed}
-                  isActive={audioUrl !== null && !isPlaying}
-                  onSpeedChange={handleSpeaker2SpeedChange}
-                  size="small"
-                />
-              </div>
-            </div>
-            <div class="speaker-speeds-section">
-              <span class="speaker-speeds-label">Silence</span>
-              <div class="speaker-speeds-row">
-                <SilenceSlider
-                  level={speaker1SilenceLevel}
-                  isActive={audioUrl !== null && !isPlaying}
-                  onLevelChange={handleSpeaker1SilenceChange}
-                  size="small"
-                />
-                <SilenceSlider
-                  level={speaker2SilenceLevel}
-                  isActive={audioUrl !== null && !isPlaying}
-                  onLevelChange={handleSpeaker2SilenceChange}
-                  size="small"
-                />
-              </div>
-            </div>
-          {/if}
         {/if}
       </div>
 
@@ -1437,6 +1509,8 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-xs);
+    margin: 0;
+    padding: 0;
   }
 
 
@@ -1692,8 +1766,8 @@
     border-radius: var(--radius-md);
     background: var(--color-app-bg);
     color: var(--color-text-secondary);
-    font-size: var(--font-size-base);
-    font-weight: 600;
+    font-size: var(--font-size-sm);
+    font-weight: 500;
     cursor: not-allowed;
     transition: all var(--transition-fast);
   }
@@ -1831,96 +1905,7 @@
     background: #4a1d9e;
   }
 
-  .two-speaker-section {
-    border: 1px solid #777777;
-    border-radius: var(--radius-md);
-    padding: 12px var(--spacing-md);
-    background: var(--color-white);
-  }
 
-  .two-speaker-toggle-row {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    gap: var(--spacing-sm);
-  }
-
-  .two-speaker-toggle-row .chevron-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    flex-shrink: 0;
-  }
-
-  .two-speaker-toggle-row .chevron-btn.disabled {
-    cursor: default;
-  }
-
-  .two-speaker-toggle-row .chevron-btn.disabled .chevron-icon {
-    opacity: 0.3;
-  }
-
-  .two-speaker-toggle-row .chevron-icon {
-    width: 16px;
-    height: 16px;
-    filter: invert(0);
-    transition: transform var(--transition-fast), opacity var(--transition-fast);
-  }
-
-  .two-speaker-label {
-    font-size: var(--font-size-sm);
-    color: #777777;
-    font-weight: 500;
-    flex: 1;
-  }
-
-  .toggle-switch {
-    width: 44px;
-    height: 24px;
-    background: #999999;
-    border: none;
-    border-radius: var(--radius-full);
-    cursor: pointer;
-    position: relative;
-    transition: background var(--transition-fast);
-    padding: 0;
-  }
-
-  .toggle-switch.active {
-    background: var(--color-primary);
-  }
-
-  .toggle-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
-    background: var(--color-white);
-    border-radius: 50%;
-    transition: transform var(--transition-fast);
-  }
-
-  .toggle-switch.active .toggle-thumb {
-    transform: translateX(20px);
-  }
-
-  .two-speaker-divider {
-    height: 1px;
-    background: var(--color-border);
-    margin: var(--spacing-md) 0;
-  }
-
-  .speaker-dropdowns-row {
-    display: flex;
-    gap: var(--spacing-sm);
-  }
 
   .speaker-dropdown {
     flex: 1;
@@ -1933,11 +1918,13 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: var(--spacing-sm) var(--spacing-md);
+    padding: 12px var(--spacing-md);
     border: 1px solid #777777;
     border-radius: var(--radius-md);
     background: var(--color-white);
     font-size: var(--font-size-sm);
+    font-weight: 500;
+    line-height: 1.5;
     color: #777777;
     cursor: pointer;
     transition: border-color var(--transition-fast);
@@ -2043,24 +2030,205 @@
     filter: invert(0.32) sepia(0.6) hue-rotate(248deg) saturate(1.5);
   }
 
-  .speaker-speeds-section {
-    margin-top: var(--spacing-md);
+  /* Mode Toggle Container */
+  .mode-toggle-container {
+    display: flex;
+    gap: 0;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+    border: 1px solid var(--color-primary);
+    width: 100%;
   }
 
-  .speaker-speeds-label {
-    display: block;
+  .mode-toggle-btn {
+    flex: 1;
+    padding: 12px var(--spacing-md);
+    border: none;
+    background: var(--color-white);
+    color: var(--color-primary);
     font-size: var(--font-size-sm);
+    font-weight: 500;
+    cursor: pointer;
+    transition: background-color var(--transition-normal), color var(--transition-normal);
+    text-align: center;
+  }
+
+  .mode-toggle-btn.active {
+    background: var(--color-primary);
+    color: var(--color-white);
+  }
+
+  .mode-toggle-btn:not(.active):hover {
+    background: var(--color-lavender-veil);
+  }
+
+  /* Adjust Audio Section */
+  .adjust-audio-section {
+    border: 1px solid #777777;
+    border-radius: var(--radius-md);
+    background: var(--color-white);
+    overflow: hidden;
+    margin-bottom: var(--spacing-md);
+    transition: border-color var(--transition-normal);
+  }
+
+  .adjust-audio-section.inactive {
+    opacity: 0.5;
+  }
+
+  .adjust-audio-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px var(--spacing-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    transition: background var(--transition-normal);
+    font-size: var(--font-size-sm);
+    text-align: left;
+  }
+
+  .adjust-audio-header:hover:not(:disabled) {
+    background: var(--color-lavender-veil);
+  }
+
+  .adjust-audio-header:disabled {
+    cursor: not-allowed;
+  }
+
+  .adjust-audio-label {
     color: #777777;
     font-weight: 500;
-    margin-bottom: var(--spacing-sm);
+    flex: 1;
   }
 
-  .speaker-speeds-row {
+  .adjust-audio-chevron {
+    width: 16px;
+    height: 16px;
+    filter: brightness(0) saturate(100%) invert(47%);
+    transition: transform var(--transition-normal);
+  }
+
+  .adjust-audio-content {
+    padding: 0 var(--spacing-md) var(--spacing-md);
+    animation: slideDown var(--transition-normal);
+  }
+
+  .adjust-audio-row {
     display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .adjust-audio-column {
+    display: flex;
+    flex-direction: column;
     gap: var(--spacing-md);
   }
 
-  .speaker-speeds-row :global(> div) {
+  .adjust-audio-slider {
     flex: 1;
+  }
+
+  .slider-header {
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .slider-label-text {
+    font-size: var(--font-size-xs);
+    color: #777777;
+    font-weight: 500;
+    display: block;
+  }
+
+  .discrete-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: var(--radius-full);
+    background: #dcdcdc;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .discrete-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #5422b0;
+    cursor: pointer;
+    border: none;
+    transform: translateY(-7px);
+  }
+
+  .discrete-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    background: #5422b0;
+    cursor: pointer;
+    border: none;
+  }
+
+  .discrete-slider::-webkit-slider-runnable-track {
+    background: #efefef;
+    height: 6px;
+    border-radius: var(--radius-full);
+  }
+
+  .discrete-slider::-moz-range-track {
+    background: transparent;
+    border: none;
+  }
+
+  .slider-labels {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--spacing-xs);
+  }
+
+  .slider-label {
+    font-size: var(--font-size-xs);
+    color: var(--color-text-secondary);
+    transition: color var(--transition-fast), font-weight var(--transition-fast);
+    flex: 1;
+    text-align: center;
+  }
+
+  .slider-label.active {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+
+  /* Speaker Dropdowns Row for Two-Speaker Mode */
+  .speaker-dropdowns-row-top {
+    display: flex;
+    flex-direction: row;
+    gap: var(--spacing-sm);
+    width: 100%;
+    margin: 0;
+    padding: 0;
+  }
+
+  .speaker-dropdowns-row-top .speaker-dropdown {
+    flex: 1;
+    position: relative;
+    scroll-margin-bottom: 320px;
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
