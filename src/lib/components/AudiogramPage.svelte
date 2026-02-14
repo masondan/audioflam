@@ -1623,21 +1623,17 @@
         <div class="trim-handle-bar"></div>
       </div>
     </div>
-    <span class="audio-duration">{audioData?.duration.toFixed(1)}s</span>
+    <div class="audio-actions">
+      <button type="button" class="text-btn" onclick={handleStartAgain}>
+        Delete audio
+      </button>
+      <span class="audio-duration">{audioData?.duration.toFixed(1)}s</span>
+    </div>
   {/if}
 
   <!-- Playback Controls -->
   <div class="playback-controls">
-    <button
-      type="button"
-      class="control-btn start-again"
-      onclick={isMicActive ? handleRecordingStartAgain : handleStartAgain}
-      disabled={!hasAudio && !isMicActive}
-      aria-label="Start again"
-    >
-      <img src="/icons/icon-start-again.svg" alt="" class="control-icon" />
-    </button>
-
+    <div class="control-btn-spacer"></div>
     <div class="playback-center">
       <button
         type="button"
@@ -1908,13 +1904,13 @@
   .image-actions {
     display: flex;
     justify-content: space-between;
-    padding: 0 var(--spacing-xs);
+    padding: 0;
   }
 
   .text-btn {
     background: none;
     border: none;
-    padding: var(--spacing-xs) var(--spacing-sm);
+    padding: var(--spacing-xs) 0;
     font-size: var(--font-size-sm);
     color: var(--color-text-secondary);
     cursor: pointer;
@@ -2011,7 +2007,7 @@
 
   .audio-waveform-container {
     position: relative;
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-primary);
     border-radius: var(--radius-md);
     padding: var(--spacing-sm) 22px;
     background: var(--color-white);
@@ -2055,7 +2051,7 @@
     justify-content: center;
     z-index: 10;
     touch-action: none;
-    background: #999999;
+    background: var(--color-primary);
   }
 
   .trim-handle.start {
@@ -2075,7 +2071,15 @@
 
   .trim-handle:hover,
   .trim-handle:focus {
-    background: #888888;
+    background: color-mix(in srgb, var(--color-primary) 85%, black);
+  }
+
+  .audio-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 0;
+    margin-top: calc(-1 * var(--spacing-md) + var(--spacing-sm));
   }
 
   .audio-duration {
@@ -2094,6 +2098,11 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-lg);
+  }
+
+  .control-btn-spacer {
+    width: 40px;
+    height: 40px;
   }
 
   .control-btn {

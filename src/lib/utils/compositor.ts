@@ -250,6 +250,14 @@ function generateStaticWaveformData(count: number): Uint8Array {
   return data;
 }
 
+function getDataMax(data: Uint8Array): number {
+  let max = 0;
+  for (let i = 0; i < data.length; i++) {
+    if (data[i] > max) max = data[i];
+  }
+  return Math.max(max, 128);
+}
+
 function drawBarsWaveform(
   ctx: CanvasRenderingContext2D,
   x: number,
@@ -265,16 +273,16 @@ function drawBarsWaveform(
   const barWidth = totalBarSpace * 0.75;
   const gap = totalBarSpace * 0.25;
   const centerY = y + height / 2;
-  const maxBarHeight = height / 2 - 4;
+  const maxBarHeight = height / 2;
+  const dataMax = getDataMax(data);
 
   ctx.fillStyle = color;
 
   for (let i = 0; i < barCount; i++) {
     const barX = x + i * totalBarSpace + gap / 2;
-    const normalized = data[Math.floor(i * data.length / barCount)] / 255;
-    // Apply power curve to reduce overall height and increase peaks/troughs variation
-    const scaled = Math.pow(normalized, 1.8) * 0.7;
-    const barHeight = Math.max(6, scaled * maxBarHeight);
+    const normalized = data[Math.floor(i * data.length / barCount)] / dataMax;
+    const scaled = Math.pow(normalized, 1.8);
+    const barHeight = Math.max(2, scaled * maxBarHeight);
     const radius = Math.min(barWidth / 2, 4);
 
     // Single continuous bar spanning both directions from center
@@ -298,16 +306,16 @@ function drawThinWaveform(
   const spacing = width / lineCount;
   const barWidth = Math.max(1.5, spacing * 0.4);
   const centerY = y + height / 2;
-  const maxLineHeight = height / 2 - 2;
+  const maxLineHeight = height / 2;
+  const dataMax = getDataMax(data);
 
   ctx.fillStyle = color;
 
   for (let i = 0; i < lineCount; i++) {
     const lineX = x + i * spacing + (spacing - barWidth) / 2;
-    const normalized = data[Math.floor(i * data.length / lineCount)] / 255;
-    // Apply power curve to reduce overall height and increase peaks/troughs variation
-    const scaled = Math.pow(normalized, 1.8) * 0.7;
-    const lineHeight = Math.max(4, scaled * maxLineHeight);
+    const normalized = data[Math.floor(i * data.length / lineCount)] / dataMax;
+    const scaled = Math.pow(normalized, 1.8);
+    const lineHeight = Math.max(2, scaled * maxLineHeight);
     const radius = Math.min(barWidth / 2, 1);
 
     // Single continuous bar spanning both directions from center
@@ -334,14 +342,14 @@ function drawBlocksWaveform(
   const maxSegments = 12;
   const segmentGap = 2;
   const segmentHeight = (height - (maxSegments - 1) * segmentGap) / maxSegments;
+  const dataMax = getDataMax(data);
 
   ctx.fillStyle = color;
 
   for (let i = 0; i < columnCount; i++) {
     const colX = x + i * totalColumnSpace + columnGap / 2;
-    const normalized = data[Math.floor(i * data.length / columnCount)] / 255;
-    // Apply power curve to reduce overall height and increase peaks/troughs variation
-    const scaled = Math.pow(normalized, 1.8) * 0.7;
+    const normalized = data[Math.floor(i * data.length / columnCount)] / dataMax;
+    const scaled = Math.pow(normalized, 1.8);
     const segments = Math.max(1, Math.round(scaled * maxSegments));
 
     for (let j = 0; j < segments; j++) {
