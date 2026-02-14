@@ -48,6 +48,12 @@
       audioPlaylist = [];
       currentTrackIndex = 0;
       mergedAudioBase64 = null;
+      originalAudioBase64 = null;
+      errorMsg = null;
+      
+      // Critical: reset lastGeneratedText so app knows to regenerate audio
+      lastGeneratedText = '';
+      
       // Reset controls
       singleSpeakerSpeed = 1.0;
       speaker1Speed = 1.0;
@@ -56,6 +62,24 @@
       speaker2SilenceLevel = 'default';
       speedLevel = 'default';
       silenceLevel = 'default';
+      
+      // Clear speaker selections
+      speaker1 = null;
+      speaker2 = null;
+      speaker1Open = false;
+      speaker2Open = false;
+      
+      // Reset UI state
+      adjustAudioOpen = false;
+      showDownloadModal = false;
+      downloadFilename = '';
+      
+      // Stop any preview audio
+      if (speakerPreviewAudio) {
+        speakerPreviewAudio.pause();
+        speakerPreviewAudio = null;
+      }
+      speakerPreviewPlaying = null;
     }
   });
   
@@ -241,20 +265,89 @@
     }
   }
 
-  function handleSpeaker1SpeedChange(speed: number) {
+  async function handleSpeaker1SpeedChange(speed: number) {
     if (audioUrl === null) {
       showSpeedBlockModal = true;
       return;
     }
     speaker1Speed = speed;
+    await regenerateAndRestartTwoSpeakerAudio();
   }
 
-  function handleSpeaker2SpeedChange(speed: number) {
+  async function handleSpeaker2SpeedChange(speed: number) {
     if (audioUrl === null) {
       showSpeedBlockModal = true;
       return;
     }
     speaker2Speed = speed;
+    await regenerateAndRestartTwoSpeakerAudio();
+  }
+
+  async function regenerateAndRestartTwoSpeakerAudio() {
+    // Check if silence has been applied to two-speaker audio
+    const hasSilenceAdjustment = twoSpeakerMode && 
+      (speaker1SilenceLevel !== 'default' || speaker2SilenceLevel !== 'default');
+    
+    try {
+      // Stop any currently playing audio
+      if (audioElement) {
+        audioElement.pause();
+        audioElement.currentTime = 0;
+      }
+      isPlaying = false;
+
+      // If silence adjustment is active, we need to regenerate and reapply silence
+      if (hasSilenceAdjustment && mergedAudioBase64) {
+        // Process with current silence levels for both speakers
+        let processedAudio = mergedAudioBase64;
+        
+        if (speaker1SilenceLevel !== 'default') {
+          const result = await removeSilence(processedAudio, speaker1SilenceLevel);
+          processedAudio = result.base64Audio;
+        }
+        
+        if (speaker2SilenceLevel !== 'default') {
+          const result = await removeSilence(processedAudio, speaker2SilenceLevel);
+          processedAudio = result.base64Audio;
+        }
+        
+        // Update merged audio base64
+        mergedAudioBase64 = processedAudio;
+        
+        // Clean up old URL and create new one
+        if (audioUrl) {
+          URL.revokeObjectURL(audioUrl);
+        }
+        
+        const blob = new Blob([Uint8Array.from(atob(processedAudio), c => c.charCodeAt(0))], { type: 'audio/mp3' });
+        audioUrl = URL.createObjectURL(blob);
+      }
+      
+      // Create new audio element (user will manually press play)
+      if (audioUrl) {
+        const newAudioElement = new Audio(audioUrl);
+        newAudioElement.playbackRate = 1.0; // Speed applied per-segment in playNextTrack
+        
+        newAudioElement.addEventListener('loadedmetadata', () => {
+          duration = newAudioElement.duration || 0;
+        });
+        newAudioElement.addEventListener('ended', () => {
+          isPlaying = false;
+          currentTrackIndex = 0;
+        });
+        newAudioElement.addEventListener('error', (e) => {
+          errorMsg = 'Failed to load audio';
+          isPlaying = false;
+        });
+        
+        audioElement = newAudioElement;
+        currentTrackIndex = 0;
+      }
+    } catch (err) {
+      console.error('Failed to regenerate audio:', err);
+      errorMsg = 'Failed to apply speed change';
+      isPlaying = false;
+    }
   }
 
   async function handleSpeaker1SilenceChange(level: SilenceLevel) {
@@ -1274,48 +1367,24 @@
                   <div class="slider-header">
                     <span class="slider-label-text">Speed</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="1"
-                    value={['default', 'lively', 'fast'].indexOf(speedLevel)}
-                    oninput={(e) => {
-                      const idx = parseInt((e.target as HTMLInputElement).value);
-                      const levels: SpeedLevel[] = ['default', 'lively', 'fast'];
-                      handleSpeedLevelChange(levels[idx]);
-                    }}
-                    class="discrete-slider"
+                  <SpeedSlider
+                    speed={singleSpeakerSpeed}
+                    isActive={true}
+                    onSpeedChange={handleSingleSpeakerSpeedChange}
+                    size="small"
                   />
-                  <div class="slider-labels">
-                    <span class="slider-label" class:active={speedLevel === 'default'}>Default</span>
-                    <span class="slider-label" class:active={speedLevel === 'lively'}>Lively</span>
-                    <span class="slider-label" class:active={speedLevel === 'fast'}>Fast</span>
-                  </div>
                 </div>
 
                 <div class="adjust-audio-slider">
                   <div class="slider-header">
                     <span class="slider-label-text">Silence</span>
                   </div>
-                  <input
-                    type="range"
-                    min="0"
-                    max="2"
-                    step="1"
-                    value={['default', 'trim', 'tight'].indexOf(silenceLevel)}
-                    oninput={(e) => {
-                      const idx = parseInt((e.target as HTMLInputElement).value);
-                      const levels: SilenceLevel[] = ['default', 'trim', 'tight'];
-                      handleSilenceLevelChange(levels[idx]);
-                    }}
-                    class="discrete-slider"
+                  <SilenceSlider
+                    level={silenceLevel}
+                    isActive={true}
+                    onLevelChange={handleSilenceLevelChange}
+                    size="small"
                   />
-                  <div class="slider-labels">
-                    <span class="slider-label" class:active={silenceLevel === 'default'}>Default</span>
-                    <span class="slider-label" class:active={silenceLevel === 'trim'}>Trim</span>
-                    <span class="slider-label" class:active={silenceLevel === 'tight'}>Tight</span>
-                  </div>
                 </div>
               </div>
             {:else}
@@ -1324,11 +1393,11 @@
                 <div class="adjust-audio-row">
                   <div class="adjust-audio-slider">
                     <div class="slider-header">
-                      <span class="slider-label-text">Speaker 1 Speed</span>
+                      <span class="slider-label-text">1: Speed</span>
                     </div>
                     <SpeedSlider
                       speed={speaker1Speed}
-                      isActive={true}
+                      isActive={!isPlaying}
                       onSpeedChange={handleSpeaker1SpeedChange}
                       size="small"
                     />
@@ -1336,11 +1405,11 @@
 
                   <div class="adjust-audio-slider">
                     <div class="slider-header">
-                      <span class="slider-label-text">Speaker 2 Speed</span>
+                      <span class="slider-label-text">2: Speed</span>
                     </div>
                     <SpeedSlider
                       speed={speaker2Speed}
-                      isActive={true}
+                      isActive={!isPlaying}
                       onSpeedChange={handleSpeaker2SpeedChange}
                       size="small"
                     />
@@ -1350,11 +1419,11 @@
                 <div class="adjust-audio-row">
                   <div class="adjust-audio-slider">
                     <div class="slider-header">
-                      <span class="slider-label-text">Speaker 1 Silence</span>
+                      <span class="slider-label-text">1: Silence</span>
                     </div>
                     <SilenceSlider
                       level={speaker1SilenceLevel}
-                      isActive={true}
+                      isActive={!isPlaying}
                       onLevelChange={handleSpeaker1SilenceChange}
                       size="small"
                     />
@@ -1362,11 +1431,11 @@
 
                   <div class="adjust-audio-slider">
                     <div class="slider-header">
-                      <span class="slider-label-text">Speaker 2 Silence</span>
+                      <span class="slider-label-text">2: Silence</span>
                     </div>
                     <SilenceSlider
                       level={speaker2SilenceLevel}
-                      isActive={true}
+                      isActive={!isPlaying}
                       onLevelChange={handleSpeaker2SilenceChange}
                       size="small"
                     />
