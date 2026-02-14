@@ -1160,39 +1160,45 @@
               const targetBins = 80;
               const syntheticData = new Uint8Array(targetBins);
               
-              // Use a frequency-like pattern based on bin position
-              // This creates variation between bins like real frequency data would
-              // Make the pattern wider (not just bell curve) to avoid flat edges
-              const frequencyPattern = new Uint8Array(targetBins);
-              for (let i = 0; i < targetBins; i++) {
-                const position = i / targetBins;
-                // Wider distribution: bell curve + constant baseline to avoid flat edges
-                const bellCurve = Math.sin(position * Math.PI) * 150; // Bell curve component
-                const randomNoise = Math.sin(i * 12.9898) * 100; // More variation per bin
-                const baseline = 80; // Keep edges from being flat
-                frequencyPattern[i] = Math.max(30, bellCurve + randomNoise + baseline);
-              }
-              
-              // Apply time-based animation exactly like the preview
-              for (let i = 0; i < targetBins; i++) {
-                // Use time-based phase like preview: Date.now() * 0.008
-                // But for export, use currentTimeInExport * frame rate
-                const phase = currentTimeInExport * 30; // ~30fps animation tempo
-                
-                // Add variation based on bin position (like preview line 608)
-                // Increase multipliers for more dramatic movement
-                const variation = Math.sin(i * 0.4 + phase) * 40 + Math.sin(i * 0.15 + phase * 0.7) * 30;
-                
-                // Base value from frequency pattern (already 0-255 range)
-                const baseValue = frequencyPattern[i];
-                
-                // Apply amplitude scaling - much higher multiplier for visible waveform
-                // Amplitude goes 0-1, so we need strong scaling
-                const amplitudeBoost = 1.5; // Boost amplitude effect
-                const scaled = (baseValue + variation) * (0.5 + currentAmplitude * amplitudeBoost);
-                const enhanced = Math.min(255, scaled + avgEnergy * 0.4 * 255);
-                syntheticData[i] = Math.max(30, enhanced);
-              }
+              // Create a frequency pattern that shows relative heights (0-1), not absolute values
+               // This is then modulated by amplitude to prevent clipping while showing variety
+               const frequencyPattern = new Float32Array(targetBins);
+               for (let i = 0; i < targetBins; i++) {
+                 const position = i / targetBins;
+                 // Bell curve (0-1 range) with enhanced per-bin variation for more peaks/troughs
+                 const bellCurve = Math.sin(position * Math.PI); // 0 to 1 to 0
+                 const smoothVariation = Math.sin(i * 12.9898) * 0.25; // Increased from 0.15 to 0.25 for more variety
+                 // Clamp to 0-1 range - this represents relative height
+                 frequencyPattern[i] = Math.max(0, Math.min(1, bellCurve * 0.9 + smoothVariation + 0.15));
+               }
+               
+               // During silence, show a completely flat, still line
+               if (currentAmplitude < 0.01) {
+                 // Silence: flat line at center (128 is the middle value)
+                 for (let i = 0; i < targetBins; i++) {
+                   syntheticData[i] = 128;
+                 }
+               } else {
+                 // Audio present: frequency pattern modulated by amplitude
+                 for (let i = 0; i < targetBins; i++) {
+                   // Use time-based phase like preview
+                   const phase = currentTimeInExport * 30; // ~30fps animation tempo
+                   
+                   // Animated variation - subtle oscillation based on bin position
+                   const rawVariation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
+                   
+                   // Base: center line (128) + pattern * amplitude
+                   // Pattern is 0-1, amplitude is 0-1, so result is 128 to 128 + (frequencyPattern * amplitude * range)
+                   const patternHeight = frequencyPattern[i] * currentAmplitude; // 0 to amplitude
+                   
+                   // Convert to -128 to +128 range centered at 128
+                   const baseHeight = 128 + (patternHeight * 100); // 100 is the max deviation from center
+                   const withVariation = baseHeight + (rawVariation * currentAmplitude); // Variation also scaled by amplitude
+                   const withEnergy = withVariation + (avgEnergy * 0.2 * 60); // Subtle energy boost
+                   
+                   syntheticData[i] = Math.max(30, Math.min(255, Math.round(withEnergy)));
+                 }
+               }
               
               currentExportWaveformData = syntheticData;
             } else if (waveformActive) {
@@ -1200,13 +1206,35 @@
               const targetBins = 80;
               const fallbackData = new Uint8Array(targetBins);
               
+              // Assume moderate amplitude for fallback
+              const fallbackAmplitude = 0.5;
+              
+              // Create fallback frequency pattern (0-1 range)
+              const fallbackPattern = new Float32Array(targetBins);
               for (let i = 0; i < targetBins; i++) {
                 const position = i / targetBins;
-                const phase = currentTimeInExport * 30;
-                const variation = Math.sin(i * 0.4 + phase) * 40 + Math.sin(i * 0.15 + phase * 0.7) * 30;
-                const baseValue = Math.sin(position * Math.PI) * 150 + Math.sin(i * 12.9898) * 100 + 80;
-                const scaled = baseValue + variation;
-                fallbackData[i] = Math.max(30, Math.min(255, scaled));
+                const bellCurve = Math.sin(position * Math.PI);
+                const smoothVariation = Math.sin(i * 12.9898) * 0.25; // Increased for more variety
+                fallbackPattern[i] = Math.max(0, Math.min(1, bellCurve * 0.9 + smoothVariation + 0.15));
+              }
+              
+              if (fallbackAmplitude < 0.01) {
+                // Silence fallback: completely flat
+                for (let i = 0; i < targetBins; i++) {
+                  fallbackData[i] = 128;
+                }
+              } else {
+                // Audio present: animated fallback
+                for (let i = 0; i < targetBins; i++) {
+                  const phase = currentTimeInExport * 30;
+                  const rawVariation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
+                  
+                  const patternHeight = fallbackPattern[i] * fallbackAmplitude;
+                  const baseHeight = 128 + (patternHeight * 100);
+                  const withVariation = baseHeight + (rawVariation * fallbackAmplitude);
+                  
+                  fallbackData[i] = Math.max(30, Math.min(255, Math.round(withVariation)));
+                }
               }
               
               currentExportWaveformData = fallbackData;
