@@ -132,6 +132,122 @@ export function drawWaveform(options: DrawWaveformOptions): void {
   }
 }
 
+/**
+ * Pre-compute frequency data frames for export rendering.
+ * Performs FFT on windowed chunks of the AudioBuffer at each frame interval,
+ * producing the same type of data as AnalyserNode.getByteFrequencyData().
+ */
+export function precomputeFrequencyFrames(
+  audioBuffer: AudioBuffer,
+  fps: number = 24,
+  fftSize: number = 256,
+  smoothingTimeConstant: number = 0.3
+): Uint8Array[] {
+  const channelData = audioBuffer.getChannelData(0);
+  const sampleRate = audioBuffer.sampleRate;
+  const totalFrames = Math.ceil(audioBuffer.duration * fps);
+  const frequencyBinCount = fftSize / 2;
+  const frames: Uint8Array[] = [];
+
+  let previousMagnitudes = new Float32Array(frequencyBinCount);
+  const win = blackmanWindow(fftSize);
+
+  const minDecibels = -100;
+  const maxDecibels = -30;
+  const rangeScalar = 255 / (maxDecibels - minDecibels);
+
+  for (let frame = 0; frame < totalFrames; frame++) {
+    const time = frame / fps;
+    const centerSample = Math.floor(time * sampleRate);
+
+    const real = new Float32Array(fftSize);
+    const imag = new Float32Array(fftSize);
+    const halfFFT = fftSize / 2;
+
+    for (let i = 0; i < fftSize; i++) {
+      const sampleIdx = centerSample - halfFFT + i;
+      const sample = (sampleIdx >= 0 && sampleIdx < channelData.length)
+        ? channelData[sampleIdx]
+        : 0;
+      real[i] = sample * win[i];
+      imag[i] = 0;
+    }
+
+    fftInPlace(real, imag);
+
+    const byteData = new Uint8Array(frequencyBinCount);
+
+    for (let i = 0; i < frequencyBinCount; i++) {
+      const magnitude = Math.sqrt(real[i] * real[i] + imag[i] * imag[i]) / fftSize;
+      const smoothed = smoothingTimeConstant * previousMagnitudes[i] +
+                       (1 - smoothingTimeConstant) * magnitude;
+      previousMagnitudes[i] = smoothed;
+
+      let dB = 20 * Math.log10(smoothed || 1e-20);
+      dB = Math.max(minDecibels, Math.min(maxDecibels, dB));
+      byteData[i] = Math.round((dB - minDecibels) * rangeScalar);
+    }
+
+    frames.push(byteData);
+  }
+
+  return frames;
+}
+
+function blackmanWindow(size: number): Float32Array {
+  const win = new Float32Array(size);
+  for (let i = 0; i < size; i++) {
+    const x = (2 * Math.PI * i) / (size - 1);
+    win[i] = 0.42 - 0.5 * Math.cos(x) + 0.08 * Math.cos(2 * x);
+  }
+  return win;
+}
+
+function fftInPlace(real: Float32Array, imag: Float32Array): void {
+  const n = real.length;
+
+  for (let i = 1, j = 0; i < n; i++) {
+    let bit = n >> 1;
+    while (j & bit) {
+      j ^= bit;
+      bit >>= 1;
+    }
+    j ^= bit;
+
+    if (i < j) {
+      [real[i], real[j]] = [real[j], real[i]];
+      [imag[i], imag[j]] = [imag[j], imag[i]];
+    }
+  }
+
+  for (let len = 2; len <= n; len *= 2) {
+    const halfLen = len / 2;
+    const angle = -2 * Math.PI / len;
+    const wReal = Math.cos(angle);
+    const wImag = Math.sin(angle);
+
+    for (let i = 0; i < n; i += len) {
+      let curReal = 1, curImag = 0;
+
+      for (let j = 0; j < halfLen; j++) {
+        const uReal = real[i + j];
+        const uImag = imag[i + j];
+        const vReal = real[i + j + halfLen] * curReal - imag[i + j + halfLen] * curImag;
+        const vImag = real[i + j + halfLen] * curImag + imag[i + j + halfLen] * curReal;
+
+        real[i + j] = uReal + vReal;
+        imag[i + j] = uImag + vImag;
+        real[i + j + halfLen] = uReal - vReal;
+        imag[i + j + halfLen] = uImag - vImag;
+
+        const newCurReal = curReal * wReal - curImag * wImag;
+        curImag = curReal * wImag + curImag * wReal;
+        curReal = newCurReal;
+      }
+    }
+  }
+}
+
 function resamplePeaks(peaks: number[], targetCount: number): number[] {
   if (peaks.length === targetCount) return peaks;
   

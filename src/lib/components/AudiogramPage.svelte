@@ -11,7 +11,7 @@
   import LightEffectPanel from './LightEffectPanel.svelte';
   import type { WaveformStyle } from './WaveformPanel.svelte';
   import type { TitleFont, TitleAlign } from './TitlePanel.svelte';
-  import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
+  import { decodeAudioFile, extractWaveformData, drawWaveform, precomputeFrequencyFrames, type WaveformData } from '$lib/utils/waveform';
   import {
     requestMicrophonePermission,
     createAudioAnalyser,
@@ -1123,8 +1123,12 @@
         }
       }
       
-      // Track current waveform data for export render callback
-      let currentExportWaveformData: Uint8Array | undefined;
+      // Pre-compute frequency data from the actual audio (same FFT as live AnalyserNode)
+      const exportFps = 24;
+      const precomputedFrames = waveformActive
+        ? precomputeFrequencyFrames(trimmedAudioBuffer || audioData.buffer, exportFps)
+        : [];
+      console.log('[Export] Pre-computed', precomputedFrames.length, 'frequency frames for waveform');
 
       // Export using smartExportVideo (WebCodecs on Android, MediaRecorder fallback, cloud transcode for WebM)
       const exportResult = await smartExportVideo(
@@ -1137,109 +1141,6 @@
           exportProgress = progress;
         },
         (currentTimeInExport) => {
-           // Render frame callback - receives current time for animation sync
-            // Create waveform that matches the preview animation logic
-            if (waveformActive && audioData?.waveform?.peaks && audioData.waveform.peaks.length > 0) {
-              const totalDuration = audioData.duration * (trimEnd - trimStart);
-              const timePosition = currentTimeInExport / totalDuration;
-              const peakIndex = Math.floor(timePosition * audioData.waveform.peaks.length);
-              
-              // Get current and surrounding amplitudes for smooth visualization
-              const currentAmplitude = audioData.waveform.peaks[Math.min(peakIndex, audioData.waveform.peaks.length - 1)] || 0;
-              
-              // Calculate average amplitude for energy boost (like preview's avgEnergy)
-              const peakRange = 10; // Look at surrounding peaks for context
-              let totalEnergy = 0;
-              for (let i = Math.max(0, peakIndex - peakRange); i <= Math.min(peakIndex + peakRange, audioData.waveform.peaks.length - 1); i++) {
-                totalEnergy += audioData.waveform.peaks[i] || 0;
-              }
-              const avgEnergy = totalEnergy / (peakRange * 2 + 1);
-              
-              // Create frequency-inspired data using peaks as base
-              // Mirror peaks like the preview does (left-center-right pattern)
-              const targetBins = 80;
-              const syntheticData = new Uint8Array(targetBins);
-              
-              // Create a frequency pattern that shows relative heights (0-1), not absolute values
-               // This is then modulated by amplitude to prevent clipping while showing variety
-               const frequencyPattern = new Float32Array(targetBins);
-               for (let i = 0; i < targetBins; i++) {
-                 const position = i / targetBins;
-                 // Bell curve (0-1 range) with enhanced per-bin variation for more peaks/troughs
-                 const bellCurve = Math.sin(position * Math.PI); // 0 to 1 to 0
-                 const smoothVariation = Math.sin(i * 12.9898) * 0.25; // Increased from 0.15 to 0.25 for more variety
-                 // Clamp to 0-1 range - this represents relative height
-                 frequencyPattern[i] = Math.max(0, Math.min(1, bellCurve * 0.9 + smoothVariation + 0.15));
-               }
-               
-               // During silence, show a completely flat, still line
-               if (currentAmplitude < 0.01) {
-                 // Silence: flat line at center (128 is the middle value)
-                 for (let i = 0; i < targetBins; i++) {
-                   syntheticData[i] = 128;
-                 }
-               } else {
-                 // Audio present: frequency pattern modulated by amplitude
-                 for (let i = 0; i < targetBins; i++) {
-                   // Use time-based phase like preview
-                   const phase = currentTimeInExport * 30; // ~30fps animation tempo
-                   
-                   // Animated variation - subtle oscillation based on bin position
-                   const rawVariation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
-                   
-                   // Base: center line (128) + pattern * amplitude
-                   // Pattern is 0-1, amplitude is 0-1, so result is 128 to 128 + (frequencyPattern * amplitude * range)
-                   const patternHeight = frequencyPattern[i] * currentAmplitude; // 0 to amplitude
-                   
-                   // Convert to -128 to +128 range centered at 128
-                   const baseHeight = 128 + (patternHeight * 100); // 100 is the max deviation from center
-                   const withVariation = baseHeight + (rawVariation * currentAmplitude); // Variation also scaled by amplitude
-                   const withEnergy = withVariation + (avgEnergy * 0.2 * 60); // Subtle energy boost
-                   
-                   syntheticData[i] = Math.max(30, Math.min(255, Math.round(withEnergy)));
-                 }
-               }
-              
-              currentExportWaveformData = syntheticData;
-            } else if (waveformActive) {
-              // Fallback when peaks unavailable
-              const targetBins = 80;
-              const fallbackData = new Uint8Array(targetBins);
-              
-              // Assume moderate amplitude for fallback
-              const fallbackAmplitude = 0.5;
-              
-              // Create fallback frequency pattern (0-1 range)
-              const fallbackPattern = new Float32Array(targetBins);
-              for (let i = 0; i < targetBins; i++) {
-                const position = i / targetBins;
-                const bellCurve = Math.sin(position * Math.PI);
-                const smoothVariation = Math.sin(i * 12.9898) * 0.25; // Increased for more variety
-                fallbackPattern[i] = Math.max(0, Math.min(1, bellCurve * 0.9 + smoothVariation + 0.15));
-              }
-              
-              if (fallbackAmplitude < 0.01) {
-                // Silence fallback: completely flat
-                for (let i = 0; i < targetBins; i++) {
-                  fallbackData[i] = 128;
-                }
-              } else {
-                // Audio present: animated fallback
-                for (let i = 0; i < targetBins; i++) {
-                  const phase = currentTimeInExport * 30;
-                  const rawVariation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
-                  
-                  const patternHeight = fallbackPattern[i] * fallbackAmplitude;
-                  const baseHeight = 128 + (patternHeight * 100);
-                  const withVariation = baseHeight + (rawVariation * fallbackAmplitude);
-                  
-                  fallbackData[i] = Math.max(30, Math.min(255, Math.round(withVariation)));
-                }
-              }
-              
-              currentExportWaveformData = fallbackData;
-            }
-           
            // Build layer config for export rendering
            const exportLayers: LayerConfig = {};
            
@@ -1252,13 +1153,46 @@
              };
            }
            
-           if (waveformActive && currentExportWaveformData) {
+           if (waveformActive && precomputedFrames.length > 0) {
+             // Look up the pre-computed FFT frame for this time
+             const frameIndex = Math.min(
+               Math.floor(currentTimeInExport * exportFps),
+               precomputedFrames.length - 1
+             );
+             const rawData = precomputedFrames[frameIndex];
+
+             // Apply the SAME enhancement logic as the live preview (startWaveformAnimation)
+             const activeRange = Math.floor(rawData.length * 0.4);
+             let totalEnergy = 0;
+             for (let i = 0; i < activeRange; i++) {
+               totalEnergy += rawData[i];
+             }
+             const avgEnergy = totalEnergy / activeRange;
+
+             const targetBins = 80;
+             const enhancedData = new Uint8Array(targetBins);
+
+             for (let i = 0; i < targetBins; i++) {
+               let sourceIdx: number;
+               if (i < targetBins / 2) {
+                 sourceIdx = Math.floor((i / (targetBins / 2)) * activeRange);
+               } else {
+                 sourceIdx = Math.floor(((targetBins - 1 - i) / (targetBins / 2)) * activeRange);
+               }
+
+               const value = rawData[Math.min(sourceIdx, rawData.length - 1)];
+               const phase = currentTimeInExport * 8;
+               const variation = Math.sin(i * 0.4 + phase) * 20 + Math.sin(i * 0.15 + phase * 0.7) * 15;
+               const enhanced = Math.min(255, value * 1.3 + variation + avgEnergy * 0.3);
+               enhancedData[i] = Math.max(30, enhanced);
+             }
+
              exportLayers.waveform = {
                enabled: true,
                position: waveformPosition,
                color: waveformColor,
                style: waveformStyle,
-               frequencyData: currentExportWaveformData,
+               frequencyData: enhancedData,
                opacity: waveformOpacity
              };
            }
