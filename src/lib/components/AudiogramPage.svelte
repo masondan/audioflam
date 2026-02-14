@@ -1137,50 +1137,103 @@
           exportProgress = progress;
         },
         (currentTimeInExport) => {
-          // Render frame callback - receives current time for animation sync
-          // Generate waveform data from pre-computed peaks (no live audio analysis)
-          if (waveformActive && audioData?.waveform) {
-            const totalDuration = audioData.duration * (trimEnd - trimStart);
-            const timePosition = currentTimeInExport / totalDuration;
-            const peakIndex = Math.floor(timePosition * audioData.waveform.peaks.length);
-            
-            // Generate frequency data based on current amplitude
-            const currentAmplitude = audioData.waveform.peaks[Math.min(peakIndex, audioData.waveform.peaks.length - 1)] || 0.5;
-            const targetBins = 80;
-            const syntheticData = new Uint8Array(targetBins);
-            
-            for (let i = 0; i < targetBins; i++) {
-              // Create symmetrical waveform with variation
-              const phase = currentTimeInExport * 8 + i * 0.4;
-              const variation = Math.sin(phase) * 20 + Math.sin(phase * 0.7) * 15;
-              const baseValue = currentAmplitude * 180;
-              syntheticData[i] = Math.max(30, Math.min(255, baseValue + variation));
+           // Render frame callback - receives current time for animation sync
+            // Create waveform that matches the preview animation logic
+            if (waveformActive && audioData?.waveform?.peaks && audioData.waveform.peaks.length > 0) {
+              const totalDuration = audioData.duration * (trimEnd - trimStart);
+              const timePosition = currentTimeInExport / totalDuration;
+              const peakIndex = Math.floor(timePosition * audioData.waveform.peaks.length);
+              
+              // Get current and surrounding amplitudes for smooth visualization
+              const currentAmplitude = audioData.waveform.peaks[Math.min(peakIndex, audioData.waveform.peaks.length - 1)] || 0;
+              
+              // Calculate average amplitude for energy boost (like preview's avgEnergy)
+              const peakRange = 10; // Look at surrounding peaks for context
+              let totalEnergy = 0;
+              for (let i = Math.max(0, peakIndex - peakRange); i <= Math.min(peakIndex + peakRange, audioData.waveform.peaks.length - 1); i++) {
+                totalEnergy += audioData.waveform.peaks[i] || 0;
+              }
+              const avgEnergy = totalEnergy / (peakRange * 2 + 1);
+              
+              // Create frequency-inspired data using peaks as base
+              // Mirror peaks like the preview does (left-center-right pattern)
+              const targetBins = 80;
+              const syntheticData = new Uint8Array(targetBins);
+              
+              // Use a frequency-like pattern based on bin position
+              // This creates variation between bins like real frequency data would
+              // Make the pattern wider (not just bell curve) to avoid flat edges
+              const frequencyPattern = new Uint8Array(targetBins);
+              for (let i = 0; i < targetBins; i++) {
+                const position = i / targetBins;
+                // Wider distribution: bell curve + constant baseline to avoid flat edges
+                const bellCurve = Math.sin(position * Math.PI) * 150; // Bell curve component
+                const randomNoise = Math.sin(i * 12.9898) * 100; // More variation per bin
+                const baseline = 80; // Keep edges from being flat
+                frequencyPattern[i] = Math.max(30, bellCurve + randomNoise + baseline);
+              }
+              
+              // Apply time-based animation exactly like the preview
+              for (let i = 0; i < targetBins; i++) {
+                // Use time-based phase like preview: Date.now() * 0.008
+                // But for export, use currentTimeInExport * frame rate
+                const phase = currentTimeInExport * 30; // ~30fps animation tempo
+                
+                // Add variation based on bin position (like preview line 608)
+                // Increase multipliers for more dramatic movement
+                const variation = Math.sin(i * 0.4 + phase) * 40 + Math.sin(i * 0.15 + phase * 0.7) * 30;
+                
+                // Base value from frequency pattern (already 0-255 range)
+                const baseValue = frequencyPattern[i];
+                
+                // Apply amplitude scaling - much higher multiplier for visible waveform
+                // Amplitude goes 0-1, so we need strong scaling
+                const amplitudeBoost = 1.5; // Boost amplitude effect
+                const scaled = (baseValue + variation) * (0.5 + currentAmplitude * amplitudeBoost);
+                const enhanced = Math.min(255, scaled + avgEnergy * 0.4 * 255);
+                syntheticData[i] = Math.max(30, enhanced);
+              }
+              
+              currentExportWaveformData = syntheticData;
+            } else if (waveformActive) {
+              // Fallback when peaks unavailable
+              const targetBins = 80;
+              const fallbackData = new Uint8Array(targetBins);
+              
+              for (let i = 0; i < targetBins; i++) {
+                const position = i / targetBins;
+                const phase = currentTimeInExport * 30;
+                const variation = Math.sin(i * 0.4 + phase) * 40 + Math.sin(i * 0.15 + phase * 0.7) * 30;
+                const baseValue = Math.sin(position * Math.PI) * 150 + Math.sin(i * 12.9898) * 100 + 80;
+                const scaled = baseValue + variation;
+                fallbackData[i] = Math.max(30, Math.min(255, scaled));
+              }
+              
+              currentExportWaveformData = fallbackData;
             }
-            currentExportWaveformData = syntheticData;
-          }
-          
-          // Build layer config for export rendering
-          const exportLayers: LayerConfig = {};
-          
-          if (lightActive) {
-            exportLayers.lightEffect = {
-              enabled: true,
-              opacity: lightOpacity,
-              speed: lightSpeed,
-              phase: currentTimeInExport * 60 // Animate light effect based on time
-            };
-          }
-          
-          if (waveformActive) {
-            exportLayers.waveform = {
-              enabled: true,
-              position: waveformPosition,
-              color: waveformColor,
-              style: waveformStyle,
-              frequencyData: currentExportWaveformData,
-              opacity: waveformOpacity
-            };
-          }
+           
+           // Build layer config for export rendering
+           const exportLayers: LayerConfig = {};
+           
+           if (lightActive) {
+             exportLayers.lightEffect = {
+               enabled: true,
+               opacity: lightOpacity,
+               speed: lightSpeed,
+               phase: currentTimeInExport * 60 // Animate light effect based on time
+             };
+           }
+           
+           if (waveformActive && currentExportWaveformData) {
+             exportLayers.waveform = {
+               enabled: true,
+               position: waveformPosition,
+               color: waveformColor,
+               style: waveformStyle,
+               frequencyData: currentExportWaveformData,
+               opacity: waveformOpacity
+             };
+           }
           
           if (titleActive) {
             exportLayers.title = {

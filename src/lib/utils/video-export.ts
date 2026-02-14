@@ -63,8 +63,8 @@ export async function smartExportVideo(
   
   console.log('[SmartExport] Using MediaRecorder fallback');
   
-  // Legacy renderFrame wrapper (doesn't receive currentTime)
-  const legacyRenderFrame = renderFrame ? () => renderFrame(0) : undefined;
+  // Pass through the renderFrame function with its currentTime parameter
+  // (no need for a wrapper - exportCanvasVideoLegacy now accepts currentTime parameter)
   
   // When forceCloudTranscode is true, use WebM to avoid Android H.264 encoding errors
   const localResult = await exportCanvasVideoLegacy(
@@ -72,7 +72,7 @@ export async function smartExportVideo(
     audioElement,
     duration,
     onProgress,
-    legacyRenderFrame,
+    renderFrame,
     startAudioPlayback,
     stopAudioPlayback,
     forceCloudTranscode // Pass as forceWebM
@@ -255,7 +255,7 @@ export async function exportCanvasVideoLegacy(
    audioElement: HTMLAudioElement,
    duration: number,
    onProgress?: ProgressCallback,
-   renderFrame?: () => void,
+   renderFrame?: (currentTime: number) => void,
    startAudioPlayback?: () => void,
    stopAudioPlayback?: () => void,
    forceWebM?: boolean // Skip H.264 attempts, go straight to WebM (for cloud transcode testing)
@@ -519,7 +519,7 @@ export async function exportCanvasVideoLegacy(
     // Ensure canvas is rendered at least once before recording starts
     if (renderFrame) {
       console.log('[VideoExport] Rendering initial frame');
-      renderFrame();
+      renderFrame(0); // Initial frame at time 0
     }
 
     // Small delay to ensure tracks are settled (critical for mobile)
@@ -546,7 +546,7 @@ export async function exportCanvasVideoLegacy(
         function renderLoop() {
           const elapsed = (Date.now() - startRenderTime) / 1000;
           if (elapsed < duration && renderFrame) {
-            renderFrame();
+            renderFrame(elapsed); // Pass current time to renderFrame for waveform animation
             renderAnimationId = requestAnimationFrame(renderLoop);
           }
         }

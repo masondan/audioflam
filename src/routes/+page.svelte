@@ -1480,7 +1480,7 @@
                   </div>
                   <SpeedSlider
                     speed={singleSpeakerSpeed}
-                    isActive={true}
+                    isActive={!isPlaying}
                     onSpeedChange={handleSingleSpeakerSpeedChange}
                     size="small"
                   />
@@ -1492,7 +1492,7 @@
                   </div>
                   <SilenceSlider
                     level={silenceLevel}
-                    isActive={true}
+                    isActive={!isPlaying}
                     onLevelChange={handleSilenceLevelChange}
                     size="small"
                   />
