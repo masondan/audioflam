@@ -48,6 +48,7 @@
       audioPlaylist = [];
       currentTrackIndex = 0;
       mergedAudioBase64 = null;
+      originalMergedAudioBase64 = null;
       originalAudioBase64 = null;
       errorMsg = null;
       
@@ -119,6 +120,7 @@
   let speaker1SilenceLevel = $state<SilenceLevel>('default');
   let speaker2SilenceLevel = $state<SilenceLevel>('default');
   let mergedAudioBase64 = $state<string | null>(null);
+  let originalMergedAudioBase64 = $state<string | null>(null);
   
   let speedLevel = $state<SpeedLevel>('default');
   let silenceLevel = $state<SilenceLevel>('default');
@@ -299,16 +301,37 @@
       // If silence adjustment is active, we need to regenerate and reapply silence
       if (hasSilenceAdjustment && mergedAudioBase64) {
         // Process with current silence levels for both speakers
+        let processedBlob = null;
         let processedAudio = mergedAudioBase64;
         
         if (speaker1SilenceLevel !== 'default') {
           const result = await removeSilence(processedAudio, speaker1SilenceLevel);
-          processedAudio = result.base64Audio;
+          processedBlob = result.blob;
+          // Convert blob back to base64 for next iteration
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
         }
         
         if (speaker2SilenceLevel !== 'default') {
           const result = await removeSilence(processedAudio, speaker2SilenceLevel);
-          processedAudio = result.base64Audio;
+          processedBlob = result.blob;
+          // Convert blob back to base64 for storage
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
         }
         
         // Update merged audio base64
@@ -319,8 +342,10 @@
           URL.revokeObjectURL(audioUrl);
         }
         
-        const blob = new Blob([Uint8Array.from(atob(processedAudio), c => c.charCodeAt(0))], { type: 'audio/mp3' });
-        audioUrl = URL.createObjectURL(blob);
+        // Use the last processed blob
+        if (processedBlob) {
+          audioUrl = URL.createObjectURL(processedBlob);
+        }
       }
       
       // Create new audio element (user will manually press play)
@@ -367,7 +392,7 @@
   }
 
   async function applyMergedAudioSilenceRemoval(speaker: 'speaker1' | 'speaker2', level: SilenceLevel) {
-    if (!mergedAudioBase64) return;
+    if (!originalMergedAudioBase64) return;
     
     const previousLevel = speaker === 'speaker1' ? speaker1SilenceLevel : speaker2SilenceLevel;
     
@@ -380,11 +405,92 @@
         audioElement.currentTime = 0;
       }
       
-      // Process the merged audio with the new silence level
-      const result = await removeSilence(mergedAudioBase64, level);
+      // Always process from the original audio
+      let processedAudio = originalMergedAudioBase64;
+      let lastResult = null;
       
-      // Update merged audio base64 for future adjustments
-      mergedAudioBase64 = result.base64Audio;
+      // Apply silence removal for speaker1 if needed
+      if (level === 'default' && speaker === 'speaker1') {
+        // Reverting to default for speaker1, use original
+        const speaker2Level = speaker2SilenceLevel;
+        if (speaker2Level !== 'default') {
+          // Still need to apply speaker2 silence
+          const result = await removeSilence(processedAudio, speaker2Level);
+          lastResult = result;
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
+        } else {
+          // No speaker2 silence, use original as-is
+          lastResult = await removeSilence(originalMergedAudioBase64, 'default');
+        }
+      } else if (level === 'default' && speaker === 'speaker2') {
+        // Reverting to default for speaker2, use original
+        const speaker1Level = speaker1SilenceLevel;
+        if (speaker1Level !== 'default') {
+          // Still need to apply speaker1 silence
+          const result = await removeSilence(processedAudio, speaker1Level);
+          lastResult = result;
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
+        } else {
+          // No speaker1 silence, use original as-is
+          lastResult = await removeSilence(originalMergedAudioBase64, 'default');
+        }
+      } else {
+        // Adjusting to a new silence level, apply all active silences from original
+        const speaker1Level = speaker === 'speaker1' ? level : speaker1SilenceLevel;
+        const speaker2Level = speaker === 'speaker2' ? level : speaker2SilenceLevel;
+        
+        if (speaker1Level !== 'default') {
+          const result = await removeSilence(processedAudio, speaker1Level);
+          lastResult = result;
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
+        }
+        
+        if (speaker2Level !== 'default') {
+          const result = await removeSilence(processedAudio, speaker2Level);
+          lastResult = result;
+          const arrayBuffer = await result.blob.arrayBuffer();
+          const uint8Array = new Uint8Array(arrayBuffer);
+          let binaryString = '';
+          const chunkSize = 8192;
+          for (let i = 0; i < uint8Array.length; i += chunkSize) {
+            const chunk = uint8Array.subarray(i, i + chunkSize);
+            binaryString += String.fromCharCode(...chunk);
+          }
+          processedAudio = btoa(binaryString);
+        }
+        
+        // If no silences are active, use original
+        if (speaker1Level === 'default' && speaker2Level === 'default') {
+          lastResult = await removeSilence(originalMergedAudioBase64, 'default');
+        }
+      }
+      
+      // Update merged audio base64
+      mergedAudioBase64 = processedAudio;
       
       // Clean up old URL
       if (audioUrl) {
@@ -392,7 +498,9 @@
       }
       
       // Create new blob and URL from processed audio
-      audioUrl = URL.createObjectURL(result.blob);
+      if (lastResult) {
+        audioUrl = URL.createObjectURL(lastResult.blob);
+      }
       
       // Create new audio element
       const newAudioElement = new Audio(audioUrl);
@@ -944,6 +1052,8 @@
         audioPlaylist = result.segments;
         audioUrl = result.mergedUrl;
         duration = result.totalDuration;
+        // Store original unprocessed audio for later silence adjustments
+        originalMergedAudioBase64 = result.mergedBase64;
         mergedAudioBase64 = result.mergedBase64;
         currentTrackIndex = 0;
         lastGeneratedText = $textInput.trim();
@@ -1035,6 +1145,7 @@
     lastGeneratedText = '';
     originalAudioBase64 = null;
     mergedAudioBase64 = null;
+    originalMergedAudioBase64 = null;
     singleSpeakerSpeed = 1.0;
     speaker1Speed = 1.0;
     speaker2Speed = 1.0;
