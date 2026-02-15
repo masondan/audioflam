@@ -1,7 +1,7 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam  
-**Status:** Production (Step 15 - Smart Export & UX Polish)  
+**Status:** Production (Step 15 - Waveform Export Parity Complete)  
 **Updated:** February 2026
 
 ---
@@ -61,12 +61,12 @@ src/
 │   │   ├── SpeedBlockModal.svelte # Speed warning modal
 │   │   └── [other UI components]
 │   └── utils/
-│       ├── waveform.ts           # Amplitude extraction + rendering
-│       ├── recording.ts          # MediaRecorder wrapper
+│       ├── waveform.ts           # FFT preprocessing + rendering (precomputeFrequencyFrames)
 │       ├── compositor.ts         # Canvas layer composition
-│       ├── video-export.ts       # Smart export orchestration
+│       ├── video-export.ts       # Export orchestration (smartExportVideo)
 │       ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
-│       └── [audio utilities]
+│       ├── timestretch.ts        # Audio speed adjustment
+│       └── recording.ts          # MediaRecorder wrapper
 ├── app.css                       # Global styles + CSS variables
 └── app.html                      # HTML template
 
@@ -236,7 +236,8 @@ All CSS variables defined in `src/app.css`.
 
 ### Export-Specific Gotchas
 
-- **WebCodecs audio NOT played during export** - Rendering uses time-based animation, not live playback analysis
+- **WebCodecs audio NOT played during export** - Rendering uses pre-computed FFT frames, not live playback
+- **Pre-computed frames critical for parity** - `precomputeFrequencyFrames()` must be called before export; determines visual output
 - **H.264 requires even dimensions** - Canvas auto-corrected in webcodecs-export.ts (lines 194-196)
 - **Canvas copy needed** - Offscreen canvas required to handle dimension correction
 - **Audio mono→stereo conversion** - Many mobile AAC encoders reject mono; code converts automatically
@@ -253,19 +254,21 @@ All CSS variables defined in `src/app.css`.
 
 ## Current Phase Focus
 
-**Step 15 - Smart Export & UX Polish**
+**Step 15 - Waveform Export Parity Complete**
 
 ✅ **Complete:**
 - TTS with Azure + YarnGPT
 - Full Audiogram creation (image, audio, waveform, title, effects)
+- **Waveform visual parity:** Preview and export waveforms now match exactly via pre-computed FFT frames
 - MP4 export via WebCodecs (Android)
 - MediaRecorder fallback (iOS/Firefox)
 - Cloud transcoding via api.video
 
-**In Progress:**
-- Edge case testing
-- UX polish (error messages, loading states)
-- Mobile device compatibility
+**Waveform Export Fix (Critical Implementation):**
+- `precomputeFrequencyFrames()` in `waveform.ts` performs offline FFT using Cooley-Tukey algorithm with Blackman windowing
+- Generates `Uint8Array[]` frames matching `AnalyserNode.getByteFrequencyData()` output format
+- Export pipeline passes pre-computed frames to `renderFrame(currentTime)` callback for frame-accurate rendering
+- Eliminates visual mismatch between live preview and exported MP4 (was caused by synthetic sine-wave generation)
 
 **Next Phase (Phase 2 - Future):**
 - TTS→Audiogram one-click integration (store exists, UI not wired)
@@ -310,13 +313,15 @@ All CSS variables defined in `src/app.css`.
 
 **Context:** WebCodecs encoding is CPU-intensive. Playing audio during export causes stuttering.
 
-**Decision:** Encode audio from AudioBuffer (no playback), use time-based frame rendering
+**Decision:** Encode audio from AudioBuffer (no playback), use time-based frame rendering with pre-computed FFT data
 
 **Why:** Guarantees smooth 24fps export without competing for CPU with Web Audio playback
 
-**Trade-off:** Waveform animation must be time-synchronized, not frequency-analyzed from live playback
-
-**Implementation:** `renderFrame(currentTime)` callback passes time to animation logic, not live audio data.
+**Implementation:** 
+- `precomputeFrequencyFrames()` pre-computes FFT for entire audio before export starts
+- `renderFrame(currentTime)` callback retrieves pre-computed frame by index instead of generating synthetic data
+- Eliminates visual mismatch: export now uses same frequency data as live preview (AnalyserNode-compatible format)
+- Uses Cooley-Tukey FFT with Blackman windowing for spectral accuracy
 
 ---
 
@@ -379,29 +384,48 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## How to Navigate This Codebase
+## How to Navigate by Task
 
-### For TTS Changes
+### I'm starting work on AudioFlam
+1. **Read this file (AGENTS.md)** - 5 minutes for complete overview
+2. **Check "Critical Rules & Gotchas"** - Avoid breaking patterns
+3. **Check "Common Pitfalls for Agents"** - Learn from past mistakes
+4. **Bookmark `/docs/TROUBLESHOOTING.md`** - For debugging later
+
+### I need to implement a TTS change
 1. Start: `src/routes/api/tts/+server.ts` (handler)
-2. Test: `src/routes/+page.svelte` (UI)
-3. Reference: `src/lib/stores.ts` (voice definitions)
+2. Reference: `src/lib/stores.ts` (voice definitions)
+3. UI: `src/routes/+page.svelte` (TTS panel)
+4. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
-### For Audiogram Changes
+### I need to implement an Audiogram change
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
 2. UI logic: Individual panel components (WaveformPanel, TitlePanel, etc.)
 3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
 4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
+5. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
 
-### For Export Changes
+### I need to implement an Export change
 1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
 2. Branch A (WebCodecs): `src/lib/utils/webcodecs-export.ts`
 3. Branch B (MediaRecorder): `src/lib/utils/video-export.ts:exportCanvasVideoLegacy()`
 4. Branch C (Cloud): `src/routes/api/transcode/+server.ts`
+5. Consult: TROUBLESHOOTING.md → Export Issues + ARCHITECTURE.md
 
-### For Design Changes
+### I need to make Design/CSS changes
 1. Colors/spacing: `src/app.css` (CSS variables)
 2. Icons: `static/icons/` (SVG files)
 3. Components: Individual `.svelte` files (use design tokens)
+
+### I'm debugging an issue
+1. **Search TROUBLESHOOTING.md** for your symptom
+2. Check "Debug steps" section for your issue
+3. Check "Critical Rules & Gotchas" in this file
+4. Check console logs for prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`
+
+### I want to understand a design decision
+1. Check this file → "Architecture Decision Log" section
+2. For deep dives: see "Useful References" for archive docs
 
 ---
 
@@ -422,26 +446,45 @@ All CSS variables defined in `src/app.css`.
 ### Waveform Not Rendering
 1. Check audio decode success (AudioContext.decodeAudioData)
 2. Verify canvas context available
-3. Check `waveform.ts:extractAmplitude()` returns data
+3. Check `waveform.ts:precomputeFrequencyFrames()` generates data (FFT computation)
 4. Verify container has dimensions
+5. Check preview vs export mismatch: are pre-computed frames being passed to export pipeline?
 
 ---
 
-## Useful References
+## Reference Documents
 
-**Most Helpful:**
-- **`docs/CHALLENGES_AND_FIXES.md`** - Consolidated reference for known issues, root causes, and fixes applied (audio pipeline, export reliability, mobile compatibility)
+### For Debugging & Problem-Solving
+- **`/docs/TROUBLESHOOTING.md`** - Searchable Q&A for common issues (TTS, export, mobile, performance, deployment)
+- **`/docs/CHALLENGES_AND_FIXES.md`** - Consolidated reference for known issues, root causes, and fixes applied
 
-**Deep Dives:**
-- **`docs/ARCHITECTURE.md`** - Visual diagrams and data flow
-- **`docs/TROUBLESHOOTING.md`** - Quick reference for debugging (TTS, export, mobile-specific issues)
+### For System Design & Architecture
+- **`/docs/ARCHITECTURE.md`** - Visual diagrams and data flows (TTS pipeline, export pipeline, canvas composition, browser compatibility)
 
-**Historical Context** (see `docs/archive/MANIFEST.md` for full index):
-- `EXPORT_TECH_PLAN.md` - Why WebCodecs + Mediabunny was chosen
-- `MOBILE_EXPORT_FIX.md` - Diagnostic approach for black-screen issue
-- `EXPORT_FIX_IMPLEMENTATION.md` - How the RAF loop fix works
-- `AUDIT_REPORT.md` - Performance issues that were fixed
-- `ROADMAP.md` - Original implementation roadmap
+### For Historical Context & Design Decisions
+- **`/docs/archive/MANIFEST.md`** - Index & status guide for archived documents
+- **`/docs/archive/EXPORT_TECH_PLAN.md`** - Why WebCodecs + Mediabunny was chosen over FFmpeg/MediaRecorder
+- **`/docs/archive/ROADMAP.md`** - 14-step development timeline and completion status
+- **`/docs/archive/MOBILE_EXPORT_FIX.md`** - Black-screen issue diagnostic approach (learning resource)
+- **`/docs/archive/EXPORT_FIX_IMPLEMENTATION.md`** - How RAF loop decoupling fixed export stuttering
+
+### For Design & UI Reference
+- **`/docs/archive/DESIGN_VISION.md`** - Original design specification (design tokens now in `src/app.css`)
+- **`/docs/archive/TTS_REDESIGN_SUMMARY.md`** - TTS page UI redesign history (completed February 2026)
+
+---
+
+## Questions? Need Help?
+
+**This file (AGENTS.md) is your primary reference. It should answer 90% of questions:**
+
+- **How does AudioFlam work?** → Read relevant section above
+- **How do I implement X?** → See "How to Navigate by Task" section
+- **I'm stuck on an issue** → Check "Debugging Tips" above, then `/docs/TROUBLESHOOTING.md`
+- **Why was decision Y made?** → Check "Architecture Decision Log" above, then `/docs/archive/` for deep dives
+- **How do systems interact?** → See `/docs/ARCHITECTURE.md` for visual diagrams
+
+**For code tracing:** Grep for log prefixes to trace execution: `[WebCodecs]`, `[VideoExport]`, `[TTS]`
 
 ---
 

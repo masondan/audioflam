@@ -1,4 +1,20 @@
-# TTS Page Redesign - Summary of Changes
+# TTS Page Redesign - Historical Record
+
+**Status:** ✅ Completed (February 2026)
+
+---
+
+## Archive Note
+
+This document records the TTS page redesign completed in February 2026. The redesign introduced the mode toggle and unified "Adjust audio" controls. The feature is now complete and deployed.
+
+**Preserved for reference** if similar UI redesigns are planned, or to understand how this design was arrived at.
+
+**For current TTS implementation:** See code in `src/routes/+page.svelte`.
+
+---
+
+## Summary of Changes
 
 ## Overview
 Successfully redesigned the TTS page to eliminate confusion between one-speaker and two-speaker modes by introducing a prominent mode toggle at the top of the page. All audio controls are now organized in a single, unified "Adjust audio" dropdown that becomes active after audio generation.

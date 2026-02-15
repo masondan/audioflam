@@ -1,3 +1,23 @@
+# AudioFlam Design Vision - Historical Specification
+
+**Status:** ✅ Mostly Implemented (January 2026)
+
+---
+
+## Archive Note
+
+This document contains the original design vision for AudioFlam from January 2026, including UI mockups, layout specifications, component descriptions, and icon requirements.
+
+**Most features have been implemented.** For current design system, see:
+- AGENTS.md "Design System" section (colors, typography, spacing)
+- `src/app.css` (CSS variables for all design tokens)
+- `static/icons/` (current icon set)
+
+Used as historical reference if understanding original design decisions is needed.
+
+---
+
+## Original Design Vision
 
 ## Implementation of audiogram function for AudioFlam - UI design vision
 

@@ -1,4 +1,21 @@
-# Afro-TTS Integration Report
+# Afro-TTS Integration Research - BLOCKED
+
+**Status:** 🔴 BLOCKED (January 2026)  
+**Decision:** Continue with Azure Speech + YarnGPT Nigerian voices
+
+---
+
+## Archive Note
+
+This document preserves research on Afro-TTS (XTTS v2) integration via HuggingFace Spaces. The HF Spaces approach failed due to GPU requirements on the free tier. An alternative path (Replicate.com at $0.01-0.05/prediction) was identified but not implemented.
+
+**For current TTS implementation:** See AGENTS.md "TTS Providers" section (Azure + YarnGPT).
+
+If higher-quality Nigerian voice synthesis becomes a priority, this research provides context on alternative approaches.
+
+---
+
+## Original Report
 
 **Status:** Blocked on backend hosting. Recommendation: Pivot to Replicate.com
 

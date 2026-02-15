@@ -1,15 +1,33 @@
 # Archive Manifest - Historical Documentation
 
 **Purpose:** Reference documents for understanding past development iterations and design decisions  
-**Note:** These are historical records. For current reference, use `AGENTS.md` and other docs at project root.
+**Note:** These are historical records. For current reference, use `/AGENTS.md` (single source of truth).
+
+---
+
+## Archive Status Guide
+
+### ✅ HIGHLY VALUABLE - Read these for context:
+- **EXPORT_TECH_PLAN.md** - Why WebCodecs + Mediabunny was chosen over alternatives
+- **ROADMAP.md** - 14-step development timeline and completion status
+- **MOBILE_EXPORT_FIX.md** - Black-screen issue diagnostic approach (learning resource)
+- **EXPORT_FIX_IMPLEMENTATION.md** - How RAF loop decoupling fixed export stuttering
+
+### ⚠️ REFERENCE-ONLY - Use when needed:
+- **DESIGN_VISION.md** - Original design specification (design tokens now in `src/app.css` + AGENTS.md)
+- **TTS_REDESIGN_SUMMARY.md** - TTS UI redesign history (completed February 2026, implementation in code)
+
+### ❌ OBSOLETE - Don't read these:
+- **COMPLETION_REPORT.md** - Use AGENTS.md "Current Phase Focus" section instead
+- **AUDIT_REPORT.md** - Issues consolidated in `/docs/CHALLENGES_AND_FIXES.md`
 
 ---
 
 ## Summary
 
-**Why this archive exists:** Historical documentation that preserves why decisions were made. For current reference, all essential info is in `/AGENTS.md`.
+**Why this archive exists:** Historical documentation preserving why decisions were made. For current reference, all essential info is in `/AGENTS.md`.
 
-**Consolidated challenges:** Most persistent issues and fixes are now consolidated in `/docs/CHALLENGES_AND_FIXES.md` (newer, single source of truth). The archived docs below provide additional context if needed.
+**For persistent issues and fixes:** See `/docs/CHALLENGES_AND_FIXES.md` (consolidated reference). Archive docs provide additional context if needed.
 
 ---
 
