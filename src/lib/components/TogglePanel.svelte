@@ -114,8 +114,13 @@
   .panel-label {
     flex: 1;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     font-weight: 500;
+    transition: color var(--transition-fast);
+  }
+
+  .toggle-panel.active .panel-label {
+    color: #555555;
   }
 
   .toggle-switch {

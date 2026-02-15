@@ -1912,13 +1912,13 @@
     border: none;
     padding: var(--spacing-xs) 0;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--color-primary);
     cursor: pointer;
     transition: color var(--transition-fast);
   }
 
   .text-btn:hover {
-    color: var(--color-primary);
+    color: #4a1d9e;
   }
 
   .upload-box.loading {
@@ -2084,7 +2084,7 @@
 
   .audio-duration {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: #555555;
   }
 
   .playback-controls {
@@ -2240,7 +2240,7 @@
     padding: var(--spacing-sm) 0;
     font-size: var(--font-size-xs);
     font-weight: 500;
-    color: var(--color-text-secondary);
+    color: var(--color-primary);
     cursor: not-allowed;
     transition: color var(--transition-fast);
   }
@@ -2256,7 +2256,7 @@
 
   .download-hint {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: #777777;
     margin: 0;
     line-height: 1.4;
   }

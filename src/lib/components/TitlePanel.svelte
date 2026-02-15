@@ -422,7 +422,7 @@
 
   .style-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: #777777;
     min-width: 80px;
     flex-shrink: 0;
   }
