@@ -16,6 +16,7 @@
 		<meta property="og:type" content="website" />
 		<meta property="og:title" content="AudioFlam" />
 		<meta property="og:description" content="A mobile-first, AI text-to-voice and audiogram app for journalists and content creators." />
+		<meta property="og:url" content="https://audioflam.app/" />
 		<meta property="og:image" content="/icons/audioflam-share.png" />
 		<meta property="og:image:type" content="image/png" />
 		<meta property="og:image:width" content="1200" />
@@ -29,8 +30,25 @@
 		
 		<!-- Icons & Manifest -->
 		<link rel="icon" type="image/png" href="/icons/logo-audioflam-purple-trs.png" />
+		<link rel="icon" type="image/x-icon" href="/favicon.ico" />
 		<link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
 		<link rel="manifest" href="/manifest.json" />
+		
+		<!-- Structured Data for Search Engines -->
+		<script type="application/ld+json">
+		{
+			"@context": "https://schema.org",
+			"@type": "SoftwareApplication",
+			"name": "AudioFlam",
+			"description": "A mobile-first, AI text-to-voice and audiogram app for journalists and content creators.",
+			"applicationCategory": "EducationalApplication",
+			"operatingSystem": "Any",
+			"offers": {
+				"@type": "Offer",
+				"price": "0"
+			}
+		}
+		</script>
 		
 		%sveltekit.head%
 	</head>

@@ -1,7 +1,7 @@
 {
   "name": "AudioFlam",
   "short_name": "AudioFlam",
-  "description": "A mobile-first, text-to-voice and audiogram app to support training for journalists and content creators.",
+  "description": "A mobile-first, AI text-to-voice and audiogram app for journalists and content creators. Convert scripts to audio and create stunning audiograms with waveforms and effects.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",
@@ -9,6 +9,14 @@
   "background_color": "#5422b0",
   "theme_color": "#5422b0",
   "categories": ["education", "productivity"],
+  "screenshots": [
+    {
+      "src": "/icons/audioflam-share.png",
+      "sizes": "1200x630",
+      "form_factor": "wide",
+      "type": "image/png"
+    }
+  ],
   "icons": [
     {
       "src": "/icons/audioflam-any.png",
