@@ -7,27 +7,23 @@
 ## ⚡ Quick Links
 
 ### I'm starting work on AudioFlam
-👉 Read **[/AGENTS.md](/AGENTS.md)** (5 minutes)  
-Everything you need to know: commands, architecture, critical rules.
+👉 Read **[AGENTS.md](AGENTS.md)** (5 minutes)  
+Single source of truth: commands, architecture, critical rules, navigation guide.
 
 ### I'm stuck on an issue
-👉 Search **[/docs/TROUBLESHOOTING.md](/docs/TROUBLESHOOTING.md)**  
+👉 Search **[/docs/TROUBLESHOOTING.md](docs/TROUBLESHOOTING.md)**  
 Find your symptom, get root cause + fix + debug steps.
 
 ### I want to understand how something works
-👉 Read **[/docs/ARCHITECTURE.md](/docs/ARCHITECTURE.md)**  
+👉 Read **[/docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)**  
 Visual diagrams of TTS pipeline, export pipeline, canvas composition, etc.
 
-### I need to find a specific document
-👉 Use **[/docs/README.md](/docs/README.md)** navigation hub  
-Decision tree: "What document should I read?"
-
-### I'm looking for historical context
-👉 Check **[/docs/archive/MANIFEST.md](/docs/archive/MANIFEST.md)**  
-Index of 5 archived documents explaining why decisions were made.
+### I want to understand why a decision was made
+👉 Check **[/docs/archive/MANIFEST.md](docs/archive/MANIFEST.md)**  
+Status guide to archived documents explaining design decisions.
 
 ### I'm reviewing code quality
-👉 Read **[/docs/QUALITY_REPORT.md](/docs/QUALITY_REPORT.md)**  
+👉 Read **[/docs/QUALITY_REPORT.md](docs/QUALITY_REPORT.md)**  
 Issues found, priorities, testing gaps, recommendations.
 
 ---
@@ -37,31 +33,30 @@ Issues found, priorities, testing gaps, recommendations.
 ```
 AudioFlam/
 ├── START_HERE.md ──────────────── THIS FILE (you are here)
-├── AGENTS.md ────────────────────
-├── design.md
-├── afro-tts.md
+├── AGENTS.md ────────────────────── Single source of truth
 │
 └── docs/
-    ├── README.md ──────────────── Navigation hub
-    ├── ARCHITECTURE.md ────────── Visual diagrams
+    ├── ARCHITECTURE.md ────────── Visual diagrams & flows
     ├── TROUBLESHOOTING.md ──────── Problem solver
+    ├── CHALLENGES_AND_FIXES.md ─── Known issues & fixes
     ├── QUALITY_REPORT.md ───────── Code review
     │
     └── archive/
-        ├── MANIFEST.md ────────── Archive index
-        ├── EXPORT_TECH_PLAN.md
-        ├── MOBILE_EXPORT_FIX.md
-        ├── EXPORT_FIX_IMPLEMENTATION.md
-        ├── AUDIT_REPORT.md
-        └── ROADMAP.md
+        ├── MANIFEST.md ────────── Status guide (what to read)
+        ├── EXPORT_TECH_PLAN.md ─── Design rationale
+        ├── ROADMAP.md ────────── Development timeline
+        ├── MOBILE_EXPORT_FIX.md ─ Diagnostic approach
+        ├── EXPORT_FIX_IMPLEMENTATION.md ─ Implementation details
+        ├── DESIGN_VISION.md ──── Historical spec
+        └── TTS_REDESIGN_SUMMARY.md ─ UI redesign history
 ```
 
 ---
 
 ## ✅ What's In Each Document
 
-### `/AGENTS.md` - PRIMARY REFERENCE (472 lines)
-**Read this first.** Everything an AI agent needs:
+### `/AGENTS.md` - PRIMARY REFERENCE (500+ lines)
+**Single source of truth.** Everything an AI agent needs:
 - Quick start & commands
 - Project structure
 - TTS providers (Azure, YarnGPT)
@@ -70,27 +65,14 @@ AudioFlam/
 - Critical rules & gotchas
 - Architecture decision log (WHY we chose what)
 - Common pitfalls (lessons learned)
-- How to navigate the codebase
+- **How to navigate by task** (expanded section)
+- Reference documents (with categories)
+- Debugging tips
 - Testing checklist
 - Phase 2 plans
 
 **Read time:** 5 minutes  
-**Best for:** Everything—overview, reference, navigation
-
----
-
-### `/docs/README.md` - NAVIGATION HUB (272 lines)
-**Use this to find the right document.** Includes:
-- Decision tree: "What document should I read?"
-- Quick lookup guide (TTS, Audiogram, Export, Canvas, etc.)
-- Search terms & where to find them
-- Recommended reading paths (4 different types)
-- How to find something specific
-- Important notes for agents
-- Help & resources
-
-**Read time:** 5 minutes  
-**Best for:** Figuring out which doc to read
+**Best for:** Everything—overview, reference, debugging, navigation
 
 ---
 
@@ -151,12 +133,12 @@ Each issue includes:
 
 ---
 
-### `/docs/archive/MANIFEST.md` - ARCHIVE INDEX (218 lines)
-**Guide to historical documents.** Includes:
-- What's in the archive (5 documents)
-- Status of each (planning, diagnostics, implementation, audit, roadmap)
+### `/docs/archive/MANIFEST.md` - ARCHIVE STATUS GUIDE (230+ lines)
+**Guide to historical documents with status labels.** Includes:
+- **✅ Highly Valuable:** Documents explaining design decisions
+- **⚠️ Reference-Only:** Historical specs and completed features
+- **❌ Obsolete:** Documents superseded by newer consolidated references
 - When to read each
-- How AI agents should use them
 - Cross-references
 
 **Read time:** 5 minutes  
@@ -166,14 +148,19 @@ Each issue includes:
 
 ### `/docs/archive/` - HISTORICAL DOCUMENTS
 **Preserved for context, not daily reference:**
+
+**✅ Highly Valuable:**
 - `EXPORT_TECH_PLAN.md` - Why WebCodecs + Mediabunny chosen over alternatives
-- `MOBILE_EXPORT_FIX.md` - Diagnostic approach for black screen issue
-- `EXPORT_FIX_IMPLEMENTATION.md` - How decoupled RAF loop fixed mobile export
-- `AUDIT_REPORT.md` - Performance audit (base64 decoding, MIME types)
-- `ROADMAP.md` - Original 14-step implementation plan
+- `ROADMAP.md` - 14-step development timeline and completion
+- `MOBILE_EXPORT_FIX.md` - Black screen issue diagnostic approach
+- `EXPORT_FIX_IMPLEMENTATION.md` - How RAF loop decoupling fixed stuttering
+
+**⚠️ Reference-Only:**
+- `DESIGN_VISION.md` - Original design specification (January 2026)
+- `TTS_REDESIGN_SUMMARY.md` - TTS UI redesign history (February 2026)
 
 **Read time:** 5-30 min each (deep dives)  
-**Best for:** Learning WHY decisions were made
+**Best for:** Learning WHY decisions were made; historical context
 
 ---
 
