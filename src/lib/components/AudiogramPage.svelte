@@ -533,7 +533,7 @@
   }
 
   function handlePlayPause() {
-    if (!audioData || !audioElement) return;
+    if (!audioData || !audioElement || isExporting) return;
     
     if (isPlaying) {
       audioElement.pause();
@@ -655,7 +655,7 @@
   }
 
   function handleWaveformClick(e: MouseEvent) {
-    if (!audioData || !waveformContainer || !audioElement) return;
+    if (!audioData || !waveformContainer || !audioElement || isExporting) return;
     
     const rect = waveformContainer.getBoundingClientRect();
     const clickX = e.clientX - rect.left;
@@ -689,6 +689,7 @@
   }
 
   function handleTrimHandleMouseDown(handle: 'start' | 'end', e: MouseEvent) {
+    if (isExporting) return;
     e.preventDefault();
     e.stopPropagation();
     draggingHandle = handle;
@@ -717,6 +718,7 @@
   }
 
   function handleTrimHandleTouchStart(handle: 'start' | 'end', e: TouchEvent) {
+    if (isExporting) return;
     e.preventDefault();
     e.stopPropagation();
     draggingHandle = handle;
@@ -1493,25 +1495,27 @@
     </button>
   {:else}
     <div class="image-section">
-      <CompositionCanvas 
-        bind:this={compositionCanvasRef}
-        imageUrl={imageData.url} 
-        loading={imageLoading}
-        waveformConfig={waveformConfig}
-        titleConfig={titleConfig}
-        lightConfig={lightConfig}
-        isPlaying={isPlaying}
-        onWaveformPositionChange={handleWaveformPositionChange}
-        onWaveformClick={handleWaveformOverlayClick}
-        onTitlePositionChange={handleTitlePositionChange}
-        onTitleClick={handleTitleOverlayClick}
-        onBackgroundClick={handleCanvasBackgroundClick}
-      />
+      <div class="canvas-wrapper" class:exporting={isExporting}>
+        <CompositionCanvas 
+          bind:this={compositionCanvasRef}
+          imageUrl={imageData.url} 
+          loading={imageLoading}
+          waveformConfig={waveformConfig}
+          titleConfig={titleConfig}
+          lightConfig={lightConfig}
+          isPlaying={isPlaying}
+          onWaveformPositionChange={handleWaveformPositionChange}
+          onWaveformClick={handleWaveformOverlayClick}
+          onTitlePositionChange={handleTitlePositionChange}
+          onTitleClick={handleTitleOverlayClick}
+          onBackgroundClick={handleCanvasBackgroundClick}
+        />
+      </div>
       <div class="image-actions">
-        <button type="button" class="text-btn" onclick={handleDeleteImage}>
+        <button type="button" class="text-btn" onclick={handleDeleteImage} disabled={isExporting}>
           Delete image
         </button>
-        <button type="button" class="text-btn" onclick={handleResizeClick}>
+        <button type="button" class="text-btn" onclick={handleResizeClick} disabled={isExporting}>
           Resize
         </button>
       </div>
@@ -1584,6 +1588,7 @@
     >
       <div
         class="trim-handle start"
+        class:disabled={isExporting}
         style="left: calc({trimStart} * (100% - 44px))"
         onmousedown={(e) => handleTrimHandleMouseDown('start', e)}
         ontouchstart={(e) => handleTrimHandleTouchStart('start', e)}
@@ -1610,6 +1615,7 @@
       {/if}
       <div
         class="trim-handle end"
+        class:disabled={isExporting}
         style="left: calc(22px + {trimEnd} * (100% - 44px))"
         onmousedown={(e) => handleTrimHandleMouseDown('end', e)}
         ontouchstart={(e) => handleTrimHandleTouchStart('end', e)}
@@ -1624,7 +1630,7 @@
       </div>
     </div>
     <div class="audio-actions">
-      <button type="button" class="text-btn" onclick={handleStartAgain}>
+      <button type="button" class="text-btn" onclick={handleStartAgain} disabled={isExporting}>
         Delete audio
       </button>
       <span class="audio-duration">{audioData?.duration.toFixed(1)}s</span>
@@ -1639,7 +1645,7 @@
         type="button"
         class="control-btn skip"
         onclick={handleSkipBack}
-        disabled={!hasAudio || isMicActive}
+        disabled={!hasAudio || isMicActive || isExporting}
         aria-label="Skip back 5 seconds"
       >
         <img src="/icons/icon-back-five.svg" alt="" class="control-icon" />
@@ -1651,7 +1657,7 @@
         class:active={hasAudio || isMicActive}
         class:playing={isPlaying || recordingPhase === 'recording'}
         onclick={isMicActive ? handleRecordPlayPause : handlePlayPause}
-        disabled={!hasAudio && !isMicActive}
+        disabled={(!hasAudio && !isMicActive) || isExporting}
         aria-label={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
       >
         {#if recordingPhase === 'countdown'}
@@ -1679,7 +1685,7 @@
         type="button"
         class="control-btn skip"
         onclick={handleSkipForward}
-        disabled={!hasAudio || isMicActive}
+        disabled={!hasAudio || isMicActive || isExporting}
         aria-label="Skip forward 5 seconds"
       >
         <img src="/icons/icon-forward-five.svg" alt="" class="control-icon" />
@@ -1691,7 +1697,7 @@
       class="control-btn mic"
       class:active={isMicActive}
       onclick={handleMicClick}
-      disabled={hasAudio}
+      disabled={hasAudio || isExporting}
       aria-label="Record audio"
       aria-pressed={isMicActive}
     >
@@ -1799,7 +1805,7 @@
       onclick={handleCancelExport}
       disabled={!isExporting}
     >
-      Cancel export
+      Cancel
     </button>
     <p class="download-hint">
       Local processing works on most devices. If not, we'll convert in the cloud (a few extra seconds). You'll see a progress indicator.
@@ -1888,6 +1894,49 @@
     gap: var(--spacing-sm);
   }
 
+  .canvas-wrapper {
+    position: relative;
+  }
+
+  .canvas-wrapper.exporting::before {
+    content: '';
+    position: absolute;
+    top: -2px;
+    left: -2px;
+    right: -2px;
+    bottom: -2px;
+    border-radius: calc(var(--radius-md) + 2px);
+    background: conic-gradient(
+      from var(--export-angle, 0deg),
+      var(--color-primary) 0deg,
+      transparent 60deg,
+      transparent 180deg,
+      var(--color-primary) 180deg,
+      transparent 240deg,
+      transparent 360deg
+    );
+    z-index: 1;
+    pointer-events: none;
+    animation: export-spin 5s linear infinite;
+    mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    mask-composite: exclude;
+    -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+    -webkit-mask-composite: xor;
+    padding: 2px;
+  }
+
+  @keyframes export-spin {
+    to { --export-angle: 360deg; }
+  }
+
+  :global {
+    @property --export-angle {
+      syntax: '<angle>';
+      initial-value: 0deg;
+      inherits: false;
+    }
+  }
+
   .loading-spinner {
     width: 32px;
     height: 32px;
@@ -1917,8 +1966,13 @@
     transition: color var(--transition-fast);
   }
 
-  .text-btn:hover {
+  .text-btn:hover:not(:disabled) {
     color: #4a1d9e;
+  }
+
+  .text-btn:disabled {
+    color: #777777;
+    cursor: default;
   }
 
   .upload-box.loading {
@@ -2069,9 +2123,15 @@
     border-radius: 2px;
   }
 
-  .trim-handle:hover,
-  .trim-handle:focus {
+  .trim-handle:hover:not(.disabled),
+  .trim-handle:focus:not(.disabled) {
     background: color-mix(in srgb, var(--color-primary) 85%, black);
+  }
+
+  .trim-handle.disabled {
+    background: #777777;
+    cursor: default;
+    pointer-events: none;
   }
 
   .audio-actions {
@@ -2159,10 +2219,13 @@
 
   .play-btn:disabled {
     cursor: not-allowed;
+    border-color: #777777 !important;
   }
 
   .play-btn:disabled .play-icon {
-    opacity: 0.4;
+    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    -webkit-filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    opacity: 1;
   }
 
   .play-btn.active {
@@ -2212,7 +2275,7 @@
     border: none;
     font-size: var(--font-size-base);
     font-weight: 600;
-    color: var(--color-text-secondary);
+    color: #777777;
     cursor: not-allowed;
     transition: all var(--transition-fast);
   }
@@ -2238,9 +2301,9 @@
     background: none;
     border: none;
     padding: var(--spacing-sm) 0;
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     font-weight: 500;
-    color: var(--color-primary);
+    color: #777777;
     cursor: not-allowed;
     transition: color var(--transition-fast);
   }

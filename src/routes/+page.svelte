@@ -1946,8 +1946,8 @@
     border-radius: var(--radius-md);
     background: var(--color-app-bg);
     color: var(--color-text-secondary);
-    font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-size: var(--font-size-base);
+    font-weight: 600;
     cursor: not-allowed;
     transition: all var(--transition-fast);
   }
@@ -2216,7 +2216,7 @@
     gap: 0;
     border-radius: var(--radius-md);
     overflow: hidden;
-    border: 1px solid var(--color-primary);
+    border: 1px solid #777777;
     width: 100%;
   }
 

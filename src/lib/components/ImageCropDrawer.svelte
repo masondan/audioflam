@@ -473,7 +473,7 @@
   .ratio-buttons {
     display: flex;
     gap: var(--spacing-md);
-    justify-content: flex-start;
+    justify-content: center;
   }
 
   .ratio-btn {
@@ -488,8 +488,8 @@
   }
 
   .ratio-icon-container {
-    width: 56px;
-    height: 56px;
+    width: 45px;
+    height: 45px;
     display: flex;
     align-items: center;
     justify-content: center;

@@ -68,7 +68,7 @@
 
 <style>
   .toggle-panel {
-    border: 1px solid var(--color-border);
+    border: 1px solid #777777;
     border-radius: var(--radius-md);
     background: var(--color-white);
     overflow: hidden;
@@ -76,7 +76,7 @@
   }
 
   .toggle-panel.active {
-    border-color: var(--color-primary);
+    border-color: #555555;
   }
 
   .panel-header {
