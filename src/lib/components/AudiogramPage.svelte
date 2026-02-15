@@ -1237,6 +1237,9 @@
         forceCloudTranscode // Pass the test mode flag
       );
 
+      // If cancelled while encoding, discard the result
+      if (exportCancelled) return;
+
       // Store the blob/mimeType and show filename modal
       console.log('[Export] Received result, blob size:', exportResult.blob.size);
       pendingVideoBlob = exportResult.blob;
@@ -2219,13 +2222,6 @@
 
   .play-btn:disabled {
     cursor: not-allowed;
-    border-color: #777777 !important;
-  }
-
-  .play-btn:disabled .play-icon {
-    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
-    -webkit-filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
-    opacity: 1;
   }
 
   .play-btn.active {
@@ -2236,6 +2232,15 @@
   .play-btn.active .play-icon {
     filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
     -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+  }
+
+  .play-btn.active:disabled {
+    border-color: #777777 !important;
+  }
+
+  .play-btn.active:disabled .play-icon {
+    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    -webkit-filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
   }
 
   .play-btn.playing {
