@@ -128,11 +128,12 @@
     height: 24px;
     background: #999999;
     border: none;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     cursor: pointer;
     position: relative;
     transition: background var(--transition-fast);
     padding: 0;
+    flex-shrink: 0;
   }
 
   .toggle-switch.active {
@@ -146,7 +147,7 @@
     width: 20px;
     height: 20px;
     background: var(--bg-white);
-    border-radius: var(--radius-round);
+    border-radius: 50%;
     transition: transform var(--transition-fast);
   }
 

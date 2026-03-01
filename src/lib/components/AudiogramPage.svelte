@@ -2360,14 +2360,14 @@
     width: 100%;
     height: 6px;
     background: rgba(255, 255, 255, 0.25);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     overflow: hidden;
   }
 
   .export-bar-fill {
     height: 100%;
     background: white;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     transition: width 0.15s ease-out;
   }
 

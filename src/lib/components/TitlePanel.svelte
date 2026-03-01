@@ -487,7 +487,7 @@
     flex: 1;
     height: 4px;
     background: #e0e0e0;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     -webkit-appearance: none;
     appearance: none;
   }

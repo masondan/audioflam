@@ -236,7 +236,7 @@
     position: relative;
     width: 100%;
     height: 24px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: linear-gradient(
       to right,
       #ff0000,

@@ -2325,7 +2325,7 @@
   .discrete-slider {
     width: 100%;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: #dcdcdc;
     outline: none;
     -webkit-appearance: none;
@@ -2358,7 +2358,7 @@
   .discrete-slider::-webkit-slider-runnable-track {
     background: #efefef;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
   }
 
   .discrete-slider::-moz-range-track {

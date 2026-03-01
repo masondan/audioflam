@@ -80,7 +80,7 @@
   .effect-slider {
     width: 100%;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: #efefef;
     outline: none;
     -webkit-appearance: none;
@@ -130,13 +130,13 @@
   .effect-slider::-webkit-slider-runnable-track {
     background: #d0d0d0;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
   }
 
   .effect-slider::-moz-range-track {
     background: #d0d0d0;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     border: none;
   }
 </style>

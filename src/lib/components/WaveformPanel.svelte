@@ -210,7 +210,7 @@
   .opacity-slider {
     flex: 1;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: #efefef;
     outline: none;
     -webkit-appearance: none;
@@ -260,13 +260,13 @@
   .opacity-slider::-webkit-slider-runnable-track {
     background: #d0d0d0;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
   }
 
   .opacity-slider::-moz-range-track {
     background: #d0d0d0;
     height: 6px;
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     border: none;
   }
 

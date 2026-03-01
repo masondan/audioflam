@@ -121,7 +121,7 @@
   .speed-slider {
     width: 100%;
     height: var(--slider-height);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: #dcdcdc;
     outline: none;
     -webkit-appearance: none;
@@ -195,7 +195,7 @@
   .speed-slider::-webkit-slider-runnable-track {
     background: #dcdcdc;
     height: var(--slider-height);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
   }
 
   .speed-slider::-moz-range-track {

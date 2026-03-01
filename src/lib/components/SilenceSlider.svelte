@@ -118,7 +118,7 @@
   .silence-slider {
     width: 100%;
     height: var(--slider-height);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
     background: #dcdcdc;
     outline: none;
     -webkit-appearance: none;
@@ -189,7 +189,7 @@
   .silence-slider::-webkit-slider-runnable-track {
     background: #dcdcdc;
     height: var(--slider-height);
-    border-radius: var(--radius-full);
+    border-radius: var(--radius-round);
   }
 
   .silence-slider::-moz-range-track {
