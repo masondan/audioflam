@@ -343,7 +343,7 @@
     overflow-y: auto;
     min-height: 40px;
     max-height: 120px;
-    line-height: 24px;
+    line-height: var(--line-height-tight);
   }
 
   .title-input::placeholder {
@@ -369,12 +369,12 @@
     padding: 0;
     cursor: pointer;
     transition: color var(--transition-fast);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .tab.active {
     color: var(--color-primary);
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
   }
 
   .tab-content {
@@ -497,7 +497,7 @@
     width: 20px;
     height: 20px;
     background: #999999;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
   }
 
@@ -505,7 +505,7 @@
     width: 20px;
     height: 20px;
     background: #999999;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
     border: none;
   }
@@ -525,7 +525,7 @@
     padding: 0;
     background: transparent;
     border: 1.5px solid transparent;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -554,7 +554,7 @@
   .color-swatch {
     width: 22px;
     height: 22px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
   }
 
   .color-swatch.white {

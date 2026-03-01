@@ -64,7 +64,7 @@
     color: var(--text-primary);
     margin: 0;
     text-align: center;
-    line-height: 1.5;
+    line-height: var(--line-height-normal);
   }
 
   .modal-button {
@@ -75,7 +75,7 @@
     border-radius: var(--radius-sm);
     color: var(--bg-white);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: background var(--transition-fast);
   }

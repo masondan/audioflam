@@ -94,7 +94,7 @@
     display: block;
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     margin-bottom: var(--spacing-xs);
   }
 
@@ -180,7 +180,7 @@
 
   .dropdown-option.selected {
     color: var(--color-primary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .dropdown-option:last-child {

@@ -392,7 +392,7 @@
     background: none;
     border: none;
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-secondary);
     cursor: pointer;
     padding: var(--spacing-xs) var(--spacing-sm);
@@ -518,6 +518,6 @@
   .ratio-label {
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 </style>

@@ -1649,7 +1649,7 @@
   .nav-tab-btn {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -1710,7 +1710,7 @@
   .text-label {
     font-size: var(--font-size-sm);
     color: #555555;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .char-count {
@@ -1720,7 +1720,7 @@
 
   .char-count.warning {
     color: #dc2626;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .text-editor-wrapper {
@@ -1742,7 +1742,7 @@
     border: 1px solid #555555;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
-    line-height: 1.6;
+    line-height: var(--line-height-relaxed);
     outline: none;
     transition: border-color var(--transition-fast);
     resize: vertical;
@@ -1863,7 +1863,7 @@
     justify-content: center;
     background: var(--bg-white);
     border: 3px solid #777777 !important;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
     flex-shrink: 0;
@@ -1903,7 +1903,7 @@
     content: '';
     position: absolute;
     inset: -3px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: conic-gradient(from 0deg, var(--color-primary), var(--color-highlight), var(--color-primary));
     animation: spinner-rotate 1s linear infinite;
     z-index: 0;
@@ -1913,7 +1913,7 @@
     content: '';
     position: absolute;
     inset: 0;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: var(--bg-white);
     z-index: 1;
   }
@@ -1947,7 +1947,7 @@
     background: var(--bg-main);
     color: var(--text-secondary);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: not-allowed;
     transition: all var(--transition-fast);
   }
@@ -1971,7 +1971,7 @@
     background: transparent;
     color: var(--text-secondary);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: not-allowed;
     transition: color var(--transition-fast);
   }
@@ -2007,7 +2007,7 @@
 
   .modal-title {
     font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     margin: 0 0 var(--spacing-md) 0;
     text-align: center;
@@ -2017,7 +2017,7 @@
     display: block;
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     margin-bottom: var(--spacing-xs);
   }
 
@@ -2060,7 +2060,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background var(--transition-fast);
   }
@@ -2103,8 +2103,8 @@
     border-radius: var(--radius-md);
     background: var(--bg-white);
     font-size: var(--font-size-sm);
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-normal);
     color: #777777;
     cursor: pointer;
     transition: border-color var(--transition-fast);
@@ -2167,7 +2167,7 @@
 
   .speaker-option.selected {
     color: var(--color-primary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .speaker-option .voice-name {
@@ -2227,7 +2227,7 @@
     background: var(--bg-white);
     color: var(--color-primary);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: background-color var(--transition-normal), color var(--transition-normal);
     text-align: center;
@@ -2280,7 +2280,7 @@
 
   .adjust-audio-label {
     color: #777777;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     flex: 1;
   }
 
@@ -2318,7 +2318,7 @@
   .slider-label-text {
     font-size: var(--font-size-xs);
     color: #777777;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     display: block;
   }
 
@@ -2339,7 +2339,7 @@
     appearance: none;
     width: 20px;
     height: 20px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     border: none;
@@ -2349,7 +2349,7 @@
   .discrete-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     border: none;
@@ -2382,7 +2382,7 @@
 
   .slider-label.active {
     color: var(--color-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   /* Speaker Dropdowns Row for Two-Speaker Mode */

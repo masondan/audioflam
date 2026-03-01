@@ -74,7 +74,7 @@
   .slider-label {
     font-size: var(--font-size-xs);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .effect-slider {
@@ -93,7 +93,7 @@
     appearance: none;
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #777777;
     cursor: pointer;
     transition: background var(--transition-fast);
@@ -112,7 +112,7 @@
   .effect-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #777777;
     cursor: pointer;
     border: none;

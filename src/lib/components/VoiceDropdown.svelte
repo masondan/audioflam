@@ -163,7 +163,7 @@
     display: block;
     font-size: var(--font-size-sm);
     color: #555555;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     margin-bottom: var(--spacing-xs);
   }
 
@@ -177,8 +177,8 @@
     border: 1px solid #555555;
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    font-weight: 500;
-    line-height: 1.5;
+    font-weight: var(--font-weight-medium);
+    line-height: var(--line-height-normal);
     color: #555555;
     cursor: pointer;
     transition: border-color var(--transition-fast);
@@ -249,7 +249,7 @@
     background: none;
     border: none;
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: var(--text-primary);
     cursor: pointer;
     text-align: left;
@@ -262,7 +262,7 @@
 
   .dropdown-option.selected {
     color: var(--color-primary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .preview-btn {

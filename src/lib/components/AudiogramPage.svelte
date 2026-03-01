@@ -1882,7 +1882,7 @@
   .upload-label {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .upload-icon {
@@ -1925,7 +1925,7 @@
     mask-composite: exclude;
     -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
     -webkit-mask-composite: xor;
-    padding: 2px;
+    padding: var(--spacing-xs);
   }
 
   @keyframes export-spin {
@@ -1945,7 +1945,7 @@
     height: 32px;
     border: 3px solid rgba(255, 255, 255, 0.3);
     border-top-color: white;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     animation: spin 0.8s linear infinite;
   }
 
@@ -2009,7 +2009,7 @@
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     text-align: center;
-    line-height: 1.5;
+    line-height: var(--line-height-normal);
     margin: 0;
   }
 
@@ -2030,7 +2030,7 @@
 
   .countdown-number {
     font-size: 2.5rem;
-    font-weight: 700;
+    font-weight: var(--font-weight-bold);
     color: var(--color-primary);
     animation: pulse 1s ease-in-out;
   }
@@ -2112,11 +2112,11 @@
   }
 
   .trim-handle.start {
-    border-radius: 6px 0 0 6px;
+    border-radius: var(--radius-sm) 0 0 var(--radius-sm);
   }
 
   .trim-handle.end {
-    border-radius: 0 6px 6px 0;
+    border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
   }
 
   .trim-handle-bar {
@@ -2212,7 +2212,7 @@
     justify-content: center;
     background: var(--bg-white);
     border: 3px solid #999999 !important;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
     transition: border-color var(--transition-fast), background-color var(--transition-fast);
     flex-shrink: 0;
@@ -2279,7 +2279,7 @@
     background: var(--bg-main);
     border: none;
     font-size: var(--font-size-base);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: #777777;
     cursor: not-allowed;
     transition: all var(--transition-fast);
@@ -2307,7 +2307,7 @@
     border: none;
     padding: var(--spacing-sm) 0;
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     color: #777777;
     cursor: not-allowed;
     transition: color var(--transition-fast);
@@ -2326,7 +2326,7 @@
     font-size: var(--font-size-xs);
     color: #777777;
     margin: 0;
-    line-height: 1.4;
+    line-height: var(--line-height-normal);
   }
 
   .test-checkbox {
@@ -2353,7 +2353,7 @@
 
   .export-message {
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .export-bar {
@@ -2396,7 +2396,7 @@
 
   .modal-title {
     font-size: var(--font-size-lg);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     margin: 0;
   }
@@ -2426,7 +2426,7 @@
     padding: var(--spacing-sm) var(--spacing-md);
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: all var(--transition-fast);
   }

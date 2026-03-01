@@ -115,7 +115,7 @@
     flex: 1;
     font-size: var(--font-size-sm);
     color: #777777;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
   }
 
@@ -146,7 +146,7 @@
     width: 20px;
     height: 20px;
     background: var(--bg-white);
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     transition: transform var(--transition-fast);
   }
 

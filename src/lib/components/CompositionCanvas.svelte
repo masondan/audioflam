@@ -620,7 +620,7 @@
     height: 32px;
     border: 3px solid rgba(255, 255, 255, 0.3);
     border-top-color: white;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     animation: spin 1s linear infinite;
   }
 

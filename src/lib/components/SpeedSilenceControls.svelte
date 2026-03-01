@@ -206,7 +206,7 @@
   .panel-label {
     font-size: var(--font-size-sm);
     color: #777777;
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
   }
 
   .panel-chevron {
@@ -252,7 +252,7 @@
     appearance: none;
     width: 20px;
     height: 20px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     border: none;
@@ -262,7 +262,7 @@
   .discrete-slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     border: none;
@@ -293,6 +293,6 @@
 
   .slider-label.active {
     color: var(--color-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 </style>

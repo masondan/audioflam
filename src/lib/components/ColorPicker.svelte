@@ -226,7 +226,7 @@
     width: 20px;
     height: 20px;
     border: 3px solid white;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
     transform: translate(-50%, -50%);
     pointer-events: none;
@@ -258,7 +258,7 @@
     height: 20px;
     background: white;
     border: 2px solid white;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     box-shadow: 0 0 4px rgba(0, 0, 0, 0.5);
     transform: translate(-50%, -50%);
     pointer-events: none;
@@ -284,7 +284,7 @@
     border: none;
     border-radius: var(--radius-md);
     font-size: var(--font-size-sm);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
     transition: background var(--transition-fast);
   }

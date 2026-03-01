@@ -210,12 +210,59 @@ Export Button
 
 ### Typography & Spacing
 
+#### Font Family (Self-hosted)
 | Token | Value |
 |-------|-------|
-| `--font-family-base` | Inter, sans-serif |
-| `--font-size-base` | 1rem |
-| `--spacing-md` | 16px |
-| `--radius-md` | 8px |
+| `--font-family-base` | Inter (self-hosted), -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif |
+
+#### Font Sizes
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--font-size-xs` | 0.75rem (12px) | Captions, metadata |
+| `--font-size-sm` | 0.875rem (14px) | Small labels, helper text |
+| `--font-size-base` | 1rem (16px) | Body text, inputs, buttons |
+| `--font-size-lg` | 1.125rem (18px) | H3, subheadings |
+| `--font-size-larger` | 1.25rem (20px) | H2, section titles |
+| `--font-size-xl` | 1.5rem (24px) | H1, page titles |
+
+#### Font Weights
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--font-weight-regular` | 400 | Body text, default |
+| `--font-weight-medium` | 500 | Buttons, emphasis |
+| `--font-weight-semibold` | 600 | Subheadings, form labels |
+| `--font-weight-bold` | 700 | Headings, strong emphasis |
+
+#### Line Heights
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--line-height-tight` | 1.2 | Headings (H1, H2, H3) |
+| `--line-height-normal` | 1.5 | Body text, paragraphs, inputs |
+| `--line-height-relaxed` | 1.8 | Long-form content, descriptions |
+
+#### Spacing (Design System Scale)
+| Token | Value | Px Equivalent | Usage |
+|-------|-------|--------|-------|
+| `--spacing-xs` | 0.375rem | 6px | Tight spacing, icon padding |
+| `--spacing-sm` | 0.625rem | 10px | Element padding, gaps between small items |
+| `--spacing-md` | 1rem | 16px | Default padding, section margins |
+| `--spacing-lg` | 1.25rem | 20px | Vertical spacing, section separators |
+| `--spacing-xl` | 1.75rem | 28px | Large gaps, layout-level spacing |
+
+#### Border Radius
+| Token | Value | Usage |
+|-------|-------|-------|
+| `--radius-sm` | 6px | Input fields, small buttons, small containers |
+| `--radius-md` | 8px | Most buttons, containers, panels |
+| `--radius-lg` | 12px | Cards, larger containers |
+| `--radius-xl` | 16px | Modals, largest containers |
+| `--radius-round` | 50% | Circular icons, pill buttons, circles |
+
+**Note:** Trim Handle Bar (2px) is an approved exception for visual refinement.
+
+#### Transitions
+| Token | Value |
+|-------|-------|
 | `--transition-normal` | 200ms ease |
 
 All CSS variables defined in `src/app.css`.

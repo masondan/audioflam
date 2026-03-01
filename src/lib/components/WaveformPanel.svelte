@@ -203,7 +203,7 @@
   .opacity-label {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
-    font-weight: 500;
+    font-weight: var(--font-weight-medium);
     flex-shrink: 0;
   }
 
@@ -223,7 +223,7 @@
     appearance: none;
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #777777;
     cursor: pointer;
     transition: background var(--transition-fast);
@@ -242,7 +242,7 @@
   .opacity-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #777777;
     cursor: pointer;
     border: none;
@@ -282,7 +282,7 @@
     padding: 0;
     background: transparent;
     border: 1.5px solid transparent;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     cursor: pointer;
     display: flex;
     align-items: center;
@@ -301,7 +301,7 @@
   .color-swatch {
     width: 22px;
     height: 22px;
-    border-radius: 50%;
+    border-radius: var(--radius-round);
   }
 
   .color-swatch.white {

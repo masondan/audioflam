@@ -140,7 +140,7 @@
     appearance: none;
     width: var(--thumb-size);
     height: var(--thumb-size);
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     transition: background var(--transition-fast), box-shadow var(--transition-fast);
@@ -165,7 +165,7 @@
   .silence-slider::-moz-range-thumb {
     width: var(--thumb-size);
     height: var(--thumb-size);
-    border-radius: 50%;
+    border-radius: var(--radius-round);
     background: #5422b0;
     cursor: pointer;
     border: none;
@@ -210,7 +210,7 @@
 
   .slider-label.active {
     color: var(--color-primary);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
   }
 
   .silence-label-popup {
@@ -218,10 +218,10 @@
     top: -24px;
     right: 0;
     font-size: var(--font-size-xs);
-    font-weight: 600;
+    font-weight: var(--font-weight-semibold);
     color: var(--text-primary);
     background: var(--color-highlight);
-    padding: 2px 6px;
+    padding: var(--spacing-xs) var(--spacing-sm);
     border-radius: var(--radius-sm);
     white-space: nowrap;
     pointer-events: none;
