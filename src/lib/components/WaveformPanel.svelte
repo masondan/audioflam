@@ -198,6 +198,8 @@
     display: flex;
     align-items: center;
     gap: var(--spacing-md);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
   }
 
   .opacity-label {
@@ -224,7 +226,7 @@
     width: 18px;
     height: 18px;
     border-radius: var(--radius-round);
-    background: #777777;
+    background: var(--color-primary);
     cursor: pointer;
     transition: background var(--transition-fast);
     border: none;
@@ -232,29 +234,29 @@
   }
 
   .opacity-slider::-webkit-slider-thumb:hover {
-    background: #555555;
+    background: #4a1d9e;
   }
 
   .opacity-slider::-webkit-slider-thumb:active {
-    background: var(--color-primary);
+    background: #3a1580;
   }
 
   .opacity-slider::-moz-range-thumb {
     width: 18px;
     height: 18px;
     border-radius: var(--radius-round);
-    background: #777777;
+    background: var(--color-primary);
     cursor: pointer;
     border: none;
     transition: background var(--transition-fast);
   }
 
   .opacity-slider::-moz-range-thumb:hover {
-    background: #555555;
+    background: #4a1d9e;
   }
 
   .opacity-slider::-moz-range-thumb:active {
-    background: var(--color-primary);
+    background: #3a1580;
   }
 
   .opacity-slider::-webkit-slider-runnable-track {
@@ -277,8 +279,8 @@
   }
 
   .color-btn {
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     background: transparent;
     border: 1.5px solid transparent;
@@ -299,8 +301,8 @@
   }
 
   .color-swatch {
-    width: 22px;
-    height: 22px;
+    width: 36px;
+    height: 36px;
     border-radius: var(--radius-round);
   }
 

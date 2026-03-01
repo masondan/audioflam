@@ -358,17 +358,18 @@
   .tabs {
     display: flex;
     gap: var(--spacing-md);
+    margin-top: 8px;
     margin-bottom: var(--spacing-sm);
   }
 
   .tab {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
     background: none;
     border: none;
     padding: 0;
     cursor: pointer;
-    transition: color var(--transition-fast);
+    transition: color var(--transition-fast), font-weight var(--transition-fast);
     font-weight: var(--font-weight-medium);
   }
 
@@ -422,7 +423,7 @@
 
   .style-label {
     font-size: var(--font-size-sm);
-    color: #777777;
+    color: #1f1f1f;
     min-width: 80px;
     flex-shrink: 0;
   }
@@ -496,7 +497,7 @@
     -webkit-appearance: none;
     width: 20px;
     height: 20px;
-    background: #999999;
+    background: var(--color-primary);
     border-radius: var(--radius-round);
     cursor: pointer;
   }
@@ -504,7 +505,7 @@
   .slider::-moz-range-thumb {
     width: 20px;
     height: 20px;
-    background: #999999;
+    background: var(--color-primary);
     border-radius: var(--radius-round);
     cursor: pointer;
     border: none;
@@ -546,8 +547,8 @@
   }
 
   .none-icon {
-    width: 22px;
-    height: 22px;
+    width: 28px;
+    height: 28px;
     filter: invert(46%) sepia(0%) saturate(0%) brightness(70%) contrast(89%);
   }
 
