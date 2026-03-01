@@ -1880,8 +1880,8 @@
   }
 
   .upload-label {
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    color: #1f1f1f;
     font-weight: var(--font-weight-medium);
   }
 

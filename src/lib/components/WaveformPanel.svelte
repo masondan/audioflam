@@ -202,7 +202,7 @@
 
   .opacity-label {
     font-size: var(--font-size-sm);
-    color: var(--text-secondary);
+    color: #1f1f1f;
     font-weight: var(--font-weight-medium);
     flex-shrink: 0;
   }

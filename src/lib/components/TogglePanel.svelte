@@ -68,7 +68,7 @@
 
 <style>
   .toggle-panel {
-    border: 1px solid #777777;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--bg-white);
     overflow: hidden;
@@ -76,7 +76,7 @@
   }
 
   .toggle-panel.active {
-    border-color: #555555;
+    border-color: var(--color-border-active);
   }
 
   .panel-header {
@@ -113,14 +113,14 @@
 
   .panel-label {
     flex: 1;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: #777777;
     font-weight: var(--font-weight-medium);
     transition: color var(--transition-fast);
   }
 
   .toggle-panel.active .panel-label {
-    color: #555555;
+    color: #1f1f1f;
   }
 
   .toggle-switch {
@@ -156,7 +156,7 @@
   }
 
   .panel-content {
-    padding: 0 var(--spacing-md) var(--spacing-md);
+    padding: var(--spacing-md) var(--spacing-md) var(--spacing-md);
     animation: slideDown var(--transition-fast);
   }
 

@@ -1654,24 +1654,24 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: 1px solid var(--text-secondary);
+    border: 1px solid var(--color-icon-border);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
 
   .nav-tab-btn:hover {
-    border-color: var(--color-primary);
+    border-color: var(--color-icon-border);
   }
 
   .nav-tab-btn.active {
     background: var(--color-primary);
-    border: none;
+    border: 1px solid var(--color-primary);
   }
 
   .nav-tab-icon {
     width: 24px;
     height: 24px;
-    filter: invert(0.46);
+    filter: invert(0.3);
   }
 
   .nav-tab-btn.active .nav-tab-icon {
@@ -1708,14 +1708,14 @@
   }
 
   .text-label {
-    font-size: var(--font-size-sm);
-    color: #555555;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
     font-weight: var(--font-weight-medium);
   }
 
   .char-count {
-    font-size: var(--font-size-xs);
-    color: #777777;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
   }
 
   .char-count.warning {
@@ -1731,15 +1731,15 @@
     position: absolute;
     top: var(--spacing-md);
     left: var(--spacing-md);
-    color: #999999;
-    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-size: var(--font-size-base);
     pointer-events: none;
   }
 
   .text-editor {
     min-height: 150px;
     padding: var(--spacing-md);
-    border: 1px solid #555555;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
     line-height: var(--line-height-relaxed);
@@ -1747,10 +1747,11 @@
     transition: border-color var(--transition-fast);
     resize: vertical;
     overflow: auto;
+    color: var(--text-primary);
   }
 
   .text-editor:focus {
-    border-color: var(--color-primary);
+    border-color: var(--color-border-active);
   }
 
   .controls-section {
@@ -1773,13 +1774,14 @@
 
   .audio-duration {
     font-size: var(--font-size-sm);
-    color: #777777;
+    color: var(--text-secondary);
   }
 
   .clear-btn {
     padding: 0;
-    font-size: var(--font-size-sm);
-    color: #777777;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    color: var(--color-primary);
     background: none;
     border: none;
     cursor: pointer;
@@ -1788,11 +1790,12 @@
   }
 
   .clear-btn:hover:not(:disabled) {
-    color: #555555;
+    color: var(--color-primary);
   }
 
   .clear-btn.inactive {
-    color: #999999;
+    color: var(--text-secondary);
+    opacity: 0.5;
     cursor: default;
   }
 
@@ -1945,9 +1948,9 @@
     border: none;
     border-radius: var(--radius-md);
     background: var(--bg-main);
-    color: var(--text-secondary);
+    color: #777777;
     font-size: var(--font-size-base);
-    font-weight: var(--font-weight-semibold);
+    font-weight: var(--font-weight-medium);
     cursor: not-allowed;
     transition: all var(--transition-fast);
   }
@@ -1969,8 +1972,8 @@
     margin-top: calc(-1 * var(--spacing-sm));
     border: none;
     background: transparent;
-    color: var(--text-secondary);
-    font-size: var(--font-size-sm);
+    color: #777777;
+    font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
     cursor: not-allowed;
     transition: color var(--transition-fast);
@@ -2099,20 +2102,20 @@
     justify-content: space-between;
     align-items: center;
     padding: 12px var(--spacing-md);
-    border: 1px solid #777777;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--bg-white);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
     line-height: var(--line-height-normal);
-    color: #777777;
+    color: var(--text-primary);
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
 
   .speaker-dropdown-btn:hover {
-    border-color: #555555;
-    color: #555555;
+    border-color: var(--color-border);
+    color: var(--text-primary);
   }
 
   .chevron-icon {
@@ -2156,7 +2159,8 @@
     background: none;
     cursor: pointer;
     text-align: left;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
     color: var(--text-primary);
     transition: background var(--transition-fast);
   }
@@ -2167,7 +2171,7 @@
 
   .speaker-option.selected {
     color: var(--color-primary);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
   }
 
   .speaker-option .voice-name {
@@ -2226,7 +2230,7 @@
     border: none;
     background: var(--bg-white);
     color: var(--color-primary);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: background-color var(--transition-normal), color var(--transition-normal);
@@ -2244,7 +2248,7 @@
 
   /* Adjust Audio Section */
   .adjust-audio-section {
-    border: 1px solid #777777;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--bg-white);
     overflow: hidden;
@@ -2253,7 +2257,11 @@
   }
 
   .adjust-audio-section.inactive {
-    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .adjust-audio-section.inactive .adjust-audio-label {
+    color: var(--text-secondary);
   }
 
   .adjust-audio-header {
@@ -2266,12 +2274,8 @@
     border: none;
     cursor: pointer;
     transition: background var(--transition-normal);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     text-align: left;
-  }
-
-  .adjust-audio-header:hover:not(:disabled) {
-    background: var(--color-highlight);
   }
 
   .adjust-audio-header:disabled {
@@ -2279,7 +2283,7 @@
   }
 
   .adjust-audio-label {
-    color: #777777;
+    color: var(--text-primary);
     font-weight: var(--font-weight-medium);
     flex: 1;
   }
@@ -2316,7 +2320,7 @@
   }
 
   .slider-label-text {
-    font-size: var(--font-size-xs);
+    font-size: var(--font-size-sm);
     color: #777777;
     font-weight: var(--font-weight-medium);
     display: block;

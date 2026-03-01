@@ -161,8 +161,8 @@
 
   .dropdown-label {
     display: block;
-    font-size: var(--font-size-sm);
-    color: #555555;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
     font-weight: var(--font-weight-medium);
     margin-bottom: var(--spacing-xs);
   }
@@ -174,22 +174,22 @@
     justify-content: space-between;
     padding: 12px var(--spacing-md);
     background: var(--bg-white);
-    border: 1px solid #555555;
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
     line-height: var(--line-height-normal);
-    color: #555555;
+    color: var(--text-primary);
     cursor: pointer;
     transition: border-color var(--transition-fast);
   }
 
   .dropdown-trigger:hover {
-    border-color: var(--text-secondary);
+    border-color: var(--color-border);
   }
 
   .dropdown-trigger.open {
-    border-color: var(--color-primary);
+    border-color: var(--color-border-active);
     border-bottom-left-radius: 0;
     border-bottom-right-radius: 0;
   }
@@ -199,7 +199,8 @@
   }
 
   .dropdown-value.placeholder {
-    color: var(--text-secondary);
+    color: #1f1f1f;
+    font-weight: 500;
   }
 
   .dropdown-icon {
@@ -213,7 +214,7 @@
     position: relative;
     width: 100%;
     background: var(--bg-white);
-    border: 1px solid var(--color-primary);
+    border: 1px solid var(--color-border-active);
     border-top: none;
     border-bottom-left-radius: var(--radius-md);
     border-bottom-right-radius: var(--radius-md);
@@ -248,8 +249,8 @@
     padding: 12px var(--spacing-md);
     background: none;
     border: none;
-    font-size: var(--font-size-sm);
-    font-weight: var(--font-weight-medium);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
     color: var(--text-primary);
     cursor: pointer;
     text-align: left;
@@ -262,7 +263,7 @@
 
   .dropdown-option.selected {
     color: var(--color-primary);
-    font-weight: var(--font-weight-medium);
+    font-weight: var(--font-weight-semibold);
   }
 
   .preview-btn {
