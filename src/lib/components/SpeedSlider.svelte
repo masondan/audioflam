@@ -210,7 +210,7 @@
 
   .slider-label {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     transition: color var(--transition-fast), font-weight var(--transition-fast);
   }
 
@@ -225,8 +225,8 @@
     right: 0;
     font-size: var(--font-size-xs);
     font-weight: 600;
-    color: var(--color-text-primary);
-    background: var(--color-lavender-veil);
+    color: var(--text-primary);
+    background: var(--color-highlight);
     padding: 2px 6px;
     border-radius: var(--radius-sm);
     white-space: nowrap;

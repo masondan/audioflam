@@ -158,7 +158,7 @@
     flex: 1;
     aspect-ratio: 16 / 9;
     padding: var(--spacing-xs);
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 2px solid var(--color-border);
     border-radius: var(--radius-md);
     cursor: pointer;
@@ -173,7 +173,7 @@
   }
 
   .style-tile:hover:not(.selected) {
-    border-color: var(--color-text-secondary);
+    border-color: var(--text-secondary);
   }
 
   .tile-preview {
@@ -182,7 +182,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
   }
 
   .style-tile.selected .tile-preview {
@@ -202,7 +202,7 @@
 
   .opacity-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-weight: 500;
     flex-shrink: 0;
   }

@@ -1867,21 +1867,21 @@
     align-items: center;
     justify-content: space-between;
     padding: var(--spacing-lg) var(--spacing-md);
-    border: 2px dashed var(--color-border-dark);
+    border: 2px dashed var(--text-secondary);
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     cursor: pointer;
     transition: border-color var(--transition-fast), background var(--transition-fast);
   }
 
   .upload-box:hover {
     border-color: var(--color-primary);
-    background: var(--color-lavender-veil);
+    background: var(--color-highlight);
   }
 
   .upload-label {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-weight: 500;
   }
 
@@ -1998,7 +1998,7 @@
     padding: var(--spacing-md) var(--spacing-md);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
   }
 
   .recording-box.recording-active {
@@ -2007,7 +2007,7 @@
 
   .recording-instructions {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     text-align: center;
     line-height: 1.5;
     margin: 0;
@@ -2067,7 +2067,7 @@
     border: 1px solid var(--color-primary);
     border-radius: var(--radius-md);
     padding: var(--spacing-sm) 22px;
-    background: var(--color-white);
+    background: var(--bg-white);
     cursor: pointer;
     /* Allow vertical scroll - handles have their own touch-action: none */
     touch-action: pan-y;
@@ -2084,7 +2084,7 @@
     position: absolute;
     top: 0;
     bottom: 0;
-    background: var(--color-white);
+    background: var(--bg-white);
     z-index: 5;
     pointer-events: none;
   }
@@ -2122,7 +2122,7 @@
   .trim-handle-bar {
     width: 4px;
     height: 28px;
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: 2px;
   }
 
@@ -2210,7 +2210,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 3px solid #999999 !important;
     border-radius: 50%;
     cursor: pointer;
@@ -2226,7 +2226,7 @@
 
   .play-btn.active {
     border-color: var(--color-primary) !important;
-    background: var(--color-white);
+    background: var(--bg-white);
   }
 
   .play-btn.active .play-icon {
@@ -2276,7 +2276,7 @@
     width: 100%;
     padding: var(--spacing-md);
     border-radius: var(--radius-md);
-    background: var(--color-app-bg);
+    background: var(--bg-main);
     border: none;
     font-size: var(--font-size-base);
     font-weight: 600;
@@ -2287,7 +2287,7 @@
 
   .download-btn.active {
     background: var(--color-primary);
-    color: var(--color-white);
+    color: var(--bg-white);
     cursor: pointer;
   }
 
@@ -2297,7 +2297,7 @@
 
   .download-btn.exporting {
     background: var(--color-primary);
-    color: var(--color-white);
+    color: var(--bg-white);
     cursor: default;
   }
 
@@ -2334,7 +2334,7 @@
     align-items: center;
     gap: var(--spacing-xs);
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     cursor: pointer;
     padding: var(--spacing-xs) 0;
   }
@@ -2384,7 +2384,7 @@
   }
 
   .modal-content {
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     width: 100%;
@@ -2397,7 +2397,7 @@
   .modal-title {
     font-size: var(--font-size-lg);
     font-weight: 600;
-    color: var(--color-text-primary);
+    color: var(--text-primary);
     margin: 0;
   }
 
@@ -2434,17 +2434,17 @@
   .modal-btn.cancel {
     background: transparent;
     border: 1px solid var(--color-border);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
   }
 
   .modal-btn.cancel:hover {
-    background: var(--color-app-bg);
+    background: var(--bg-main);
   }
 
   .modal-btn.confirm {
     background: var(--color-primary);
     border: none;
-    color: var(--color-white);
+    color: var(--bg-white);
   }
 
   .modal-btn.confirm:hover {

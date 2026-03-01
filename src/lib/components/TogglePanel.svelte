@@ -70,7 +70,7 @@
   .toggle-panel {
     border: 1px solid #777777;
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     overflow: hidden;
     transition: border-color var(--transition-fast);
   }
@@ -145,7 +145,7 @@
     left: 2px;
     width: 20px;
     height: 20px;
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: 50%;
     transition: transform var(--transition-fast);
   }

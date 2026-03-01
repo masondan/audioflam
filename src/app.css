@@ -2,24 +2,35 @@
 @import url('https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Inter:wght@400;500;600;700&family=Lora:wght@400;700&family=Playfair+Display:wght@400;700&family=Roboto+Slab:wght@400;700&family=Saira+Condensed:wght@400;700&display=swap');
 
 :root {
-  /* Color Palette - Defined in AGENTS.md */
-  --color-indigo-bloom: #5422b0;
-  --color-lavender-veil: #f0e6f7;
-  --color-text-primary: #333333;
-  --color-text-secondary: #777777;
-  --color-app-bg: #efefef;
-  --color-white: #ffffff;
+  /* Core Brand Color */
+  --accent-brand: #5422b0;
   
-  /* Semantic Tokens */
-  --color-primary: var(--color-indigo-bloom);
-  --color-background: var(--color-app-bg);
-  --color-surface: var(--color-white);
-  --color-border: #999999;
-  --color-border-dark: #777777;
+  /* Primary Text & Background Colors (Design System) */
+  --text-primary: #1f1f1f;
+  --text-secondary: #777777;
+  --bg-main: #efefef;
+  --bg-white: #ffffff;
+  
+  /* Highlight & Interactive Colors */
+  --color-highlight: #f0e6f7;
+  --bg-toggle-active: #555555;
+  --color-icon-active-bg: #5422b0;
+  --color-icon-active-text: #ffffff;
+  --color-icon-default: #1f1f1f;
+  --color-icon-border: #5422b0;
+  
+  /* Border State Colors */
+  --color-border: #e0e0e0;
+  --color-border-active: #999999;
+  
+  /* Semantic Aliases for App Logic */
+  --color-primary: var(--accent-brand);
+  --color-background: var(--bg-main);
+  --color-surface: var(--bg-white);
   
   /* SSML Emphasis */
-  --color-emphasis: var(--color-indigo-bloom);
-  --color-pause: var(--color-indigo-bloom);
+  --color-emphasis: var(--accent-brand);
+  --color-pause: var(--accent-brand);
   
   /* Typography */
   --font-family-base: 'Inter', sans-serif;
@@ -61,7 +72,7 @@
 body {
   font-family: var(--font-family-base);
   background-color: var(--color-background);
-  color: var(--color-text-primary);
+  color: var(--text-primary);
   line-height: 1.5;
   -webkit-font-smoothing: antialiased;
 }

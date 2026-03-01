@@ -73,7 +73,7 @@
 
   .slider-label {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-weight: 500;
   }
 

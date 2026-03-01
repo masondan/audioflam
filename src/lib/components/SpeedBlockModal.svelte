@@ -48,7 +48,7 @@
   }
 
   .modal-content {
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: var(--radius-md);
     padding: var(--spacing-lg);
     max-width: 320px;
@@ -61,7 +61,7 @@
 
   .modal-message {
     font-size: var(--font-size-base);
-    color: var(--color-text-primary);
+    color: var(--text-primary);
     margin: 0;
     text-align: center;
     line-height: 1.5;
@@ -73,7 +73,7 @@
     background: var(--color-primary);
     border: none;
     border-radius: var(--radius-sm);
-    color: var(--color-white);
+    color: var(--bg-white);
     font-size: var(--font-size-sm);
     font-weight: 500;
     cursor: pointer;

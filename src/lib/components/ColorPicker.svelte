@@ -194,7 +194,7 @@
   }
 
   .color-picker {
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     padding: var(--spacing-md);
     width: 100%;

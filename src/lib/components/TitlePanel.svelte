@@ -338,7 +338,7 @@
     border-radius: var(--radius-md);
     font-family: var(--font-family-base);
     font-size: var(--font-size-base);
-    color: var(--color-text-primary);
+    color: var(--text-primary);
     resize: vertical;
     overflow-y: auto;
     min-height: 40px;
@@ -347,7 +347,7 @@
   }
 
   .title-input::placeholder {
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
   }
 
   .title-input:focus {
@@ -363,7 +363,7 @@
 
   .tab {
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     background: none;
     border: none;
     padding: 0;
@@ -390,7 +390,7 @@
 
   .font-btn {
     padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 1px solid #999999;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
@@ -403,7 +403,7 @@
   .font-btn.selected {
     border-color: var(--color-primary);
     border-width: 2px;
-    color: var(--color-text-primary);
+    color: var(--text-primary);
   }
 
   /* Style Tab */
@@ -446,7 +446,7 @@
   }
 
   .align-btn:hover {
-    background: var(--color-app-bg);
+    background: var(--bg-main);
   }
 
   .align-btn.active .align-icon {
@@ -471,7 +471,7 @@
   .toggle-option {
     padding: var(--spacing-xs) var(--spacing-sm);
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     background: transparent;
     border: none;
     cursor: pointer;
@@ -480,7 +480,7 @@
 
   .toggle-option.active {
     background: #999999;
-    color: var(--color-white);
+    color: var(--bg-white);
   }
 
   .slider {

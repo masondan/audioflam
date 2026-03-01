@@ -199,14 +199,14 @@ Export Button
 
 | Token | Value | Usage |
 |-------|-------|-------|
-| `--color-primary` / `--color-indigo-bloom` | `#5422b0` | Buttons, active states |
-| `--color-lavender-veil` | `#f0e6f7` | Highlights |
-| `--color-text-primary` | `#333333` | Body text |
-| `--color-text-secondary` | `#777777` | Hints, labels |
-| `--color-white` | `#ffffff` | Cards, surfaces |
-| `--color-app-bg` | `#efefef` | App background |
-| `--color-border` | `#e0e0e0` | Light borders |
-| `--color-border-dark` | `#777777` | Dark borders |
+| `--accent-brand` / `--color-primary` | `#5422b0` | Buttons, active states, brand color |
+| `--color-highlight` | `#f0e6f7` | Highlights, hover states |
+| `--text-primary` | `#1f1f1f` | Body text, labels |
+| `--text-secondary` | `#777777` | Hints, helper text, disabled states |
+| `--bg-white` | `#ffffff` | Card backgrounds, surfaces |
+| `--bg-main` | `#efefef` | App background |
+| `--color-border` | `#e0e0e0` | Dividers, inactive borders |
+| `--color-border-active` | `#999999` | Active/focus borders |
 
 ### Typography & Spacing
 

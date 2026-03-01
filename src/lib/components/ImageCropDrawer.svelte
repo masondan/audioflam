@@ -359,7 +359,7 @@
   }
 
   .crop-drawer {
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     width: 100%;
     max-width: 480px;
@@ -393,7 +393,7 @@
     border: none;
     font-size: var(--font-size-base);
     font-weight: 600;
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     cursor: pointer;
     padding: var(--spacing-xs) var(--spacing-sm);
     transition: color var(--transition-fast);
@@ -419,7 +419,7 @@
     aspect-ratio: auto;
     overflow: hidden;
     border-radius: var(--radius-md);
-    background: var(--color-app-bg);
+    background: var(--bg-main);
     touch-action: none;
     cursor: grab;
     user-select: none;
@@ -494,7 +494,7 @@
     align-items: center;
     justify-content: center;
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 1px solid var(--color-border);
     transition: all var(--transition-fast);
   }
@@ -517,7 +517,7 @@
 
   .ratio-label {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-weight: 500;
   }
 </style>

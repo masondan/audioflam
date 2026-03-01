@@ -1617,7 +1617,7 @@
     max-width: 480px;
     margin: 0 auto;
     min-height: 100vh;
-    background-color: var(--color-white);
+    background-color: var(--bg-white);
   }
 
   .tab-panel {
@@ -1630,7 +1630,7 @@
 
   .app-header {
     padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--color-border-dark);
+    border-bottom: 1px solid var(--text-secondary);
     display: flex;
     justify-content: space-between;
     align-items: center;
@@ -1654,7 +1654,7 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: 1px solid var(--color-border-dark);
+    border: 1px solid var(--text-secondary);
     cursor: pointer;
     transition: all var(--transition-fast);
   }
@@ -1861,7 +1861,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 3px solid #777777 !important;
     border-radius: 50%;
     cursor: pointer;
@@ -1886,7 +1886,7 @@
 
   .play-btn.active {
     border-color: var(--color-primary) !important;
-    background: var(--color-white);
+    background: var(--bg-white);
   }
 
   .play-btn.active .play-icon {
@@ -1904,7 +1904,7 @@
     position: absolute;
     inset: -3px;
     border-radius: 50%;
-    background: conic-gradient(from 0deg, var(--color-primary), var(--color-lavender-veil), var(--color-primary));
+    background: conic-gradient(from 0deg, var(--color-primary), var(--color-highlight), var(--color-primary));
     animation: spinner-rotate 1s linear infinite;
     z-index: 0;
   }
@@ -1914,7 +1914,7 @@
     position: absolute;
     inset: 0;
     border-radius: 50%;
-    background: var(--color-white);
+    background: var(--bg-white);
     z-index: 1;
   }
 
@@ -1944,8 +1944,8 @@
     padding: var(--spacing-md);
     border: none;
     border-radius: var(--radius-md);
-    background: var(--color-app-bg);
-    color: var(--color-text-secondary);
+    background: var(--bg-main);
+    color: var(--text-secondary);
     font-size: var(--font-size-base);
     font-weight: 600;
     cursor: not-allowed;
@@ -1954,7 +1954,7 @@
 
   .download-btn.enabled {
     background: var(--color-primary);
-    color: var(--color-white);
+    color: var(--bg-white);
     cursor: pointer;
   }
 
@@ -1969,7 +1969,7 @@
     margin-top: calc(-1 * var(--spacing-sm));
     border: none;
     background: transparent;
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-size: var(--font-size-sm);
     font-weight: 500;
     cursor: not-allowed;
@@ -1997,7 +1997,7 @@
   }
 
   .modal-content {
-    background: var(--color-white);
+    background: var(--bg-white);
     border-radius: var(--radius-lg);
     padding: var(--spacing-lg);
     width: 100%;
@@ -2008,7 +2008,7 @@
   .modal-title {
     font-size: var(--font-size-lg);
     font-weight: 600;
-    color: var(--color-text-primary);
+    color: var(--text-primary);
     margin: 0 0 var(--spacing-md) 0;
     text-align: center;
   }
@@ -2016,7 +2016,7 @@
   .modal-label {
     display: block;
     font-size: var(--font-size-sm);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     font-weight: 500;
     margin-bottom: var(--spacing-xs);
   }
@@ -2044,8 +2044,8 @@
 
   .filename-extension {
     padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-app-bg);
-    color: var(--color-text-secondary);
+    background: var(--bg-main);
+    color: var(--text-secondary);
     font-size: var(--font-size-base);
     border-left: 1px solid var(--color-border);
   }
@@ -2066,19 +2066,19 @@
   }
 
   .modal-btn.cancel {
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 1px solid var(--color-border);
-    color: var(--color-text-primary);
+    color: var(--text-primary);
   }
 
   .modal-btn.cancel:hover {
-    background: var(--color-app-bg);
+    background: var(--bg-main);
   }
 
   .modal-btn.confirm {
     background: var(--color-primary);
     border: none;
-    color: var(--color-white);
+    color: var(--bg-white);
   }
 
   .modal-btn.confirm:hover {
@@ -2101,7 +2101,7 @@
     padding: 12px var(--spacing-md);
     border: 1px solid #777777;
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     font-size: var(--font-size-sm);
     font-weight: 500;
     line-height: 1.5;
@@ -2126,7 +2126,7 @@
     top: calc(100% + 4px);
     left: 0;
     right: 0;
-    background: var(--color-white);
+    background: var(--bg-white);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     box-shadow: var(--shadow-md);
@@ -2157,12 +2157,12 @@
     cursor: pointer;
     text-align: left;
     font-size: var(--font-size-sm);
-    color: var(--color-text-primary);
+    color: var(--text-primary);
     transition: background var(--transition-fast);
   }
 
   .speaker-option:hover {
-    background: var(--color-lavender-veil);
+    background: var(--color-highlight);
   }
 
   .speaker-option.selected {
@@ -2224,7 +2224,7 @@
     flex: 1;
     padding: 12px var(--spacing-md);
     border: none;
-    background: var(--color-white);
+    background: var(--bg-white);
     color: var(--color-primary);
     font-size: var(--font-size-sm);
     font-weight: 500;
@@ -2235,18 +2235,18 @@
 
   .mode-toggle-btn.active {
     background: var(--color-primary);
-    color: var(--color-white);
+    color: var(--bg-white);
   }
 
   .mode-toggle-btn:not(.active):hover {
-    background: var(--color-lavender-veil);
+    background: var(--color-highlight);
   }
 
   /* Adjust Audio Section */
   .adjust-audio-section {
     border: 1px solid #777777;
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     overflow: hidden;
     margin-bottom: var(--spacing-md);
     transition: border-color var(--transition-normal);
@@ -2271,7 +2271,7 @@
   }
 
   .adjust-audio-header:hover:not(:disabled) {
-    background: var(--color-lavender-veil);
+    background: var(--color-highlight);
   }
 
   .adjust-audio-header:disabled {
@@ -2374,7 +2374,7 @@
 
   .slider-label {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     transition: color var(--transition-fast), font-weight var(--transition-fast);
     flex: 1;
     text-align: center;

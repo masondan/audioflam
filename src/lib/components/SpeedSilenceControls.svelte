@@ -178,7 +178,7 @@
     flex: 1;
     border: 1px solid #777777;
     border-radius: var(--radius-md);
-    background: var(--color-white);
+    background: var(--bg-white);
     overflow: hidden;
     transition: border-color var(--transition-fast);
   }
@@ -287,7 +287,7 @@
 
   .slider-label {
     font-size: var(--font-size-xs);
-    color: var(--color-text-secondary);
+    color: var(--text-secondary);
     transition: color var(--transition-fast), font-weight var(--transition-fast);
   }
 
