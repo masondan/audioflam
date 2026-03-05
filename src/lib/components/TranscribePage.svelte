@@ -717,7 +717,7 @@
     <div class="recording-box">
       <p class="recording-instructions">
         Tap Play to record. Tap Stop to end.<br />
-        Tap refresh to start again.
+        Delete audio to start again.
       </p>
       {#if micError}
         <p class="mic-error">{micError}</p>
