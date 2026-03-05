@@ -1391,11 +1391,8 @@
 
   function handleTitleFontChange(font: TitleFont) {
     titleFont = font;
-    if (font === 'Inter') {
-      titleBold = true;
-    } else if (font === 'Bebas Neue') {
-      titleBold = false;
-    }
+    // Inter font defaults to bold, all others default to regular
+    titleBold = font === 'Inter';
   }
 
   function handleTitleAlignChange(align: TitleAlign) {

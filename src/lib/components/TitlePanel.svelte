@@ -175,19 +175,20 @@
               <img src="/icons/icon-align-right.svg" alt="" class="align-icon" />
             </button>
           </div>
-          <div class="bold-toggle">
+          <div class="bold-button">
+            <span class="bold-label">Bold</span>
             <button
               type="button"
-              class="toggle-option"
-              class:active={!isBold}
-              onclick={() => onBoldChange(false)}
-            >Normal</button>
-            <button
-              type="button"
-              class="toggle-option"
+              class="icon-btn"
               class:active={isBold}
-              onclick={() => onBoldChange(true)}
-            >Bold</button>
+              onclick={() => onBoldChange(!isBold)}
+              aria-label="Toggle bold"
+              aria-pressed={isBold}
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24" class="bold-icon">
+                <path d="M8 11H12.5C13.8807 11 15 9.88071 15 8.5C15 7.11929 13.8807 6 12.5 6H8V11ZM18 15.5C18 17.9853 15.9853 20 13.5 20H6V4H12.5C14.9853 4 17 6.01472 17 8.5C17 9.70431 16.5269 10.7981 15.7564 11.6058C17.0979 12.3847 18 13.837 18 15.5ZM8 13V18H13.5C14.8807 18 16 16.8807 16 15.5C16 14.1193 14.8807 13 13.5 13H8Z"></path>
+              </svg>
+            </button>
           </div>
         </div>
 
@@ -299,7 +300,11 @@
               aria-label="Label color"
               style={labelEnabled ? `--selected-color: ${labelColor}` : ''}
             >
-              <span class="color-swatch" style="background: {labelColor}"></span>
+              {#if labelEnabled}
+                <span class="color-swatch" style="background: {labelColor}"></span>
+              {:else}
+                <span class="color-swatch rainbow"></span>
+              {/if}
             </button>
           </div>
         </div>
@@ -440,18 +445,30 @@
     align-items: center;
     justify-content: center;
     background: transparent;
-    border: none;
+    border: 1px solid #999999;
     cursor: pointer;
     border-radius: var(--radius-sm);
-    transition: background-color var(--transition-fast);
+    transition: all var(--transition-fast);
   }
 
   .align-btn:hover {
-    background: var(--bg-main);
+    background: transparent;
+  }
+
+  .align-btn.active {
+    background: #555555;
+    border-color: #555555;
+  }
+
+  .align-btn .align-icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(46%) sepia(0%) saturate(0%) brightness(70%) contrast(89%);
+    transition: filter var(--transition-fast);
   }
 
   .align-btn.active .align-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    filter: invert(100%) brightness(100%);
   }
 
   .align-icon {
@@ -461,27 +478,51 @@
     transition: filter var(--transition-fast);
   }
 
-  .bold-toggle {
+  .bold-button {
     display: flex;
-    border: 1px solid #999999;
-    border-radius: var(--radius-md);
-    overflow: hidden;
+    align-items: center;
+    gap: var(--spacing-sm);
     margin-left: auto;
   }
 
-  .toggle-option {
-    padding: var(--spacing-xs) var(--spacing-sm);
+  .bold-label {
     font-size: var(--font-size-sm);
-    color: var(--text-secondary);
-    background: transparent;
-    border: none;
-    cursor: pointer;
-    transition: all var(--transition-fast);
+    color: #1f1f1f;
+    white-space: nowrap;
   }
 
-  .toggle-option.active {
-    background: #999999;
-    color: var(--bg-white);
+  .icon-btn {
+    width: 36px;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: transparent;
+    border: 1px solid #999999;
+    cursor: pointer;
+    border-radius: var(--radius-sm);
+    transition: all var(--transition-fast);
+    padding: 0;
+  }
+
+  .icon-btn:hover {
+    background: transparent;
+  }
+
+  .icon-btn.active {
+    background: #555555;
+    border-color: #555555;
+  }
+
+  .bold-icon {
+    width: 24px;
+    height: 24px;
+    fill: #777777;
+    transition: fill var(--transition-fast);
+  }
+
+  .icon-btn.active .bold-icon {
+    fill: #ffffff;
   }
 
   .slider {
@@ -525,7 +566,7 @@
     height: 32px;
     padding: 0;
     background: transparent;
-    border: 1.5px solid transparent;
+    border: 1.5px solid #999999;
     border-radius: var(--radius-round);
     cursor: pointer;
     display: flex;
@@ -573,5 +614,6 @@
       #ff00ff,
       #ff0000
     );
+    border: none;
   }
 </style>

@@ -9,17 +9,18 @@
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
+  import TranscribePage from '$lib/components/TranscribePage.svelte';
   import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
-  type ActiveTab = 'tts' | 'audiogram';
+  type ActiveTab = 'tts' | 'audiogram' | 'transcribe';
 
   // Navigation state - restore from localStorage on mount
   let activeTab = $state<ActiveTab>('tts');
 
   onMount(() => {
     const saved = localStorage.getItem('activeTab');
-    if (saved === 'tts' || saved === 'audiogram') {
+    if (saved === 'tts' || saved === 'audiogram' || saved === 'transcribe') {
       activeTab = saved;
     }
   });
@@ -1214,6 +1215,16 @@
       >
         <img src="/icons/icon-audiogram.svg" alt="" class="nav-tab-icon" />
       </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={activeTab === 'transcribe'}
+        onclick={() => activeTab = 'transcribe'}
+        aria-label="Transcribe"
+        aria-pressed={activeTab === 'transcribe'}
+      >
+        <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
+      </button>
     </nav>
   </header>
 
@@ -1581,6 +1592,9 @@
     </div>
     <div class="tab-panel" class:hidden={activeTab !== 'audiogram'}>
       <AudiogramPage />
+    </div>
+    <div class="tab-panel" class:hidden={activeTab !== 'transcribe'}>
+      <TranscribePage />
     </div>
   </main>
 </div>

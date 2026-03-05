@@ -54,3 +54,11 @@ export interface PreloadedTTSAudio {
 	voiceName: string;
 }
 export const preloadedTTSAudio = writable<PreloadedTTSAudio | null>(null);
+
+// Transcription State
+export const transcriptionSettingsStore = writable({
+	multilingualEnabled: false,
+	quantized: true,
+	selectedLanguage: 'auto',
+	showTimestamps: false,
+});
