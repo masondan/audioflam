@@ -500,9 +500,9 @@
       };
 
       transcriptionStage = 'Starting engine…';
-      const pipe = await loadWhisperModel(options, (stage) => {
+      await loadWhisperModel(options, (stage) => {
         if (transcriptionCancelled) return;
-        transcriptionStage = stage === 'downloading' ? 'Downloading model…' : 'Model ready';
+        transcriptionStage = stage === 'downloading' ? 'Downloading engine…' : 'Model ready';
       });
 
       if (transcriptionCancelled) {
@@ -522,7 +522,7 @@
       );
 
       const result = await Promise.race([
-        transcribeAudio(trimmedBlob, pipe, selectedLanguage, (partial) => {
+        transcribeAudio(trimmedBlob, null, selectedLanguage, (partial) => {
           if (!transcriptionCancelled) {
             transcript = partial;
             wordCount = getWordCount(partial);

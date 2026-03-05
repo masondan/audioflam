@@ -1,7 +1,7 @@
-import { pipeline, env } from '@huggingface/transformers';
-
-// Disable local model check (always fetch from HuggingFace CDN)
-env.allowLocalModels = false;
+/**
+ * Transcription utility — thin wrapper around a Web Worker that runs Whisper.
+ * All heavy ML inference runs off the main thread, keeping the UI responsive.
+ */
 
 export interface TranscriptionOptions {
 	multilingualEnabled: boolean;
@@ -20,72 +20,117 @@ export interface TranscriptionResult {
 	segments: TranscriptionSegment[];
 }
 
+// --- Worker management ---
+
+let worker: Worker | null = null;
+
+function getWorker(): Worker {
+	if (!worker) {
+		worker = new Worker(
+			new URL('./transcription-worker.ts', import.meta.url),
+			{ type: 'module' }
+		);
+	}
+	return worker;
+}
+
 /**
- * Determine which Whisper model to use based on settings.
+ * Send a message to the worker and wait for a specific response type.
  */
+function workerRequest<T>(
+	message: any,
+	successTypes: string[],
+	onProgress?: (msg: any) => void
+): Promise<T> {
+	return new Promise((resolve, reject) => {
+		const w = getWorker();
+
+		const handler = (e: MessageEvent) => {
+			const msg = e.data;
+
+			if (msg.type === 'error') {
+				w.removeEventListener('message', handler);
+				reject(new Error(msg.error));
+				return;
+			}
+
+			if (msg.type === 'progress') {
+				onProgress?.(msg);
+				return;
+			}
+
+			if (successTypes.includes(msg.type)) {
+				w.removeEventListener('message', handler);
+				resolve(msg as T);
+			}
+		};
+
+		w.addEventListener('message', handler);
+		w.postMessage(message);
+	});
+}
+
+// --- Model name resolution ---
+
 function getModelName(multilingualEnabled: boolean): string {
 	return multilingualEnabled
 		? 'onnx-community/whisper-base'
 		: 'onnx-community/whisper-base.en';
 }
 
-let cachedPipeline: any = null;
-let cachedModelKey = '';
-
 /**
- * Load Whisper model. Caches pipeline to avoid re-downloading.
- * If settings change, releases old pipeline and loads new one.
+ * Load Whisper model in the worker. Caches across calls.
  */
 export async function loadWhisperModel(
 	options: TranscriptionOptions,
 	onProgress?: (stage: 'downloading' | 'loaded') => void
-): Promise<any> {
+): Promise<void> {
 	const modelName = getModelName(options.multilingualEnabled);
-	const modelKey = `${modelName}:${options.quantized}`;
 
-	if (cachedPipeline && cachedModelKey === modelKey) {
-		onProgress?.('loaded');
-		return cachedPipeline;
-	}
-
-	// Release previous pipeline
-	if (cachedPipeline) {
-		try {
-			await cachedPipeline.dispose();
-		} catch {
-			// ignore disposal errors
+	await workerRequest(
+		{ type: 'load', modelName, quantized: options.quantized },
+		['loaded'],
+		(msg) => {
+			if (msg.stage === 'downloading') onProgress?.('downloading');
 		}
-		cachedPipeline = null;
-		cachedModelKey = '';
-	}
+	);
 
-	onProgress?.('downloading');
-
-	const pipe = await pipeline('automatic-speech-recognition', modelName, {
-		dtype: options.quantized ? 'q8' : 'fp32',
-	});
-
-	cachedPipeline = pipe;
-	cachedModelKey = modelKey;
 	onProgress?.('loaded');
-	return pipe;
 }
 
 /**
- * Transcribe audio using a loaded Whisper pipeline.
- * Returns full transcript with segment timing data.
+ * Transcribe audio via the worker.
+ * Audio decoding happens on the main thread (Web Audio API not available in workers),
+ * then the raw Float32Array is sent to the worker for inference.
  */
 export async function transcribeAudio(
 	audioBlob: Blob,
-	whisperPipeline: any,
+	_pipeline: any, // ignored — kept for API compat, worker holds the pipeline
 	language: string,
 	onProgress?: (partialText: string) => void
 ): Promise<TranscriptionResult> {
-	// Convert blob to Float32Array (Whisper expects 16kHz mono)
-	const arrayBuffer = await audioBlob.arrayBuffer();
-	const audioContext = new OfflineAudioContext(1, 1, 16000);
+	// Decode and resample to 16kHz mono on the main thread
+	const audioData = await decodeToFloat32(audioBlob);
 
-	// Decode and resample to 16kHz mono
+	// Send to worker for inference
+	const response = await workerRequest<{ type: string; segments: TranscriptionSegment[] }>(
+		{ type: 'transcribe', audioData, language },
+		['result']
+	);
+
+	const segments = response.segments;
+	const fullText = segmentsToParagraphs(segments);
+	onProgress?.(fullText);
+
+	return { text: fullText, segments };
+}
+
+/**
+ * Decode an audio blob to 16kHz mono Float32Array for Whisper.
+ */
+async function decodeToFloat32(audioBlob: Blob): Promise<Float32Array> {
+	const arrayBuffer = await audioBlob.arrayBuffer();
+
 	const tempContext = new AudioContext();
 	const decoded = await tempContext.decodeAudioData(arrayBuffer);
 	await tempContext.close();
@@ -96,50 +141,13 @@ export async function transcribeAudio(
 	source.connect(offlineCtx.destination);
 	source.start(0);
 	const resampled = await offlineCtx.startRendering();
-	const audioData = resampled.getChannelData(0);
-
-	const transcriptionOptions: any = {
-		return_timestamps: true,
-		chunk_length_s: 30,
-		stride_length_s: 5,
-	};
-
-	// Set language for multilingual model
-	if (language !== 'auto' && language !== 'en') {
-		transcriptionOptions.language = language;
-	}
-
-	const result = await whisperPipeline(audioData, transcriptionOptions);
-
-	const segments: TranscriptionSegment[] = [];
-	let fullText = '';
-
-	if (result.chunks && Array.isArray(result.chunks)) {
-		for (const chunk of result.chunks) {
-			const segText = (chunk.text || '').trim();
-			if (segText) {
-				segments.push({
-					text: segText,
-					start: chunk.timestamp?.[0] ?? 0,
-					end: chunk.timestamp?.[1] ?? 0,
-				});
-			}
-		}
-		// Group segments into paragraphs (~every 3–5 segments for readability)
-		fullText = segmentsToParagraphs(segments);
-		onProgress?.(fullText);
-	} else {
-		fullText = (result.text || '').trim();
-		segments.push({ text: fullText, start: 0, end: 0 });
-		onProgress?.(fullText);
-	}
-
-	return { text: fullText, segments };
+	return resampled.getChannelData(0);
 }
 
+// --- Paragraph formatting ---
+
 /**
- * Group segments into paragraphs for readability.
- * Creates a paragraph break roughly every 4-5 sentences or ~30 seconds of audio.
+ * Group segments into paragraphs for readability (~30 seconds per paragraph).
  */
 function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	if (segments.length === 0) return '';
@@ -147,13 +155,12 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	const paragraphs: string[] = [];
 	let currentParagraph: string[] = [];
 	let paragraphStartTime = segments[0]?.start ?? 0;
-	const PARAGRAPH_INTERVAL = 30; // seconds
+	const PARAGRAPH_INTERVAL = 30;
 
 	for (const seg of segments) {
 		currentParagraph.push(seg.text);
 		const elapsed = seg.end - paragraphStartTime;
 
-		// Break paragraph after ~30s of audio or if segment ends with sentence-ending punctuation
 		if (elapsed >= PARAGRAPH_INTERVAL && currentParagraph.length >= 2) {
 			paragraphs.push(currentParagraph.join(' '));
 			currentParagraph = [];
@@ -170,7 +177,6 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 
 /**
  * Format transcript with timestamps from segment data.
- * Groups segments into paragraphs with timestamp at the start of each.
  */
 export function addTimestampsToTranscript(segments: TranscriptionSegment[]): string {
 	if (segments.length === 0) return '';
@@ -222,17 +228,15 @@ export function getWordCount(text: string): number {
 }
 
 /**
- * Release cached model to free memory.
+ * Release cached model in the worker to free memory.
  */
 export async function releaseModel(): Promise<void> {
-	if (cachedPipeline) {
+	if (worker) {
 		try {
-			await cachedPipeline.dispose();
+			await workerRequest({ type: 'release' }, ['released']);
 		} catch {
 			// ignore
 		}
-		cachedPipeline = null;
-		cachedModelKey = '';
 	}
 }
 
