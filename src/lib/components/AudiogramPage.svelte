@@ -155,6 +155,9 @@
   let hasImage = $derived(imageData !== null);
   let canDownload = $derived(hasImage && hasAudio);
   let isMicActive = $derived(recordingPhase !== 'idle');
+  
+  // Training mode: hide cloud transcode button via localStorage
+  let isTrainingMode = $derived(typeof localStorage !== 'undefined' ? localStorage.getItem('showCloudTranscodeButton') === 'false' : false);
 
   let waveformConfig = $derived<WaveformConfig | null>(
     waveformActive ? {
@@ -1810,11 +1813,13 @@
     <p class="download-hint">
       Local processing works on most devices. If not, we'll convert in the cloud (a few extra seconds). You'll see a progress indicator.
     </p>
-    <!-- Test mode: force cloud transcoding (remove after testing) -->
-    <label class="test-checkbox">
-      <input type="checkbox" bind:checked={forceCloudTranscode} />
-      <span>Test: Force cloud transcode</span>
-    </label>
+    <!-- Test mode: force cloud transcoding (hidden during training via localStorage) -->
+    {#if !isTrainingMode}
+      <label class="test-checkbox">
+        <input type="checkbox" bind:checked={forceCloudTranscode} />
+        <span>Test: Force cloud transcode</span>
+      </label>
+    {/if}
   </div>
 </div>
 
