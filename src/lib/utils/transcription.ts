@@ -147,8 +147,8 @@ async function decodeToFloat32(audioBlob: Blob): Promise<Float32Array> {
 // --- Paragraph formatting ---
 
 /**
- * Group segments into paragraphs for readability (~15 seconds per paragraph).
- * Shorter interval works better for TTS-generated audio with minimal natural pauses.
+ * Group segments into paragraphs for readability (~30 seconds per paragraph).
+ * TTS audio now includes SSML breaks after sentences, creating natural pause points.
  */
 function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	if (segments.length === 0) return '';
@@ -156,7 +156,7 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	const paragraphs: string[] = [];
 	let currentParagraph: string[] = [];
 	let paragraphStartTime = segments[0]?.start ?? 0;
-	const PARAGRAPH_INTERVAL = 15;
+	const PARAGRAPH_INTERVAL = 30;
 
 	for (const seg of segments) {
 		currentParagraph.push(seg.text);
@@ -183,7 +183,7 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 export function addTimestampsToTranscript(segments: TranscriptionSegment[], currentText?: string): string {
 	if (segments.length === 0) return '';
 
-	const PARAGRAPH_INTERVAL = 15;
+	const PARAGRAPH_INTERVAL = 30;
 
 	// If the user has manually edited paragraphs, preserve them
 	if (currentText && currentText.includes('\n\n')) {
