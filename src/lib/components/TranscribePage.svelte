@@ -635,7 +635,7 @@
   // --- Transcript display ---
   let displayTranscript = $derived(
     showTimestamps && transcriptSegments.length > 0
-      ? addTimestampsToTranscript(transcriptSegments)
+      ? addTimestampsToTranscript(transcriptSegments, transcript)
       : transcript
   );
 

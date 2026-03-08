@@ -147,7 +147,8 @@ async function decodeToFloat32(audioBlob: Blob): Promise<Float32Array> {
 // --- Paragraph formatting ---
 
 /**
- * Group segments into paragraphs for readability (~30 seconds per paragraph).
+ * Group segments into paragraphs for readability (~15 seconds per paragraph).
+ * Shorter interval works better for TTS-generated audio with minimal natural pauses.
  */
 function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	if (segments.length === 0) return '';
@@ -155,7 +156,7 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 	const paragraphs: string[] = [];
 	let currentParagraph: string[] = [];
 	let paragraphStartTime = segments[0]?.start ?? 0;
-	const PARAGRAPH_INTERVAL = 30;
+	const PARAGRAPH_INTERVAL = 15;
 
 	for (const seg of segments) {
 		currentParagraph.push(seg.text);
@@ -177,14 +178,22 @@ function segmentsToParagraphs(segments: TranscriptionSegment[]): string {
 
 /**
  * Format transcript with timestamps from segment data.
+ * Preserves manual paragraph breaks if they already exist in the transcript text.
  */
-export function addTimestampsToTranscript(segments: TranscriptionSegment[]): string {
+export function addTimestampsToTranscript(segments: TranscriptionSegment[], currentText?: string): string {
 	if (segments.length === 0) return '';
 
+	const PARAGRAPH_INTERVAL = 15;
+
+	// If the user has manually edited paragraphs, preserve them
+	if (currentText && currentText.includes('\n\n')) {
+		return preserveManualBreaksWithTimestamps(segments, currentText);
+	}
+
+	// Otherwise, auto-generate paragraphs using interval-based logic
 	const paragraphs: string[] = [];
 	let currentSegments: TranscriptionSegment[] = [];
 	let paragraphStartTime = segments[0]?.start ?? 0;
-	const PARAGRAPH_INTERVAL = 30;
 
 	for (const seg of segments) {
 		currentSegments.push(seg);
@@ -206,6 +215,37 @@ export function addTimestampsToTranscript(segments: TranscriptionSegment[]): str
 	}
 
 	return paragraphs.join('\n\n');
+}
+
+/**
+ * Add timestamps to manually-edited paragraphs, preserving user's manual breaks.
+ */
+function preserveManualBreaksWithTimestamps(segments: TranscriptionSegment[], text: string): string {
+	// Split text into manually-created paragraphs (already has \n\n breaks)
+	const manualParagraphs = text.split('\n\n').map(p => p.trim()).filter(p => p.length > 0);
+
+	// For each manual paragraph, find the first segment and add timestamp
+	const timestampedParagraphs: string[] = [];
+	let segmentIndex = 0;
+
+	for (const para of manualParagraphs) {
+		if (segmentIndex >= segments.length) break;
+
+		// Get timestamp from first segment in this paragraph
+		const ts = formatTimestamp(segments[segmentIndex].start);
+		const timestampedPara = `[${ts}] ${para}`;
+		timestampedParagraphs.push(timestampedPara);
+
+		// Advance segment index past all segments contained in this paragraph
+		const paraWords = para.split(/\s+/).length;
+		let wordCount = 0;
+		while (segmentIndex < segments.length && wordCount < paraWords) {
+			wordCount += segments[segmentIndex].text.split(/\s+/).length;
+			segmentIndex++;
+		}
+	}
+
+	return timestampedParagraphs.join('\n\n');
 }
 
 function formatTimestamp(seconds: number): string {
