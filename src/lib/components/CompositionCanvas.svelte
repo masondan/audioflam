@@ -175,7 +175,7 @@
       'Inter': "'Inter', sans-serif",
       'Lora': "'Lora', serif",
       'Roboto Slab': "'Roboto Slab', serif",
-      'Saira Condensed': "'Saira Condensed', sans-serif",
+      'Saira': "'Saira', sans-serif",
       'Playfair Display': "'Playfair Display', serif",
       'Bebas Neue': "'Bebas Neue', sans-serif"
     };

@@ -1,7 +1,7 @@
 <script lang="ts">
   import ColorPicker from './ColorPicker.svelte';
 
-  export type TitleFont = 'Inter' | 'Lora' | 'Roboto Slab' | 'Saira Condensed' | 'Playfair Display' | 'Bebas Neue';
+  export type TitleFont = 'Inter' | 'Lora' | 'Roboto Slab' | 'Saira' | 'Playfair Display' | 'Bebas Neue';
   export type TitleAlign = 'left' | 'center' | 'right';
 
   interface Props {
@@ -66,7 +66,7 @@
     { id: 'Inter', label: 'Inter', family: "'Inter', sans-serif" },
     { id: 'Lora', label: 'Lora', family: "'Lora', serif" },
     { id: 'Roboto Slab', label: 'Roboto', family: "'Roboto Slab', serif" },
-    { id: 'Saira Condensed', label: 'Saira', family: "'Saira Condensed', sans-serif" },
+    { id: 'Saira', label: 'Saira', family: "'Saira', sans-serif" },
     { id: 'Playfair Display', label: 'Playfair', family: "'Playfair Display', serif" },
     { id: 'Bebas Neue', label: 'BEBAS', family: "'Bebas Neue', sans-serif" }
   ];
