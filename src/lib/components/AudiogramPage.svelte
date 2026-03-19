@@ -1651,7 +1651,9 @@
         disabled={!hasAudio || isMicActive || isExporting}
         aria-label="Skip back 5 seconds"
       >
-        <img src="/icons/icon-back-five.svg" alt="" class="control-icon" />
+        <svg class="control-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M7 4C7.55228 4 8 4.44772 8 5V11.3333L18.2227 4.51823C18.4524 4.36506 18.7628 4.42714 18.916 4.65691C18.9708 4.73904 19 4.83555 19 4.93426V19.0657C19 19.3419 18.7761 19.5657 18.5 19.5657C18.4013 19.5657 18.3048 19.5365 18.2227 19.4818L8 12.6667V19C8 19.5523 7.55228 20 7 20C6.44772 20 6 19.5523 6 19V5C6 4.44772 6.44772 4 7 4ZM17 7.73703L10.6056 12L17 16.263V7.73703Z"></path>
+        </svg>
       </button>
 
       <button
@@ -1670,17 +1672,19 @@
             class="play-icon countdown-icon"
           />
         {:else if recordingPhase === 'recording'}
-          <img
-            src="/icons/icon-stop-fill.svg"
-            alt=""
-            class="play-icon"
-          />
+          <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+            <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM7 7H17V17H7V7Z"></path>
+          </svg>
         {:else}
-          <img
-            src={isPlaying ? '/icons/icon-pause-fill.svg' : '/icons/icon-play-fill.svg'}
-            alt=""
-            class="play-icon"
-          />
+          {#if isPlaying}
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM9 9V15H11V9H9ZM13 9V15H15V9H13Z"></path>
+            </svg>
+          {:else}
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM10.6219 8.41459C10.5562 8.37078 10.479 8.34741 10.4 8.34741C10.1791 8.34741 10 8.52649 10 8.74741V15.2526C10 15.3316 10.0234 15.4088 10.0672 15.4745C10.1897 15.6583 10.4381 15.708 10.6219 15.5854L15.5008 12.3328C15.5447 12.3035 15.5824 12.2658 15.6117 12.2219C15.7343 12.0381 15.6846 11.7897 15.5008 11.6672L10.6219 8.41459Z"></path>
+            </svg>
+          {/if}
         {/if}
       </button>
 
@@ -1691,7 +1695,9 @@
         disabled={!hasAudio || isMicActive || isExporting}
         aria-label="Skip forward 5 seconds"
       >
-        <img src="/icons/icon-forward-five.svg" alt="" class="control-icon" />
+        <svg class="control-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+          <path d="M16 12.6667L5.77735 19.4818C5.54759 19.6349 5.23715 19.5729 5.08397 19.3431C5.02922 19.261 5 19.1645 5 19.0657V4.93426C5 4.65812 5.22386 4.43426 5.5 4.43426C5.59871 4.43426 5.69522 4.46348 5.77735 4.51823L16 11.3333V5C16 4.44772 16.4477 4 17 4C17.5523 4 18 4.44772 18 5V19C18 19.5523 17.5523 20 17 20C16.4477 20 16 19.5523 16 19V12.6667ZM7 7.73703V16.263L13.3944 12L7 7.73703Z"></path>
+        </svg>
       </button>
     </div>
 
@@ -2192,18 +2198,18 @@
   }
 
   .control-btn:hover:not(:disabled) .control-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .control-btn.mic.active .control-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .control-icon {
     width: 32px;
     height: 32px;
-    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
-    transition: filter var(--transition-fast);
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
   }
 
   .play-btn {
@@ -2232,8 +2238,7 @@
   }
 
   .play-btn.active .play-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
-    -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .play-btn.active:disabled {
@@ -2241,8 +2246,7 @@
   }
 
   .play-btn.active:disabled .play-icon {
-    filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
-    -webkit-filter: invert(46%) sepia(0%) saturate(0%) brightness(97%) contrast(89%);
+    color: var(--text-secondary);
   }
 
   .play-btn.playing {
@@ -2250,16 +2254,15 @@
   }
 
   .play-btn.playing .play-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .play-icon {
     width: 40px;
     height: 40px;
-    filter: brightness(0) saturate(100%) invert(20%);
-    transition: filter var(--transition-fast);
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
     display: block;
-    -webkit-filter: brightness(0) saturate(100%) invert(20%);
   }
 
   .toggle-panels {

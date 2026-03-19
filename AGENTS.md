@@ -1,8 +1,8 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam  
-**Status:** Production (Step 15 - Waveform Export Parity Complete)  
-**Updated:** February 2026
+**Status:** Production (Waveform Export Parity Complete)
+**Updated:** March 2026
 
 ---
 
@@ -43,6 +43,7 @@ src/
 │       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT)
 │       └── transcode/+server.ts  # Cloud video transcoding (NEW)
 ├── lib/
+│   ├── audioProcessing.ts        # Audio processing utilities
 │   ├── stores.ts                 # Voice definitions, app state
 │   ├── components/
 │   │   ├── VoiceDropdown.svelte  # Voice selector
@@ -50,6 +51,7 @@ src/
 │   │   ├── CompositionCanvas.svelte # Canvas preview/export
 │   │   ├── ImageCropDrawer.svelte # Image crop overlay
 │   │   ├── AudioImport.svelte    # Audio upload + waveform
+│   │   ├── Dropdown.svelte       # Reusable dropdown component
 │   │   ├── WaveformPanel.svelte  # Waveform settings
 │   │   ├── TitlePanel.svelte     # Title text/font/style
 │   │   ├── LightEffectPanel.svelte # Bokeh effect controls
@@ -59,20 +61,27 @@ src/
 │   │   ├── SpeedSilenceControls.svelte # Speed + silence trim
 │   │   ├── SilenceSlider.svelte  # Silence detection
 │   │   ├── SpeedBlockModal.svelte # Speed warning modal
+│   │   ├── TranscribePage.svelte # Transcription UI
 │   │   └── [other UI components]
-│   └── utils/
-│       ├── waveform.ts           # FFT preprocessing + rendering (precomputeFrequencyFrames)
-│       ├── compositor.ts         # Canvas layer composition
-│       ├── video-export.ts       # Export orchestration (smartExportVideo)
-│       ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
-│       ├── timestretch.ts        # Audio speed adjustment
-│       └── recording.ts          # MediaRecorder wrapper
+│   ├── utils/
+│   │   ├── compositor.ts         # Canvas layer composition
+│   │   ├── recording.ts          # MediaRecorder wrapper
+│   │   ├── timestretch.ts        # Audio speed adjustment
+│   │   ├── waveform.ts           # FFT preprocessing + rendering (precomputeFrequencyFrames)
+│   │   ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
+│   │   ├── video-export.ts       # Export orchestration (smartExportVideo)
+│   │   ├── transcription-worker.ts # Transcription worker
+│   │   └── transcription.ts      # Transcription utilities
+│   └── server/                   # Server-side utilities
+│       ├── audioNormalize.ts     # Audio normalization
+│       └── silenceRemoval.ts     # Silence removal logic
 ├── app.css                       # Global styles + CSS variables
 └── app.html                      # HTML template
 
 static/
-├── icons/                        # SVG icons (22 for audiogram)
-└── robots.txt                    # Disallow: / (no indexing)
+  ├── icons/                        # SVG icons (22 for audiogram)
+  ├── fonts/                        # Self-hosted fonts
+  └── robots.txt                    # Disallow: / (no indexing)
 ```
 
 ---
@@ -301,9 +310,7 @@ All CSS variables defined in `src/app.css`.
 
 ## Current Phase Focus
 
-**Step 15 - Waveform Export Parity Complete**
-
-✅ **Complete:**
+✅ **Completed:**
 - TTS with Azure + YarnGPT
 - Full Audiogram creation (image, audio, waveform, title, effects)
 - **Waveform visual parity:** Preview and export waveforms now match exactly via pre-computed FFT frames
@@ -317,7 +324,7 @@ All CSS variables defined in `src/app.css`.
 - Export pipeline passes pre-computed frames to `renderFrame(currentTime)` callback for frame-accurate rendering
 - Eliminates visual mismatch between live preview and exported MP4 (was caused by synthetic sine-wave generation)
 
-**Next Phase (Phase 2 - Future):**
+**Future Development:**
 - TTS→Audiogram one-click integration (store exists, UI not wired)
 - Enhanced iOS fallback with better error guidance
 - Performance optimization (OffscreenCanvas for preview)
@@ -400,7 +407,7 @@ All CSS variables defined in `src/app.css`.
 ### 6. Breaking XML Escaping in SSML
 **Reality:** User text embedded in SSML XML without escaping = potential injection. Function exists to fix this.
 
-**File:** Check TTS handler for `escapeXml()` or equivalent.
+**File:** `src/routes/api/tts/+server.ts` - Check for `escapeXml()` or equivalent.
 
 ---
 
@@ -431,46 +438,46 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## How to Navigate by Task
+## Navigating the Codebase by Task
 
-### I'm starting work on AudioFlam
+### Getting Started with AudioFlam
 1. **Read this file (AGENTS.md)** - 5 minutes for complete overview
 2. **Check "Critical Rules & Gotchas"** - Avoid breaking patterns
 3. **Check "Common Pitfalls for Agents"** - Learn from past mistakes
 4. **Bookmark `/docs/TROUBLESHOOTING.md`** - For debugging later
 
-### I need to implement a TTS change
+### Implementing TTS Changes
 1. Start: `src/routes/api/tts/+server.ts` (handler)
 2. Reference: `src/lib/stores.ts` (voice definitions)
 3. UI: `src/routes/+page.svelte` (TTS panel)
 4. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
-### I need to implement an Audiogram change
+### Implementing Audiogram Changes
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
 2. UI logic: Individual panel components (WaveformPanel, TitlePanel, etc.)
 3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
 4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
 5. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
 
-### I need to implement an Export change
+### Implementing Export Changes
 1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
 2. Branch A (WebCodecs): `src/lib/utils/webcodecs-export.ts`
 3. Branch B (MediaRecorder): `src/lib/utils/video-export.ts:exportCanvasVideoLegacy()`
 4. Branch C (Cloud): `src/routes/api/transcode/+server.ts`
 5. Consult: TROUBLESHOOTING.md → Export Issues + ARCHITECTURE.md
 
-### I need to make Design/CSS changes
+### Implementing Design/CSS Changes
 1. Colors/spacing: `src/app.css` (CSS variables)
 2. Icons: `static/icons/` (SVG files)
 3. Components: Individual `.svelte` files (use design tokens)
 
-### I'm debugging an issue
+### Debugging Issues
 1. **Search TROUBLESHOOTING.md** for your symptom
 2. Check "Debug steps" section for your issue
 3. Check "Critical Rules & Gotchas" in this file
 4. Check console logs for prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`
 
-### I want to understand a design decision
+### Understanding Design Decisions
 1. Check this file → "Architecture Decision Log" section
 2. For deep dives: see "Useful References" for archive docs
 
@@ -521,7 +528,7 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## Questions? Need Help?
+## Agent Guidance
 
 **This file (AGENTS.md) is your primary reference. It should answer 90% of questions:**
 
@@ -535,7 +542,7 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## Phase 2 Future: TTS→Audiogram Integration
+## Future Development: TTS→Audiogram Integration
 
 **Vision:** Users generate TTS audio, then one-click to create audiogram without manual download/upload cycle.
 
@@ -551,7 +558,7 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## Questions? Need Clarification?
+## Further Assistance
 
 This document should answer 90% of questions. If not, check:
 1. **Architecture**: `docs/ARCHITECTURE.md`
@@ -561,5 +568,5 @@ This document should answer 90% of questions. If not, check:
 
 ---
 
-**Last Updated:** February 2026  
+**Last Updated:** February 2026
 **Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete.

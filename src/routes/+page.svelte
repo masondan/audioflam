@@ -1441,9 +1441,13 @@
           disabled={!hasTextInput || $textInput.length > 4000}
         >
           {#if isPlaying || loading}
-            <img src="/icons/icon-pause-fill.svg" alt="Pause" class="play-icon" />
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM9 9V15H11V9H9ZM13 9V15H15V9H13Z"></path>
+            </svg>
           {:else}
-            <img src="/icons/icon-play-fill.svg" alt="Play" class="play-icon" />
+            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM10.6219 8.41459C10.5562 8.37078 10.479 8.34741 10.4 8.34741C10.1791 8.34741 10 8.52649 10 8.74741V15.2526C10 15.3316 10.0234 15.4088 10.0672 15.4745C10.1897 15.6583 10.4381 15.708 10.6219 15.5854L15.5008 12.3328C15.5447 12.3035 15.5824 12.2658 15.6117 12.2219C15.7343 12.0381 15.6846 11.7897 15.5008 11.6672L10.6219 8.41459Z"></path>
+            </svg>
           {/if}
         </button>
 
@@ -1893,12 +1897,11 @@
   .play-btn .play-icon {
     width: 40px;
     height: 40px;
-    filter: brightness(0) saturate(100%) invert(47%);
-    transition: filter var(--transition-fast);
+    color: var(--text-secondary);
+    transition: color var(--transition-fast);
     position: relative;
     z-index: 2;
     display: block;
-    -webkit-filter: brightness(0) saturate(100%) invert(47%);
   }
 
   .play-btn.active {
@@ -1907,8 +1910,7 @@
   }
 
   .play-btn.active .play-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
-    -webkit-filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .play-btn.loading {
@@ -1937,7 +1939,7 @@
 
   .play-btn.loading .play-icon,
   .play-btn.playing .play-icon {
-    filter: invert(15%) sepia(95%) saturate(4500%) hue-rotate(260deg) brightness(85%) contrast(95%);
+    color: var(--color-primary);
   }
 
   .play-btn.playing {
