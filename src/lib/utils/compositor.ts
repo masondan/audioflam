@@ -142,7 +142,32 @@ export function renderImageLayer(
   canvasWidth: number,
   canvasHeight: number
 ): void {
-  ctx.drawImage(image, 0, 0, canvasWidth, canvasHeight);
+  const imageWidth = image.naturalWidth;
+  const imageHeight = image.naturalHeight;
+  
+  // Calculate aspect ratios
+  const imageAspect = imageWidth / imageHeight;
+  const canvasAspect = canvasWidth / canvasHeight;
+  
+  let drawWidth: number;
+  let drawHeight: number;
+  let drawX = 0;
+  let drawY = 0;
+  
+  // Maintain aspect ratio: fit image to canvas with no distortion
+  if (imageAspect > canvasAspect) {
+    // Image is wider relative to canvas: constrain by height
+    drawHeight = canvasHeight;
+    drawWidth = canvasHeight * imageAspect;
+    drawX = (canvasWidth - drawWidth) / 2; // Center horizontally
+  } else {
+    // Image is taller relative to canvas: constrain by width
+    drawWidth = canvasWidth;
+    drawHeight = canvasWidth / imageAspect;
+    drawY = (canvasHeight - drawHeight) / 2; // Center vertically
+  }
+  
+  ctx.drawImage(image, drawX, drawY, drawWidth, drawHeight);
 }
 
 export function renderFrame(
