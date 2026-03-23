@@ -1193,7 +1193,10 @@
 
 <div class="app-container">
   <header class="app-header">
-    <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
+    <div class="header-left">
+      <flam-nav current="audioflam"></flam-nav>
+      <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
+    </div>
     <nav class="nav-tabs">
       <button
         type="button"
@@ -1652,6 +1655,12 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
+  }
+
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
   }
 
   .logotype {
