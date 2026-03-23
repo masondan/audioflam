@@ -1,4 +1,4 @@
-# FlamTools Codebase Review & Refactoring Strategy
+compare # FlamTools Codebase Review & Refactoring Strategy
 **Created:** March 20, 2026  
 **Scope:** PromptFlam, PicFlam, AudioFlam, ChartFlam, MapFlam  
 **Status:** Complete Analysis
