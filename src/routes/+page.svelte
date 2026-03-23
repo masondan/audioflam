@@ -1664,7 +1664,7 @@
   }
 
   .logotype {
-    height: 30px;
+    height: 26px;
     width: auto;
   }
 
@@ -1674,31 +1674,30 @@
   }
 
   .nav-tab-btn {
-    width: 40px;
-    height: 40px;
+    width: 36px;
+    height: 36px;
     border-radius: var(--radius-round);
     display: flex;
     align-items: center;
     justify-content: center;
-    background: transparent;
-    border: 1px solid var(--color-icon-border);
+    background-color: #f0f0f0;
+    border: none;
     cursor: pointer;
-    transition: all var(--transition-fast);
+    transition: background-color var(--transition-fast);
   }
 
   .nav-tab-btn:hover {
-    border-color: var(--color-icon-border);
+    background-color: #e4e4e4;
   }
 
   .nav-tab-btn.active {
     background: var(--color-primary);
-    border: 1px solid var(--color-primary);
   }
 
   .nav-tab-icon {
-    width: 24px;
-    height: 24px;
-    filter: invert(0.3);
+    width: 22px;
+    height: 22px;
+    filter: brightness(0) saturate(100%) invert(25%) sepia(0%) saturate(0%) brightness(100%) contrast(90%);
   }
 
   .nav-tab-btn.active .nav-tab-icon {
