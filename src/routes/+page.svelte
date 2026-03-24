@@ -1651,7 +1651,7 @@
 
   .app-header {
     padding: var(--spacing-md) var(--spacing-lg);
-    border-bottom: 1px solid var(--text-secondary);
+    border-bottom: 1px solid var(--color-border);
     display: flex;
     justify-content: space-between;
     align-items: center;
