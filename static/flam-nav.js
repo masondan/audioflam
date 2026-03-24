@@ -166,7 +166,7 @@ class FlamNav extends HTMLElement {
 
 				.drawer-header {
 					padding: 20px 16px 12px;
-					border-bottom: 1px solid #eee;
+					border-bottom: 1px solid #e0e0e0;
 				}
 
 				.drawer-header a {
