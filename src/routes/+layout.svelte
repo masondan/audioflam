@@ -17,15 +17,15 @@
 		justify-content: center;
 		align-items: flex-start;
 		min-height: 100vh;
-		padding: var(--spacing-lg);
+		padding: 0;
 		background: var(--color-background);
 	}
 
 	.app-viewport {
 		width: 100%;
 		max-width: 480px;
+		min-height: 100vh;
 		background: var(--color-surface);
-		border-radius: var(--radius-md);
 		box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.05), var(--shadow-lg);
 		overflow: hidden;
 	}
