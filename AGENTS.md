@@ -568,5 +568,89 @@ This document should answer 90% of questions. If not, check:
 
 ---
 
-**Last Updated:** February 2026
+## Manifest & PWA Configuration Brief
+
+Objectives:
+- Remove unwanted "Install App?" prompts when launching sub-apps from FlamTools
+- Remove browser chrome (header/close button/URL bar) when app is open
+- Ensure proper sharing metadata (OG tags) for social media & messaging apps
+
+### Manifest.json Checklist
+
+Manifest location: `static/manifest.json` (served at `/manifest.json` via SvelteKit static folder)
+
+Each app must have static/manifest.json with:
+
+```json
+{
+  "name": "[AppName]",
+  "short_name": "[AppName]",
+  "description": "[Brief description]",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#5422B0",
+  "theme_color": "#5422B0",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/[icons-or-logos]/[app-icon].png",
+      "sizes": "512x512",
+      "type": "image/png"
+    },
+    {
+      "src": "/[icons-or-logos]/[app-maskable].png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}
+```
+
+**Key settings:**
+- `"display": "standalone"` — removes browser chrome when installed
+- `"scope": "/"` — ensures proper PWA scope
+- `"theme_color"` & `"background_color"` — both should be `#5422B0`
+- `maskable` icon — for adaptive icon support on Android
+
+### Meta Tags (in `<head>` or `app.html`)
+
+Verify these exist:
+
+```html
+<meta name="theme-color" content="#5422B0" />
+<meta name="description" content="[Description]" />
+
+<!-- Open Graph (for sharing) -->
+<meta property="og:title" content="[AppName]" />
+<meta property="og:description" content="[Description]" />
+<meta property="og:image" content="https://[app].flamtools.com/[icons-or-logos]/[og-image].png" />
+<meta property="og:type" content="website" />
+
+<!-- Twitter -->
+<meta property="twitter:card" content="summary_large_image" />
+<meta property="twitter:title" content="[AppName]" />
+<meta property="twitter:image" content="https://[app].flamtools.com/[icons-or-logos]/[og-image].png" />
+
+<!-- Search engines (training/non-commercial apps) -->
+<meta name="robots" content="noindex, nofollow" />
+```
+
+### Deployment Checklist
+
+- [ ] Manifest.json located at `static/manifest.json`
+- [ ] Manifest.json has `"display": "standalone"`
+- [ ] Manifest.json has `"scope": "/"`
+- [ ] Both `theme_color` & `background_color` set to `#5422B0`
+- [ ] Icons referenced exist and are correct paths (check icon folder structure—may be `/icons/` or `/logos/`)
+- [ ] Meta tags in head include `theme-color`, OG tags, Twitter tags
+- [ ] `<meta name="robots" content="noindex, nofollow" />` present in `<head>` (required for all training/non-commercial apps)
+
+### After Completion
+
+**Update AGENTS.md:** Add notes about any app-specific icon paths or manifest peculiarities to the "Manifest & PWA Configuration" section for future reference.
+
+---
+
+**Last Updated:** March 2026
 **Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete.
