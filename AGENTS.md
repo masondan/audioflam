@@ -1,8 +1,8 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam  
-**Status:** Production (Waveform Export Parity Complete)
-**Updated:** March 2026
+**Status:** Production (Transcription + Two-Speaker Mode Complete)
+**Updated:** April 2026
 
 ---
 
@@ -37,14 +37,18 @@ npm run check:watch  # Watch mode
 ```
 src/
 ├── routes/
-│   ├── +page.svelte              # Header + TTS/Audiogram tab
+│   ├── +page.svelte              # Header + TTS/Audiogram/Transcribe tabs
 │   ├── +layout.svelte            # Root layout
 │   └── api/
 │       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT)
-│       └── transcode/+server.ts  # Cloud video transcoding (NEW)
+│       ├── transcode/+server.ts  # Cloud video transcoding
+│       ├── audio/
+│       │   ├── silence-removal/+server.ts # Silence removal
+│       │   └── normalize/+server.ts       # Audio normalization
+│       └── normalize/+server.ts   # Audio normalization (legacy path)
 ├── lib/
-│   ├── audioProcessing.ts        # Audio processing utilities
-│   ├── stores.ts                 # Voice definitions, app state
+│   ├── audioProcessing.ts        # Audio processing utilities (silence, concatenation)
+│   ├── stores.ts                 # Voice definitions, app state, preloadedTTSAudio
 │   ├── components/
 │   │   ├── VoiceDropdown.svelte  # Voice selector
 │   │   ├── AudiogramPage.svelte  # Main audiogram UI
@@ -61,17 +65,18 @@ src/
 │   │   ├── SpeedSilenceControls.svelte # Speed + silence trim
 │   │   ├── SilenceSlider.svelte  # Silence detection
 │   │   ├── SpeedBlockModal.svelte # Speed warning modal
-│   │   ├── TranscribePage.svelte # Transcription UI
+│   │   ├── TranscribePage.svelte # Transcription UI (Whisper)
+│   │   ├── VoiceDropdown.svelte  # Voice selector (two-speaker mode)
 │   │   └── [other UI components]
 │   ├── utils/
 │   │   ├── compositor.ts         # Canvas layer composition
 │   │   ├── recording.ts          # MediaRecorder wrapper
-│   │   ├── timestretch.ts        # Audio speed adjustment
+│   │   ├── timestretch.ts        # Audio speed adjustment (SoundTouchJS)
 │   │   ├── waveform.ts           # FFT preprocessing + rendering (precomputeFrequencyFrames)
 │   │   ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
 │   │   ├── video-export.ts       # Export orchestration (smartExportVideo)
-│   │   ├── transcription-worker.ts # Transcription worker
-│   │   └── transcription.ts      # Transcription utilities
+│   │   ├── transcription-worker.ts # Whisper worker (off-main-thread)
+│   │   └── transcription.ts      # Transcription utilities (Hugging Face)
 │   └── server/                   # Server-side utilities
 │       ├── audioNormalize.ts     # Audio normalization
 │       └── silenceRemoval.ts     # Silence removal logic
@@ -80,7 +85,8 @@ src/
 
 static/
   ├── icons/                        # SVG icons (22 for audiogram)
-  ├── fonts/                        # Self-hosted fonts
+  ├── fonts/                        # Self-hosted fonts (Inter, Lora, Playfair, Roboto Slab, Saira, Bebas)
+  ├── voices/                       # Sample voice files (for preview)
   └── robots.txt                    # Disallow: / (no indexing)
 ```
 
@@ -99,7 +105,7 @@ static/
 ### YarnGPT (Native Nigerian)
 - **Speed:** ~30 seconds
 - **Auth:** Bearer token
-- **Voices:** Idera (F), Regina (F), Tayo (M), Femi (M)
+- **Voices:** Adaora (F), Idera (F), Regina (F), Tayo (M), Femi (M)
 - **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
 
@@ -122,6 +128,91 @@ Response:
 
 ---
 
+## Audio Processing
+
+### Silence Removal
+- **Endpoint:** POST `/api/audio/silence-removal`
+- **Levels:** `default`, `trim`, `tight`
+- **Input:** Base64-encoded audio
+- **Output:** Base64-encoded MP3 + duration metrics
+- **File:** `src/lib/server/silenceRemoval.ts`
+
+### Audio Normalization
+- **Endpoint:** POST `/api/normalize`
+- **Purpose:** Normalize audio levels before export
+- **File:** `src/lib/server/audioNormalize.ts`
+
+### Time-Stretching (Speed Control)
+- **Library:** SoundTouchJS
+- **Function:** `timeStretch(buffer, tempo)` in `src/lib/utils/timestretch.ts`
+- **Range:** 0.5x to 2.0x speed
+- **Used in:** TTS speed controls, two-speaker mode
+
+---
+
+## Transcription (Whisper)
+
+### Overview
+- **Model:** OpenAI Whisper (via @huggingface/transformers)
+- **Execution:** Web Worker (off-main-thread)
+- **Languages:** 99+ (multilingual mode) or English-only (quantized)
+- **Quantization:** Optional (smaller model, faster on mobile)
+
+### API
+```typescript
+// Load model (one-time)
+await loadWhisperModel({ multilingualEnabled: true, quantized: true });
+
+// Transcribe audio
+const result = await transcribeAudio(audioBlob, {
+  multilingualEnabled: true,
+  quantized: true,
+  language: 'auto' // or ISO 639-1 code
+});
+
+// Result includes segments with timestamps
+result.segments.forEach(seg => console.log(`[${seg.start}s] ${seg.text}`));
+
+// Release model from memory
+await releaseModel();
+```
+
+### Files
+- `src/lib/components/TranscribePage.svelte` - UI
+- `src/lib/utils/transcription.ts` - Main API
+- `src/lib/utils/transcription-worker.ts` - Worker thread
+- `src/lib/utils/transcription.ts:SUPPORTED_LANGUAGES` - Language list
+
+### Performance
+- **First load:** 50-200MB download (model cache)
+- **Quantized:** ~100MB, faster on mobile
+- **Full:** ~350MB, more accurate
+- **Transcription:** 30-120s per minute of audio (device-dependent)
+
+---
+
+## Two-Speaker Mode
+
+### Overview
+- Compose TTS from two different voices
+- Per-speaker speed and silence controls
+- Audio merging pipeline
+
+### Implementation
+- **File:** `src/routes/+page.svelte` (lines 88-90, 200+)
+- **State:** `twoSpeakerMode`, `speaker1`, `speaker2`, `speaker1Speed`, `speaker2Speed`
+- **Audio merge:** `concatenateAudioSegments()` in `src/lib/audioProcessing.ts`
+- **UI:** Speaker dropdowns, speed sliders, silence controls
+
+### Workflow
+1. Select two voices (speaker1, speaker2)
+2. Generate TTS for each voice separately
+3. Apply speed/silence adjustments per speaker
+4. Merge audio segments
+5. Export as single audiogram
+
+---
+
 ## Environment Variables
 
 Set in Cloudflare Pages → Settings → Environment variables:
@@ -130,9 +221,14 @@ Set in Cloudflare Pages → Settings → Environment variables:
 AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
 YARNGPT_API_KEY=<API key>
+APIVIDEO_API_KEY=<API key for cloud transcoding>
 ```
 
 **Important:** After updating env vars, deploy to activate.
+
+### Optional (Development)
+- Create `.env.local` in project root for local testing
+- Never commit `.env.local` to git
 
 ---
 
@@ -289,6 +385,8 @@ All CSS variables defined in `src/app.css`.
 5. **XML escaping** - Always escape user text before embedding in SSML (prevents injection)
 6. **Host header required** - Azure requests in Cloudflare Workers need explicit `Host` header
 7. **Audio format consistency** - All responses must include `format: 'mp3'` field
+8. **Robots.txt noindex** - Must remain in `static/robots.txt` (educational use only)
+9. **Manifest.json display** - Currently set to `"display": "browser"` (not standalone)
 
 ### Export-Specific Gotchas
 
@@ -298,25 +396,36 @@ All CSS variables defined in `src/app.css`.
 - **Canvas copy needed** - Offscreen canvas required to handle dimension correction
 - **Audio mono→stereo conversion** - Many mobile AAC encoders reject mono; code converts automatically
 - **Mediabunny lazy-load** - Loaded dynamically to keep initial bundle small
-- **Type assertions risky** - `video-export.ts:445` has unchecked type assertion; add guard if changing
+- **Type assertions risky** - `webcodecs-export.ts:445` has unchecked type assertion; add guard if changing (KNOWN ISSUE)
 
 ### TTS Gotchas
 
 - **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
 - **Azure faster but slightly accented** - 3s generation but international accent
-- **Error handling loose** - If API fails, user gets generic "error" message (see Improvements below)
+- **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE - see Quality Report)
+- **No request throttling** - Users can spam TTS API (KNOWN ISSUE - see Quality Report)
+
+### Transcription Gotchas
+
+- **Worker thread isolation** - Transcription runs off-main-thread; UI stays responsive but model loading is slow
+- **Model caching** - First transcription downloads 100-350MB; subsequent calls use cache
+- **Language detection** - `language: 'auto'` works but may misidentify mixed-language audio
+- **Quantized vs full** - Quantized is faster but less accurate; full is slower but better quality
 
 ---
 
 ## Current Phase Focus
 
 ✅ **Completed:**
-- TTS with Azure + YarnGPT
+- TTS with Azure + YarnGPT (single + two-speaker modes)
 - Full Audiogram creation (image, audio, waveform, title, effects)
-- **Waveform visual parity:** Preview and export waveforms now match exactly via pre-computed FFT frames
+- **Waveform visual parity:** Preview and export waveforms match exactly via pre-computed FFT frames
 - MP4 export via WebCodecs (Android)
 - MediaRecorder fallback (iOS/Firefox)
 - Cloud transcoding via api.video
+- **Transcription:** Whisper model (multilingual + quantized options)
+- **Audio processing:** Silence removal, normalization, time-stretching
+- **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls
 
 **Waveform Export Fix (Critical Implementation):**
 - `precomputeFrequencyFrames()` in `waveform.ts` performs offline FFT using Cooley-Tukey algorithm with Blackman windowing
@@ -324,10 +433,18 @@ All CSS variables defined in `src/app.css`.
 - Export pipeline passes pre-computed frames to `renderFrame(currentTime)` callback for frame-accurate rendering
 - Eliminates visual mismatch between live preview and exported MP4 (was caused by synthetic sine-wave generation)
 
+**Known Issues (See QUALITY_REPORT.md):**
+- 🔴 Type assertion in `webcodecs-export.ts:445` without runtime guard (HIGH priority)
+- 🔴 TTS error handling gaps - generic "error" messages (HIGH priority)
+- 🟡 Audio encoding inconsistency between WebCodecs/MediaRecorder paths (MEDIUM)
+- 🟡 Missing request throttling for TTS API (MEDIUM)
+- 🟡 Canvas export validation gaps (MEDIUM)
+
 **Future Development:**
 - TTS→Audiogram one-click integration (store exists, UI not wired)
 - Enhanced iOS fallback with better error guidance
 - Performance optimization (OffscreenCanvas for preview)
+- Fix known issues from QUALITY_REPORT.md
 
 ---
 
@@ -395,9 +512,9 @@ All CSS variables defined in `src/app.css`.
 **File:** `src/lib/utils/webcodecs-export.ts:277-294`
 
 ### 4. Type Assertions Without Guards
-**Reality:** `video-export.ts:445` does unchecked type assertion on Mediabunny target. Could fail silently if target changes.
+**Reality:** `webcodecs-export.ts:445` does unchecked type assertion on Mediabunny target. Could fail silently if target changes.
 
-**Fix:** Add runtime check before assertion.
+**Fix:** Add runtime check before assertion. (KNOWN ISSUE)
 
 ### 5. Forgetting Cloudflare Workers Host Header
 **Reality:** Azure Speech API requires explicit `Host` header in Cloudflare environment.
@@ -408,6 +525,28 @@ All CSS variables defined in `src/app.css`.
 **Reality:** User text embedded in SSML XML without escaping = potential injection. Function exists to fix this.
 
 **File:** `src/routes/api/tts/+server.ts` - Check for `escapeXml()` or equivalent.
+
+### 7. Blocking Main Thread During Transcription
+**Reality:** Whisper model loading is slow (~30-60s). Must run in Web Worker to keep UI responsive.
+
+**File:** `src/lib/utils/transcription.ts` - Worker management via `getWorker()`
+
+**Pattern:** Use `workerRequest<T>()` to send messages and wait for responses.
+
+### 8. Forgetting to Release Transcription Model
+**Reality:** Whisper model consumes 100-350MB RAM. Call `releaseModel()` when done.
+
+**File:** `src/lib/utils/transcription.ts:releaseModel()`
+
+### 9. Not Syncing Waveform Animation Between Export Paths
+**Reality:** WebCodecs (no audio playback) and MediaRecorder (with playback) need different timing logic.
+
+**File:** `src/lib/utils/compositor.ts:renderFrame()` - Must use `currentTime` parameter, not live audio data.
+
+### 10. Assuming Two-Speaker Audio Merges Automatically
+**Reality:** Must explicitly call `concatenateAudioSegments()` after generating both voices.
+
+**File:** `src/lib/audioProcessing.ts` - Audio merging logic
 
 ---
 
@@ -445,11 +584,12 @@ All CSS variables defined in `src/app.css`.
 2. **Check "Critical Rules & Gotchas"** - Avoid breaking patterns
 3. **Check "Common Pitfalls for Agents"** - Learn from past mistakes
 4. **Bookmark `/docs/TROUBLESHOOTING.md`** - For debugging later
+5. **Check `/docs/QUALITY_REPORT.md`** - Known issues and fixes
 
 ### Implementing TTS Changes
 1. Start: `src/routes/api/tts/+server.ts` (handler)
 2. Reference: `src/lib/stores.ts` (voice definitions)
-3. UI: `src/routes/+page.svelte` (TTS panel)
+3. UI: `src/routes/+page.svelte` (TTS panel, two-speaker mode)
 4. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
 ### Implementing Audiogram Changes
@@ -466,16 +606,31 @@ All CSS variables defined in `src/app.css`.
 4. Branch C (Cloud): `src/routes/api/transcode/+server.ts`
 5. Consult: TROUBLESHOOTING.md → Export Issues + ARCHITECTURE.md
 
+### Implementing Transcription Changes
+1. Start: `src/lib/components/TranscribePage.svelte` (UI)
+2. API: `src/lib/utils/transcription.ts` (main interface)
+3. Worker: `src/lib/utils/transcription-worker.ts` (off-main-thread)
+4. Model: `@huggingface/transformers` (Whisper)
+5. Consult: TROUBLESHOOTING.md → Transcription Issues
+
+### Implementing Audio Processing Changes
+1. Silence removal: `src/lib/server/silenceRemoval.ts` + `/api/audio/silence-removal`
+2. Normalization: `src/lib/server/audioNormalize.ts` + `/api/normalize`
+3. Time-stretching: `src/lib/utils/timestretch.ts` (SoundTouchJS)
+4. Utilities: `src/lib/audioProcessing.ts` (silence, concatenation)
+
 ### Implementing Design/CSS Changes
 1. Colors/spacing: `src/app.css` (CSS variables)
 2. Icons: `static/icons/` (SVG files)
-3. Components: Individual `.svelte` files (use design tokens)
+3. Fonts: `static/fonts/` (self-hosted)
+4. Components: Individual `.svelte` files (use design tokens)
 
 ### Debugging Issues
 1. **Search TROUBLESHOOTING.md** for your symptom
 2. Check "Debug steps" section for your issue
 3. Check "Critical Rules & Gotchas" in this file
-4. Check console logs for prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`
+4. Check console logs for prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`, `[Transcription]`
+5. Check QUALITY_REPORT.md for known issues
 
 ### Understanding Design Decisions
 1. Check this file → "Architecture Decision Log" section
@@ -652,5 +807,5 @@ Verify these exist:
 
 ---
 
-**Last Updated:** March 2026
-**Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete.
+**Last Updated:** April 2026
+**Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete. Update .clinerules whenever AGENTS.md changes significantly.
