@@ -426,6 +426,7 @@ All CSS variables defined in `src/app.css`.
 - **Transcription:** Whisper model (multilingual + quantized options)
 - **Audio processing:** Silence removal, normalization, time-stretching
 - **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls
+- **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export (April 2026)
 
 **Waveform Export Fix (Critical Implementation):**
 - `precomputeFrequencyFrames()` in `waveform.ts` performs offline FFT using Cooley-Tukey algorithm with Blackman windowing
