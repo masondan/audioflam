@@ -9,10 +9,17 @@ export interface TranscriptionOptions {
 	language: string; // 'auto' or ISO 639-1 code
 }
 
+export interface WordTimestamp {
+	word: string;
+	start: number;
+	end: number;
+}
+
 export interface TranscriptionSegment {
 	text: string;
 	start: number;
 	end: number;
+	words: WordTimestamp[];
 }
 
 export interface TranscriptionResult {
