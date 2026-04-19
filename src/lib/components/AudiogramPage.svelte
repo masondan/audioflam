@@ -21,10 +21,12 @@
     getFrequencyData,
     drawLiveWaveform
   } from '$lib/utils/recording';
-  import { loadImage, renderFrame as renderCompositorFrame, getExportResolution, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig, type LayerConfig } from '$lib/utils/compositor';
+  import { loadImage, renderFrame as renderCompositorFrame, getExportResolution, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig, type LayerConfig, type SubtitleConfig } from '$lib/utils/compositor';
+  import SubtitlePanel from './SubtitlePanel.svelte';
+  import { DEFAULT_SUBTITLE_STYLE, type SubtitleStyle, type SubtitleSegment } from '$lib/utils/subtitles';
   import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
 
-  type OpenPanel = 'waveform' | 'title' | 'light' | null;
+  type OpenPanel = 'waveform' | 'title' | 'light' | 'subtitle' | null;
   type AspectRatio = 'none' | '9:16' | '1:1' | '16:9';
   type RecordingPhase = 'idle' | 'ready' | 'countdown' | 'recording';
 
@@ -113,6 +115,11 @@
     width: 0.8,
     height: 0.15
   });
+
+  // Subtitle state
+  let subtitleActive = $state(false);
+  let subtitleSegments = $state<SubtitleSegment[]>([]);
+  let subtitleStyle = $state<SubtitleStyle>({ ...DEFAULT_SUBTITLE_STYLE });
 
   // Light effect state
   let lightOpacity = $state(0.5);
@@ -1219,9 +1226,17 @@
               position: titlePosition
             };
           }
+
+          if (subtitleActive && subtitleSegments.length > 0) {
+            exportLayers.subtitle = {
+              enabled: true,
+              segments: subtitleSegments,
+              style: subtitleStyle,
+            };
+          }
           
           // Render to the high-resolution export canvas
-          renderCompositorFrame(exportCtx, exportCanvas, exportImage, exportLayers);
+          renderCompositorFrame(exportCtx, exportCanvas, exportImage, exportLayers, currentTimeInExport);
         },
         () => {
           // Start audio playback callback
@@ -1506,6 +1521,8 @@
           waveformConfig={waveformConfig}
           titleConfig={titleConfig}
           lightConfig={lightConfig}
+          subtitleConfig={subtitleActive && subtitleSegments.length > 0 ? { enabled: true, segments: subtitleSegments, style: subtitleStyle } : null}
+          currentTime={currentTime}
           isPlaying={isPlaying}
           onWaveformPositionChange={handleWaveformPositionChange}
           onWaveformClick={handleWaveformOverlayClick}
@@ -1782,6 +1799,29 @@
         speed={lightSpeed}
         onOpacityChange={(opacity) => lightOpacity = opacity}
         onSpeedChange={(speed) => lightSpeed = speed}
+      />
+    </TogglePanel>
+
+    <TogglePanel
+      label="Subtitles"
+      isActive={subtitleActive}
+      isOpen={openPanel === 'subtitle'}
+      onToggle={(active) => {
+        subtitleActive = active;
+        handlePanelToggle('subtitle', active);
+      }}
+      onOpenChange={(open) => handlePanelOpenChange('subtitle', open)}
+    >
+      <SubtitlePanel
+        audioBlob={audioData?.file ?? null}
+        canvasWidth={compositionCanvasRef?.getCanvas()?.width ?? 720}
+        canvasHeight={compositionCanvasRef?.getCanvas()?.height ?? 1280}
+        style={subtitleStyle}
+        segments={subtitleSegments}
+        subtitlesEnabled={subtitleActive}
+        onStyleChange={(s) => subtitleStyle = s}
+        onSegmentsChange={(segs) => subtitleSegments = segs}
+        onEnabledChange={(en) => subtitleActive = en}
       />
     </TogglePanel>
   </div>

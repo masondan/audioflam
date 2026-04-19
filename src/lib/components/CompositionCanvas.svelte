@@ -1,6 +1,6 @@
 <script lang="ts">
   import { onMount } from 'svelte';
-  import { loadImage, renderFrame as renderFrameCanvasLayers, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig } from '$lib/utils/compositor';
+  import { loadImage, renderFrame as renderFrameCanvasLayers, type LayerConfig, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig, type SubtitleConfig } from '$lib/utils/compositor';
 
   interface Props {
     imageUrl: string | null;
@@ -8,6 +8,8 @@
     waveformConfig?: WaveformConfig | null;
     titleConfig?: TitleConfig | null;
     lightConfig?: LightEffectConfig | null;
+    subtitleConfig?: SubtitleConfig | null;
+    currentTime?: number;
     isPlaying?: boolean;
     onWaveformPositionChange?: (position: WaveformPosition) => void;
     onWaveformClick?: () => void;
@@ -22,6 +24,8 @@
     waveformConfig = null,
     titleConfig = null,
     lightConfig = null,
+    subtitleConfig = null,
+    currentTime = 0,
     isPlaying = false,
     onWaveformPositionChange,
     onWaveformClick,
@@ -94,8 +98,12 @@
         isEditing: titleConfig.isEditing && !isPlaying
       };
     }
+
+    if (subtitleConfig?.enabled) {
+      layers.subtitle = subtitleConfig;
+    }
     
-    renderFrameCanvasLayers(ctx, canvas, image, layers);
+    renderFrameCanvasLayers(ctx, canvas, image, layers, currentTime);
     
     if (showCenterLine && isDragging && activeLayer === 'title') {
       renderCenterSnapLine(ctx, canvas);
