@@ -81,8 +81,8 @@ function workerRequest<T>(
 
 function getModelName(multilingualEnabled: boolean): string {
 	return multilingualEnabled
-		? 'onnx-community/whisper-base'
-		: 'onnx-community/whisper-base.en';
+		? 'Xenova/whisper-base'
+		: 'Xenova/whisper-base.en';
 }
 
 /**

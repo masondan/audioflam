@@ -11,11 +11,6 @@
     splitSegmentAtWord,
     reflow,
   } from '$lib/utils/subtitles';
-  import {
-    loadWhisperModel,
-    transcribeAudio,
-    type TranscriptionOptions,
-  } from '$lib/utils/transcription';
 
   interface Props {
     // Audio blob to transcribe (audiogram: loaded audio; video: extracted audio)
@@ -79,7 +74,7 @@
     updateStyle({ maxLines: m });
   }
 
-  // --- Generate subtitles ---
+  // --- Generate subtitles via Deepgram API ---
 
   async function handleGenerate() {
     if (!audioBlob) {
@@ -89,36 +84,39 @@
 
     generating = true;
     generateError = null;
-    generateStage = 'Loading model…';
+    generateStage = 'Transcribing audio…';
 
     try {
-      const opts: TranscriptionOptions = {
-        multilingualEnabled: false,
-        quantized: true,
-        language: 'auto',
-      };
+      const formData = new FormData();
+      // Ensure the blob has a filename so the server can detect MIME type
+      const audioFile = new File([audioBlob], 'audio.mp3', { type: audioBlob.type || 'audio/mpeg' });
+      formData.append('audio', audioFile);
 
-      await loadWhisperModel(opts, (stage) => {
-        generateStage = stage === 'downloading'
-          ? 'Downloading model (first time only)…'
-          : 'Model ready, transcribing…';
+      const response = await fetch('/api/transcribe-deepgram', {
+        method: 'POST',
+        body: formData,
       });
 
-      generateStage = 'Transcribing audio…';
+      if (!response.ok) {
+        const data = await response.json().catch(() => ({}));
+        throw new Error(data.error || `Transcription failed (${response.status})`);
+      }
 
-      const result = await transcribeAudio(audioBlob, null, 'auto');
-
-      // Convert TranscriptionSegment[] → SubtitleSegment[]
-      const subtitleSegs: SubtitleSegment[] = result.segments.map(seg => ({
+      const data = await response.json();
+      const subtitleSegs: SubtitleSegment[] = (data.segments ?? []).map((seg: any) => ({
         start: seg.start,
         end: seg.end,
         text: seg.text.trim(),
-        words: (seg.words ?? []).map(w => ({
+        words: (seg.words ?? []).map((w: any) => ({
           word: w.word,
           start: w.start,
           end: w.end,
         })),
       }));
+
+      if (subtitleSegs.length === 0) {
+        throw new Error('No subtitles generated. Is there speech in the audio?');
+      }
 
       onSegmentsChange(subtitleSegs);
       onEnabledChange(true);

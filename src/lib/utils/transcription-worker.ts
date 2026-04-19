@@ -88,9 +88,12 @@ async function handleTranscribe(msg: TranscribeMessage) {
 
 	try {
 		const transcriptionOptions: any = {
-			return_timestamps: 'word',
-			chunk_length_s: 30,
-			stride_length_s: 5,
+			// Use segment-level timestamps — ONNX whisper-base was not exported
+			// with output_attentions=True, so 'word' timestamps are unavailable.
+			// Word-level timing is estimated below from segment duration.
+			return_timestamps: true,
+			chunk_length_s: 5,
+			stride_length_s: 1,
 		};
 
 		if (msg.language !== 'auto' && msg.language !== 'en') {
@@ -99,7 +102,7 @@ async function handleTranscribe(msg: TranscribeMessage) {
 
 		const result = await cachedPipeline(msg.audioData, transcriptionOptions);
 
-		// Extract segments
+		// Extract segments and estimate word-level timestamps from segment duration
 	interface Chunk {
 		text?: string;
 		timestamp?: [number, number];
@@ -111,12 +114,41 @@ async function handleTranscribe(msg: TranscribeMessage) {
 	if (result.chunks && Array.isArray(result.chunks)) {
 		for (const chunk of result.chunks as Chunk[]) {
 			const segText = (chunk.text || '').trim();
-			if (segText) {
+			if (!segText) continue;
+
+			const segStart = chunk.timestamp?.[0] ?? 0;
+			const segEnd = chunk.timestamp?.[1] ?? 0;
+
+			// If the model provided word-level data, use it directly
+			if (chunk.words && chunk.words.length > 0) {
 				segments.push({
 					text: segText,
-					start: chunk.timestamp?.[0] ?? 0,
-					end: chunk.timestamp?.[1] ?? 0,
-					words: chunk.words ?? [],
+					start: segStart,
+					end: segEnd,
+					words: chunk.words,
+				});
+			} else {
+				// Estimate word timestamps weighted by character count.
+				// Longer words get proportionally more time than short words,
+				// which better reflects natural speech pacing than even division.
+				const words = segText.split(/\s+/).filter(Boolean);
+				const duration = segEnd - segStart;
+				const totalChars = words.reduce((sum, w) => sum + w.length, 0);
+				let cursor = segStart;
+				const estimatedWords = words.map((word) => {
+					const wordDuration = totalChars > 0
+						? duration * (word.length / totalChars)
+						: duration / words.length;
+					const wordStart = cursor;
+					const wordEnd = cursor + wordDuration;
+					cursor = wordEnd;
+					return { word, start: wordStart, end: wordEnd };
+				});
+				segments.push({
+					text: segText,
+					start: segStart,
+					end: segEnd,
+					words: estimatedWords,
 				});
 			}
 		}
