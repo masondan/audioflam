@@ -1,3 +1,5 @@
+import { drawSubtitle, getActiveSegment } from './subtitles';
+
 export interface CompositorState {
   image: HTMLImageElement | null;
   imageRect: { x: number; y: number; width: number; height: number };
@@ -114,10 +116,17 @@ export interface LightEffectConfig {
   phase: number;
 }
 
+export interface SubtitleConfig {
+  enabled: boolean;
+  segments: import('./subtitles').SubtitleSegment[];
+  style: import('./subtitles').SubtitleStyle;
+}
+
 export interface LayerConfig {
   waveform?: WaveformConfig;
   title?: TitleConfig;
   lightEffect?: LightEffectConfig;
+  subtitle?: SubtitleConfig;
 }
 
 export function calculateCanvasDimensions(
@@ -174,7 +183,8 @@ export function renderFrame(
   ctx: CanvasRenderingContext2D,
   canvas: HTMLCanvasElement,
   image: HTMLImageElement | null,
-  layers: LayerConfig
+  layers: LayerConfig,
+  currentTime?: number
 ): void {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   
@@ -195,6 +205,14 @@ export function renderFrame(
 
   if (layers.title?.enabled && layers.title.text) {
     renderTitleLayer(ctx, canvas, layers.title);
+  }
+
+  // Subtitles render as the topmost layer
+  if (layers.subtitle?.enabled && layers.subtitle.segments.length > 0 && currentTime !== undefined) {
+    const activeSeg = getActiveSegment(layers.subtitle.segments, currentTime);
+    if (activeSeg) {
+      drawSubtitle(ctx, activeSeg, layers.subtitle.style, canvas.width, canvas.height, currentTime);
+    }
   }
 }
 

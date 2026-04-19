@@ -88,7 +88,7 @@ async function handleTranscribe(msg: TranscribeMessage) {
 
 	try {
 		const transcriptionOptions: any = {
-			return_timestamps: true,
+			return_timestamps: 'word',
 			chunk_length_s: 30,
 			stride_length_s: 5,
 		};
@@ -100,30 +100,32 @@ async function handleTranscribe(msg: TranscribeMessage) {
 		const result = await cachedPipeline(msg.audioData, transcriptionOptions);
 
 		// Extract segments
-		interface Chunk {
-			text?: string;
-			timestamp?: [number, number];
-		}
+	interface Chunk {
+		text?: string;
+		timestamp?: [number, number];
+		words?: Array<{ word: string; start: number; end: number }>;
+	}
 
-		const segments: Array<{ text: string; start: number; end: number }> = [];
+	const segments: Array<{ text: string; start: number; end: number; words: Array<{ word: string; start: number; end: number }> }> = [];
 
-		if (result.chunks && Array.isArray(result.chunks)) {
-			for (const chunk of result.chunks as Chunk[]) {
-				const segText = (chunk.text || '').trim();
-				if (segText) {
-					segments.push({
-						text: segText,
-						start: chunk.timestamp?.[0] ?? 0,
-						end: chunk.timestamp?.[1] ?? 0,
-					});
-				}
+	if (result.chunks && Array.isArray(result.chunks)) {
+		for (const chunk of result.chunks as Chunk[]) {
+			const segText = (chunk.text || '').trim();
+			if (segText) {
+				segments.push({
+					text: segText,
+					start: chunk.timestamp?.[0] ?? 0,
+					end: chunk.timestamp?.[1] ?? 0,
+					words: chunk.words ?? [],
+				});
 			}
-		} else {
-			const text = (result.text || '').trim();
-			segments.push({ text, start: 0, end: 0 });
 		}
+	} else {
+		const text = (result.text || '').trim();
+		segments.push({ text, start: 0, end: 0, words: [] });
+	}
 
-		self.postMessage({ type: 'result', segments });
+	self.postMessage({ type: 'result', segments });
 	} catch (err) {
 		self.postMessage({
 			type: 'error',

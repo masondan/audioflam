@@ -504,7 +504,7 @@
       }
       
       // Create new audio element
-      const newAudioElement = new Audio(audioUrl);
+      const newAudioElement = new Audio(audioUrl ?? undefined);
       const playbackRate = speaker === 'speaker1' ? speaker1Speed : speaker2Speed;
       newAudioElement.playbackRate = playbackRate;
       
@@ -786,6 +786,7 @@
     segments: PlaylistSegment[];
     mergedUrl: string;
     totalDuration: number;
+    mergedBase64: string;
   }
 
   function getAudioDuration(url: string): Promise<number> {
