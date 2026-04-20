@@ -84,7 +84,7 @@
 
     generating = true;
     generateError = null;
-    generateStage = 'Transcribing audio…';
+    generateStage = 'Generating…';
 
     try {
       const formData = new FormData();
@@ -747,7 +747,7 @@
   .generate-btn {
     width: 100%;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-primary);
+    background: #555555;
     color: #fff;
     border: none;
     border-radius: var(--radius-md);
@@ -768,7 +768,7 @@
   }
 
   .generate-btn.loading {
-    background: var(--color-primary);
+    background: #555555;
     opacity: 0.8;
   }
 
@@ -794,7 +794,7 @@
   .edit-btn {
     flex: 1;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--color-primary);
+    background: #555555;
     color: #fff;
     border: none;
     border-radius: var(--radius-md);
@@ -805,7 +805,7 @@
   }
 
   .edit-btn:hover {
-    background: #4a1d9e;
+    background: #444444;
   }
 
   .reset-btn {
