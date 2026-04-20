@@ -297,10 +297,10 @@
         </button>
       </div>
 
-      <!-- Bold button -->
+      <!-- Bold button (square) -->
       <button
         type="button"
-        class="text-btn"
+        class="bold-btn"
         class:active={style.boldEnabled}
         onclick={() => updateStyle({ boldEnabled: !style.boldEnabled })}
         aria-label="Toggle bold"
@@ -309,16 +309,16 @@
         <img src="/icons/icon-bold.svg" alt="" />
       </button>
 
-      <!-- All caps button -->
+      <!-- All caps button (expands to fill) -->
       <button
         type="button"
-        class="text-btn"
+        class="caps-btn"
         class:active={style.uppercaseEnabled}
         onclick={() => updateStyle({ uppercaseEnabled: !style.uppercaseEnabled })}
         aria-label="Toggle all caps"
         title="Toggle all caps"
       >
-        Aa
+        All caps
       </button>
     </div>
   </div>
@@ -329,8 +329,8 @@
     <input
       type="range"
       class="position-slider"
-      min="0.05"
-      max="0.95"
+      min="0.15"
+      max="0.85"
       step="0.01"
       value={style.verticalPosition}
       oninput={(e) => updateStyle({ verticalPosition: parseFloat((e.target as HTMLInputElement).value) })}
@@ -1131,7 +1131,45 @@
     filter: brightness(0) invert(1);
   }
 
-  .text-btn {
+  .bold-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-white);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-normal), color var(--transition-normal);
+    flex-shrink: 0;
+  }
+
+  .bold-btn img {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .bold-btn:hover {
+    border-color: var(--color-border-active);
+    background: var(--color-highlight);
+  }
+
+  .bold-btn.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+
+  .bold-btn.active img {
+    filter: brightness(0) invert(1);
+  }
+
+  .caps-btn {
+    flex: 1;
     padding: 6px var(--spacing-sm);
     border: 1px solid var(--color-border);
     border-radius: var(--radius-sm);
@@ -1144,28 +1182,16 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    flex-shrink: 0;
-    min-width: 44px;
   }
 
-  .text-btn img {
-    width: 16px;
-    height: 16px;
-    display: block;
-  }
-
-  .text-btn:hover {
+  .caps-btn:hover {
     border-color: var(--color-border-active);
     background: var(--color-highlight);
   }
 
-  .text-btn.active {
+  .caps-btn.active {
     background: var(--color-primary);
     color: #fff;
     border-color: var(--color-primary);
-  }
-
-  .text-btn.active img {
-    filter: brightness(0) invert(1);
   }
 </style>

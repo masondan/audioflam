@@ -126,8 +126,8 @@ export function calculateCharsPerLine(canvasWidth: number, fontSize: FontSize): 
 	// Approximate: Inter at medium size ~0.55 * fontSize width per char
 	const fontPx = canvasWidth * FONT_SIZE_RATIOS[fontSize];
 	const charWidth = fontPx * 0.55;
-	// Use 90% of canvas width for text
-	return Math.floor((canvasWidth * 0.9) / charWidth);
+	// Use 80% of canvas width for text
+	return Math.floor((canvasWidth * 0.8) / charWidth);
 }
 
 /**
@@ -150,7 +150,7 @@ export function drawSubtitle(
 	if (lines.length === 0) return;
 
 	ctx.save();
-	const fontWeight = style.boldEnabled ? 700 : 400;
+	const fontWeight = style.boldEnabled ? 900 : 600;
 	ctx.font = `${fontWeight} ${fontPx}px 'Inter', sans-serif`;
 	ctx.textAlign = style.textAlign;
 	ctx.textBaseline = 'top';
@@ -233,6 +233,7 @@ function drawFocusSubtitle(
 
 		for (let wi = 0; wi < lineWords.length; wi++) {
 			const word = lineWords[wi];
+			const displayWord = transformText(word, style.uppercaseEnabled);
 			const isActive = wordIdx === activeWordIndex;
 			const wordColor = (isActive && style.spotlightEnabled) ? style.spotlightColor : style.textColor;
 
@@ -241,14 +242,14 @@ function drawFocusSubtitle(
 
 			if (style.outlineEnabled) {
 				ctx.strokeStyle = style.outlineColor;
-				ctx.lineWidth = 2.5;
+				ctx.lineWidth = 1;
 				ctx.textAlign = 'left';
-				ctx.strokeText(word, wordX, lineY);
+				ctx.strokeText(displayWord, wordX, lineY);
 			}
 			ctx.textAlign = 'left';
-			ctx.fillText(word, wordX, lineY);
+			ctx.fillText(displayWord, wordX, lineY);
 
-			const wordWidth = ctx.measureText(word + ' ').width;
+			const wordWidth = ctx.measureText(displayWord + ' ').width;
 			wordX += wordWidth;
 			wordIdx++;
 		}
@@ -287,11 +288,12 @@ function drawFlowSubtitle(
 
 		for (let wi = 0; wi < lineWords.length; wi++) {
 			const word = lineWords[wi];
+			const displayWord = transformText(word, style.uppercaseEnabled);
 			const timing = wordTimings[wordIdx];
 
 			if (!timing || currentTime < timing.start) {
 				// Word hasn't started yet — invisible
-				const wordWidth = ctx.measureText(word + ' ').width;
+				const wordWidth = ctx.measureText(displayWord + ' ').width;
 				wordX += wordWidth;
 				wordIdx++;
 				continue;
@@ -310,19 +312,19 @@ function drawFlowSubtitle(
 			applyTextEffects(ctx, style, fontPx);
 			ctx.fillStyle = wordColor;
 
-			if (style.outlineEnabled) {
-				ctx.strokeStyle = style.outlineColor;
-				ctx.lineWidth = 2.5;
-				ctx.textAlign = 'left';
-				ctx.strokeText(word, wordX, lineY);
-			}
+		if (style.outlineEnabled) {
+			ctx.strokeStyle = style.outlineColor;
+			ctx.lineWidth = 1;
 			ctx.textAlign = 'left';
-			ctx.fillText(word, wordX, lineY);
+			ctx.strokeText(displayWord, wordX, lineY);
+		}
+			ctx.textAlign = 'left';
+			ctx.fillText(displayWord, wordX, lineY);
 
 			resetTextEffects(ctx);
 			ctx.globalAlpha = 1;
 
-			const wordWidth = ctx.measureText(word + ' ').width;
+			const wordWidth = ctx.measureText(displayWord + ' ').width;
 			wordX += wordWidth;
 			wordIdx++;
 		}
