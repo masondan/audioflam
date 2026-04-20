@@ -1924,7 +1924,7 @@
       Cancel
     </button>
     <p class="download-hint">
-      Local processing works on most devices. If not, we'll convert in the cloud (a few extra seconds). You'll see a progress indicator.
+      Wrapping your audiogram into a video file works locally on most devices. If not, we'll send to the cloud (a few extra seconds). You'll see a progress indicator.
     </p>
     <!-- Test mode: force cloud transcoding (hidden during training via localStorage) -->
     {#if !isTrainingMode}
