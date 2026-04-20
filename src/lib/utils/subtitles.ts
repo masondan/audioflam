@@ -4,6 +4,8 @@
  * This module can be extracted to a standalone app without rework.
  */
 
+import placeholderConfig from '$lib/config/subtitlePlaceholders.json';
+
 // --- Data models ---
 
 export interface WordTimestamp {
@@ -397,24 +399,66 @@ export function reflow(
 }
 
 /**
+ * Builds a placeholder SubtitleSegment for the given template from config.
+ *
+ * Key design: the segment always contains ALL words from the placeholder text,
+ * with evenly-spaced timestamps across PLACEHOLDER_CYCLE_DURATION. The
+ * drawSubtitle() engine wraps the text into lines based on the current
+ * fontSize/maxLines settings, but the word timestamps always cover the full
+ * word list — so the animation cycles through every word regardless of how
+ * many lines are visible at once.
+ *
+ * @param template - 'focus' or 'flow'
+ * @returns A SubtitleSegment ready to pass to drawSubtitle()
+ */
+export function buildPlaceholderSegment(template: SubtitleTemplate): SubtitleSegment {
+	const cfg = placeholderConfig.placeholders[template];
+	const allWords = cfg.words;
+	const wordDuration = PLACEHOLDER_CYCLE_DURATION / allWords.length;
+
+	const words: WordTimestamp[] = allWords.map((word, i) => ({
+		word,
+		start: i * wordDuration,
+		end: (i + 1) * wordDuration,
+	}));
+
+	return {
+		start: 0,
+		end: PLACEHOLDER_CYCLE_DURATION,
+		text: allWords.join(' '),
+		words,
+	};
+}
+
+/**
+ * The duration (in seconds) of one placeholder animation cycle.
+ * AudiogramPage uses this to loop the placeholder currentTime.
+ */
+export const PLACEHOLDER_CYCLE_DURATION = 4.0;
+
+/**
  * Draws a placeholder subtitle preview (no real segments loaded yet).
- * Used when the panel is active but Whisper hasn't run.
+ * Uses template-specific text from subtitlePlaceholders.json.
+ * Pass an animated currentTime (looping 0 → PLACEHOLDER_CYCLE_DURATION) to
+ * show the template behaviour live on the canvas.
+ *
+ * The placeholder segment always contains all words; the engine wraps them
+ * into lines based on the current style (fontSize, maxLines). This means
+ * the animation always cycles through all words regardless of line count.
+ *
+ * @param ctx - Canvas 2D context
+ * @param style - Current subtitle style (template, size, colours, etc.)
+ * @param canvasWidth - Canvas width in pixels
+ * @param canvasHeight - Canvas height in pixels
+ * @param currentTime - Animated time (0 → PLACEHOLDER_CYCLE_DURATION, looping)
  */
 export function drawPlaceholderSubtitle(
 	ctx: CanvasRenderingContext2D,
 	style: SubtitleStyle,
 	canvasWidth: number,
-	canvasHeight: number
+	canvasHeight: number,
+	currentTime: number = 0.25
 ): void {
-	const placeholderSegment: SubtitleSegment = {
-		start: 0,
-		end: 999,
-		text: 'Subtitle preview',
-		words: [
-			{ word: 'Subtitle', start: 0, end: 0.5 },
-			{ word: 'preview', start: 0.5, end: 1.0 },
-		],
-	};
-	// For placeholder, use currentTime = 0.25 so first word is in spotlight (focus) or fading in (flow)
-	drawSubtitle(ctx, placeholderSegment, style, canvasWidth, canvasHeight, 0.25);
+	const segment = buildPlaceholderSegment(style.template);
+	drawSubtitle(ctx, segment, style, canvasWidth, canvasHeight, currentTime);
 }

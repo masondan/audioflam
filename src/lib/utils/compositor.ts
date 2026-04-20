@@ -1,4 +1,4 @@
-import { drawSubtitle, getActiveSegment } from './subtitles';
+import { drawSubtitle, drawPlaceholderSubtitle, getActiveSegment } from './subtitles';
 
 export interface CompositorState {
   image: HTMLImageElement | null;
@@ -207,11 +207,18 @@ export function renderFrame(
     renderTitleLayer(ctx, canvas, layers.title);
   }
 
-  // Subtitles render as the topmost layer
-  if (layers.subtitle?.enabled && layers.subtitle.segments.length > 0 && currentTime !== undefined) {
-    const activeSeg = getActiveSegment(layers.subtitle.segments, currentTime);
-    if (activeSeg) {
-      drawSubtitle(ctx, activeSeg, layers.subtitle.style, canvas.width, canvas.height, currentTime);
+  // Subtitles render as the topmost layer.
+  // If segments are present, draw the active real segment.
+  // If no segments but subtitle is enabled (placeholder mode), draw the placeholder.
+  if (layers.subtitle?.enabled) {
+    if (layers.subtitle.segments.length > 0 && currentTime !== undefined) {
+      const activeSeg = getActiveSegment(layers.subtitle.segments, currentTime);
+      if (activeSeg) {
+        drawSubtitle(ctx, activeSeg, layers.subtitle.style, canvas.width, canvas.height, currentTime);
+      }
+    } else if (layers.subtitle.segments.length === 0 && currentTime !== undefined) {
+      // Placeholder mode: no real subtitles yet — show animated preview
+      drawPlaceholderSubtitle(ctx, layers.subtitle.style, canvas.width, canvas.height, currentTime);
     }
   }
 }

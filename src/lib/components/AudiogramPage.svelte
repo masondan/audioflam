@@ -23,7 +23,7 @@
   } from '$lib/utils/recording';
   import { loadImage, renderFrame as renderCompositorFrame, getExportResolution, type WaveformConfig, type WaveformPosition, type TitleConfig, type TitlePosition, type LightEffectConfig, type LayerConfig, type SubtitleConfig } from '$lib/utils/compositor';
   import SubtitlePanel from './SubtitlePanel.svelte';
-  import { DEFAULT_SUBTITLE_STYLE, type SubtitleStyle, type SubtitleSegment } from '$lib/utils/subtitles';
+  import { DEFAULT_SUBTITLE_STYLE, PLACEHOLDER_CYCLE_DURATION, type SubtitleStyle, type SubtitleSegment } from '$lib/utils/subtitles';
   import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress, type ExportResult } from '$lib/utils/video-export';
 
   type OpenPanel = 'waveform' | 'title' | 'light' | 'subtitle' | null;
@@ -120,6 +120,12 @@
   let subtitleActive = $state(false);
   let subtitleSegments = $state<SubtitleSegment[]>([]);
   let subtitleStyle = $state<SubtitleStyle>({ ...DEFAULT_SUBTITLE_STYLE });
+
+  // Subtitle placeholder animation state
+  // Loops 0 → PLACEHOLDER_CYCLE_DURATION when subtitles are active but not yet generated
+  let subtitlePlaceholderTime = $state(0);
+  let subtitlePlaceholderAnimId: number | null = null;
+  let subtitlePlaceholderLastTs: number | null = null;
 
   // Light effect state
   let lightOpacity = $state(0.5);
@@ -232,6 +238,54 @@
     
     return () => {
       stopLightAnimation();
+    };
+  });
+
+  // --- Subtitle placeholder animation ---
+  // Runs a lightweight RAF loop that advances subtitlePlaceholderTime
+  // when subtitles are active but no real segments exist yet.
+  // Stops automatically once real segments are generated.
+
+  function startSubtitlePlaceholderAnimation() {
+    if (subtitlePlaceholderAnimId !== null) return;
+
+    function tick(ts: number) {
+      if (!subtitleActive || subtitleSegments.length > 0) {
+        // Real subtitles arrived or panel was disabled — stop
+        subtitlePlaceholderAnimId = null;
+        subtitlePlaceholderLastTs = null;
+        return;
+      }
+
+      if (subtitlePlaceholderLastTs !== null) {
+        const delta = (ts - subtitlePlaceholderLastTs) / 1000; // seconds
+        subtitlePlaceholderTime = (subtitlePlaceholderTime + delta) % PLACEHOLDER_CYCLE_DURATION;
+      }
+      subtitlePlaceholderLastTs = ts;
+      subtitlePlaceholderAnimId = requestAnimationFrame(tick);
+    }
+
+    subtitlePlaceholderAnimId = requestAnimationFrame(tick);
+  }
+
+  function stopSubtitlePlaceholderAnimation() {
+    if (subtitlePlaceholderAnimId !== null) {
+      cancelAnimationFrame(subtitlePlaceholderAnimId);
+      subtitlePlaceholderAnimId = null;
+    }
+    subtitlePlaceholderLastTs = null;
+  }
+
+  $effect(() => {
+    // Start placeholder animation when subtitles are active with no real segments
+    if (subtitleActive && subtitleSegments.length === 0) {
+      startSubtitlePlaceholderAnimation();
+    } else {
+      stopSubtitlePlaceholderAnimation();
+    }
+
+    return () => {
+      stopSubtitlePlaceholderAnimation();
     };
   });
 
@@ -1521,8 +1575,8 @@
           waveformConfig={waveformConfig}
           titleConfig={titleConfig}
           lightConfig={lightConfig}
-          subtitleConfig={subtitleActive && subtitleSegments.length > 0 ? { enabled: true, segments: subtitleSegments, style: subtitleStyle } : null}
-          currentTime={currentTime}
+          subtitleConfig={subtitleActive ? { enabled: true, segments: subtitleSegments, style: subtitleStyle } : null}
+          currentTime={subtitleActive && subtitleSegments.length === 0 ? subtitlePlaceholderTime : currentTime}
           isPlaying={isPlaying}
           onWaveformPositionChange={handleWaveformPositionChange}
           onWaveformClick={handleWaveformOverlayClick}
