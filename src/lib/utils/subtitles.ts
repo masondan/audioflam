@@ -299,14 +299,6 @@ function transformText(text: string, uppercaseEnabled: boolean): string {
 	return uppercaseEnabled ? text.toUpperCase() : text;
 }
 
-/**
- * Reconstructs text from word array to preserve original capitalization.
- * Used when uppercaseEnabled is false to maintain proper case from transcription.
- */
-function reconstructTextFromWords(words: WordTimestamp[]): string {
-	return words.map(w => w.word).join(' ');
-}
-
 function drawFocusSubtitle(
 	ctx: CanvasRenderingContext2D,
 	segment: SubtitleSegment,

@@ -132,10 +132,25 @@ async function handleTranscribe(msg: TranscribeMessage) {
 				// Longer words get proportionally more time than short words,
 				// which better reflects natural speech pacing than even division.
 				const words = segText.split(/\s+/).filter(Boolean);
+				
+				// Capitalize first letter of segment and after sentence-ending punctuation
+				const capitalizedWords = words.map((word, idx) => {
+					if (idx === 0) {
+						// Capitalize first word of segment
+						return word.charAt(0).toUpperCase() + word.slice(1);
+					}
+					// Check if previous word ends with sentence-ending punctuation
+					const prevWord = words[idx - 1];
+					if (prevWord && /[.!?]$/.test(prevWord)) {
+						return word.charAt(0).toUpperCase() + word.slice(1);
+					}
+					return word;
+				});
+				
 				const duration = segEnd - segStart;
-				const totalChars = words.reduce((sum, w) => sum + w.length, 0);
+				const totalChars = capitalizedWords.reduce((sum, w) => sum + w.length, 0);
 				let cursor = segStart;
-				const estimatedWords = words.map((word) => {
+				const estimatedWords = capitalizedWords.map((word) => {
 					const wordDuration = totalChars > 0
 						? duration * (word.length / totalChars)
 						: duration / words.length;
@@ -144,8 +159,11 @@ async function handleTranscribe(msg: TranscribeMessage) {
 					cursor = wordEnd;
 					return { word, start: wordStart, end: wordEnd };
 				});
+				
+				// Reconstruct text from capitalized words
+				const capitalizedText = capitalizedWords.join(' ');
 				segments.push({
-					text: segText,
+					text: capitalizedText,
 					start: segStart,
 					end: segEnd,
 					words: estimatedWords,

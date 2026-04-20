@@ -56,6 +56,15 @@
 
   const hasSegments = $derived(segments.length > 0);
 
+  // --- Auto-clear subtitles when audio is deleted ---
+  // If audioBlob becomes null (user deleted audio), clear subtitles and disable panel
+  $effect(() => {
+    if (audioBlob === null && hasSegments) {
+      onSegmentsChange([]);
+      onEnabledChange(false);
+    }
+  });
+
   // --- Style helpers ---
 
   function updateStyle(patch: Partial<SubtitleStyle>) {
@@ -103,16 +112,21 @@
       }
 
       const data = await response.json();
-      const subtitleSegs: SubtitleSegment[] = (data.segments ?? []).map((seg: any) => ({
-        start: seg.start,
-        end: seg.end,
-        text: seg.text.trim(),
-        words: (seg.words ?? []).map((w: any) => ({
+      const subtitleSegs: SubtitleSegment[] = (data.segments ?? []).map((seg: any) => {
+        const words = (seg.words ?? []).map((w: any) => ({
           word: w.word,
           start: w.start,
           end: w.end,
-        })),
-      }));
+        }));
+        // Reconstruct text from words to preserve original capitalization
+        const text = words.map((w: typeof words[0]) => w.word).join(' ');
+        return {
+          start: seg.start,
+          end: seg.end,
+          text,
+          words,
+        };
+      });
 
       if (subtitleSegs.length === 0) {
         throw new Error('No subtitles generated. Is there speech in the audio?');

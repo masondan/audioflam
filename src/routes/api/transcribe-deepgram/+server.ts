@@ -81,12 +81,23 @@ export const POST: RequestHandler = async ({ request }) => {
 		}> = [];
 
 		let currentWords: typeof words = [];
+		// Track whether the next word should be capitalized
+		// (start of audio, or after sentence-ending punctuation)
+		let capitalizeNext = true;
 
 		for (let i = 0; i < words.length; i++) {
 			const w = words[i];
 			const next = words[i + 1];
 
-			currentWords.push({ word: w.word, start: w.start, end: w.end });
+			// Apply sentence-case: capitalize first word and words after sentence-ending punctuation
+			let wordText = w.word;
+			if (capitalizeNext && wordText.length > 0) {
+				wordText = wordText.charAt(0).toUpperCase() + wordText.slice(1);
+			}
+			// Check if this word ends with sentence-ending punctuation — next word starts a new sentence
+			capitalizeNext = /[.!?]$/.test(wordText);
+
+			currentWords.push({ word: wordText, start: w.start, end: w.end });
 
 			const isLongEnough = currentWords.length >= MAX_WORDS_PER_SEGMENT;
 			const isPause = next && (next.start - w.end) > PAUSE_THRESHOLD;
@@ -100,6 +111,8 @@ export const POST: RequestHandler = async ({ request }) => {
 					words: [...currentWords],
 				});
 				currentWords = [];
+				// After a long pause, treat the next word as a new sentence start
+				if (isPause) capitalizeNext = true;
 			}
 		}
 

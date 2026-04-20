@@ -333,6 +333,10 @@
       trimEnd = 1;
       currentTime = 0;
       
+      // Clear subtitles when new audio is loaded
+      subtitleSegments = [];
+      subtitleActive = false;
+      
       // Clear the preloaded audio so it doesn't reload on next visit
       preloadedTTSAudio.set(null);
     } catch (err) {
@@ -562,6 +566,10 @@
       trimStart = 0;
       trimEnd = 1;
       currentTime = 0;
+      
+      // Clear subtitles when new audio is uploaded
+      subtitleSegments = [];
+      subtitleActive = false;
     } catch (err) {
       console.error('Failed to decode audio:', err);
     } finally {
@@ -587,6 +595,11 @@
       playbackAnalyser = null;
     }
     waveformActive = false;
+    
+    // Clear subtitles when audio is deleted
+    subtitleSegments = [];
+    subtitleActive = false;
+    
     openPanel = null;
     
     isPlaying = false;
