@@ -119,6 +119,82 @@ export function wrapSegmentText(
 }
 
 /**
+ * Partitions all words into pages of maxLines lines each.
+ * Each page entry records the lines to display and the start/end word indices.
+ * Used to implement the sliding window for placeholder animation.
+ */
+function paginateWords(
+	words: string[],
+	charsPerLine: number,
+	maxLines: MaxLines
+): Array<{ lines: string[]; startIdx: number; endIdx: number }> {
+	const pages: Array<{ lines: string[]; startIdx: number; endIdx: number }> = [];
+	let startIdx = 0;
+
+	while (startIdx < words.length) {
+		const lines: string[] = [];
+		let currentLine = '';
+		let lineStartIdx = startIdx; // word index where currentLine begins
+		let i = startIdx;
+
+		while (i < words.length && lines.length < maxLines) {
+			const word = words[i];
+			const testLine = currentLine ? `${currentLine} ${word}` : word;
+
+			if (testLine.length > charsPerLine && currentLine) {
+				// currentLine is full — commit it
+				lines.push(currentLine);
+				lineStartIdx = i; // next line starts at word i
+				currentLine = word;
+			} else {
+				currentLine = testLine;
+			}
+			i++;
+		}
+
+		// Commit the last partial line if there's room
+		if (currentLine && lines.length < maxLines) {
+			lines.push(currentLine);
+			// endIdx is i (exclusive) — all words up to i are on this page
+		} else if (currentLine) {
+			// lines is full; currentLine's first word (lineStartIdx) starts the next page
+			i = lineStartIdx;
+		}
+
+		if (lines.length === 0) break; // safety
+
+		pages.push({ lines, startIdx, endIdx: i });
+		startIdx = i;
+	}
+
+	return pages;
+}
+
+/**
+ * Given all segment words and the active word index, returns:
+ * - the lines to render (the page containing the active word)
+ * - the word offset (index of the first word on that page within segment.words)
+ */
+function getVisiblePage(
+	allWordTexts: string[],
+	activeWordIndex: number,
+	charsPerLine: number,
+	maxLines: MaxLines
+): { lines: string[]; wordOffset: number } {
+	const pages = paginateWords(allWordTexts, charsPerLine, maxLines);
+
+	for (const page of pages) {
+		if (activeWordIndex >= page.startIdx && activeWordIndex < page.endIdx) {
+			return { lines: page.lines, wordOffset: page.startIdx };
+		}
+	}
+
+	// Fallback: last page
+	const lastPage = pages[pages.length - 1];
+	return { lines: lastPage.lines, wordOffset: lastPage.startIdx };
+}
+
+/**
  * Derives how many characters fit per line from canvas width and font size.
  * Internal to the engine.
  */
@@ -134,6 +210,9 @@ export function calculateCharsPerLine(canvasWidth: number, fontSize: FontSize): 
  * Draws the subtitle block for the active segment onto a 2D canvas context.
  * Handles both Flow and Focus rendering.
  * Called from renderFrame() in the export pipeline and during live playback preview.
+ *
+ * When a segment has more words than fit in maxLines (e.g. placeholder text),
+ * a sliding window advances the visible page as the active word progresses.
  */
 export function drawSubtitle(
 	ctx: CanvasRenderingContext2D,
@@ -145,7 +224,38 @@ export function drawSubtitle(
 ): void {
 	const fontPx = canvasHeight * FONT_SIZE_RATIOS[style.fontSize];
 	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize);
-	const lines = wrapSegmentText(segment.text, charsPerLine, style.maxLines);
+
+	// Find active word index (needed for sliding window calculation)
+	let activeWordIndex = -1;
+	for (let i = 0; i < segment.words.length; i++) {
+		const w = segment.words[i];
+		if (currentTime >= w.start && currentTime < w.end) {
+			activeWordIndex = i;
+			break;
+		}
+		if (currentTime >= w.end) {
+			activeWordIndex = i;
+		}
+	}
+
+	// Check if the segment has more words than fit in maxLines (e.g. placeholder)
+	const allWordTexts = segment.words.map(w => w.word);
+	const defaultLines = wrapSegmentText(segment.text, charsPerLine, style.maxLines);
+	const defaultWordCount = defaultLines.join(' ').split(/\s+/).length;
+	const hasOverflow = segment.words.length > defaultWordCount;
+
+	let lines: string[];
+	let wordOffset: number;
+
+	if (hasOverflow && activeWordIndex >= 0) {
+		// Use sliding window: show the page containing the active word
+		const page = getVisiblePage(allWordTexts, activeWordIndex, charsPerLine, style.maxLines);
+		lines = page.lines;
+		wordOffset = page.wordOffset;
+	} else {
+		lines = defaultLines;
+		wordOffset = 0;
+	}
 
 	if (lines.length === 0) return;
 
@@ -161,9 +271,9 @@ export function drawSubtitle(
 	const centerX = canvasWidth / 2;
 
 	if (style.template === 'focus') {
-		drawFocusSubtitle(ctx, segment, style, lines, centerX, blockY, lineHeight, fontPx, currentTime);
+		drawFocusSubtitle(ctx, segment, style, lines, centerX, blockY, lineHeight, fontPx, currentTime, activeWordIndex, wordOffset);
 	} else {
-		drawFlowSubtitle(ctx, segment, style, lines, centerX, blockY, lineHeight, fontPx, currentTime);
+		drawFlowSubtitle(ctx, segment, style, lines, centerX, blockY, lineHeight, fontPx, currentTime, wordOffset);
 	}
 
 	ctx.restore();
@@ -189,6 +299,14 @@ function transformText(text: string, uppercaseEnabled: boolean): string {
 	return uppercaseEnabled ? text.toUpperCase() : text;
 }
 
+/**
+ * Reconstructs text from word array to preserve original capitalization.
+ * Used when uppercaseEnabled is false to maintain proper case from transcription.
+ */
+function reconstructTextFromWords(words: WordTimestamp[]): string {
+	return words.map(w => w.word).join(' ');
+}
+
 function drawFocusSubtitle(
 	ctx: CanvasRenderingContext2D,
 	segment: SubtitleSegment,
@@ -198,42 +316,35 @@ function drawFocusSubtitle(
 	blockY: number,
 	lineHeight: number,
 	fontPx: number,
-	currentTime: number
+	currentTime: number,
+	activeWordIndex: number,
+	wordOffset: number
 ): void {
-	// Find active word: word.start <= currentTime < word.end
-	// If in a gap, use the most recently completed word
-	let activeWordIndex = -1;
-	for (let i = 0; i < segment.words.length; i++) {
-		const w = segment.words[i];
-		if (currentTime >= w.start && currentTime < w.end) {
-			activeWordIndex = i;
-			break;
-		}
-		if (currentTime >= w.end) {
-			activeWordIndex = i; // hold last completed word
-		}
-	}
-
-	// Build a flat word list from lines for colour mapping
-	const allWords = segment.text.trim().split(/\s+/);
-	let wordIdx = 0;
+	// allWords is the full segment word list.
+	// wordOffset is the index of the first word on the first visible line.
+	const allWords = segment.words;
+	let wordIdx = wordOffset;
 
 	for (let li = 0; li < lines.length; li++) {
 		const lineY = blockY + li * lineHeight;
 		const lineWords = lines[li].split(/\s+/);
 
-		// Apply uppercase transformation if enabled
-		const transformedLineWords = lineWords.map(word => transformText(word, style.uppercaseEnabled));
-		const transformedLineText = transformedLineWords.join(' ');
-		
-		// Render word by word to apply spotlight colour
-		// We need to measure and position each word manually
+		// Build display words for this line (for measurement and rendering)
+		const displayWords: string[] = lineWords.map((w, wi) => {
+			const originalWord = allWords[wordIdx + wi];
+			return style.uppercaseEnabled
+				? w.toUpperCase()
+				: (originalWord ? originalWord.word : w);
+		});
+		const transformedLineText = displayWords.join(' ');
+
 		const totalLineWidth = ctx.measureText(transformedLineText).width;
 		let wordX = getTextStartX(centerX * 2, style.textAlign, totalLineWidth);
 
 		for (let wi = 0; wi < lineWords.length; wi++) {
-			const word = lineWords[wi];
-			const displayWord = transformText(word, style.uppercaseEnabled);
+			if (wordIdx >= allWords.length) break;
+
+			const displayWord = displayWords[wi];
 			const isActive = wordIdx === activeWordIndex;
 			const wordColor = (isActive && style.spotlightEnabled) ? style.spotlightColor : style.textColor;
 
@@ -267,29 +378,34 @@ function drawFlowSubtitle(
 	blockY: number,
 	lineHeight: number,
 	fontPx: number,
-	currentTime: number
+	currentTime: number,
+	wordOffset: number
 ): void {
 	const FADE_DURATION = 0.15; // seconds
 
-	// Build word-to-timestamp map from segment.words
-	const wordTimings = segment.words;
-
-	// Build flat word list from lines
-	const allWords = segment.text.trim().split(/\s+/);
-	let wordIdx = 0;
+	const allWords = segment.words;
+	let wordIdx = wordOffset;
 
 	for (let li = 0; li < lines.length; li++) {
 		const lineY = blockY + li * lineHeight;
 		const lineWords = lines[li].split(/\s+/);
 
-		const lineText = lines[li];
-		const totalLineWidth = ctx.measureText(lineText).width;
-		let wordX = centerX - totalLineWidth / 2;
+		// Build display words for width measurement
+		const displayWords: string[] = lineWords.map((w, wi) => {
+			const originalWord = allWords[wordIdx + wi];
+			return style.uppercaseEnabled
+				? w.toUpperCase()
+				: (originalWord ? originalWord.word : w);
+		});
+		const transformedLineText = displayWords.join(' ');
+		const totalLineWidth = ctx.measureText(transformedLineText).width;
+		let wordX = getTextStartX(centerX * 2, style.textAlign, totalLineWidth);
 
 		for (let wi = 0; wi < lineWords.length; wi++) {
-			const word = lineWords[wi];
-			const displayWord = transformText(word, style.uppercaseEnabled);
-			const timing = wordTimings[wordIdx];
+			if (wordIdx >= allWords.length) break;
+
+			const displayWord = displayWords[wi];
+			const timing = allWords[wordIdx];
 
 			if (!timing || currentTime < timing.start) {
 				// Word hasn't started yet — invisible
@@ -302,9 +418,8 @@ function drawFlowSubtitle(
 			const elapsed = currentTime - timing.start;
 			const isFading = elapsed < FADE_DURATION;
 			const alpha = isFading ? elapsed / FADE_DURATION : 1;
-			const isCurrentlyFading = isFading;
 
-			const wordColor = (isCurrentlyFading && style.spotlightEnabled)
+			const wordColor = (isFading && style.spotlightEnabled)
 				? style.spotlightColor
 				: style.textColor;
 
@@ -312,12 +427,12 @@ function drawFlowSubtitle(
 			applyTextEffects(ctx, style, fontPx);
 			ctx.fillStyle = wordColor;
 
-		if (style.outlineEnabled) {
-			ctx.strokeStyle = style.outlineColor;
-			ctx.lineWidth = 1;
-			ctx.textAlign = 'left';
-			ctx.strokeText(displayWord, wordX, lineY);
-		}
+			if (style.outlineEnabled) {
+				ctx.strokeStyle = style.outlineColor;
+				ctx.lineWidth = 1;
+				ctx.textAlign = 'left';
+				ctx.strokeText(displayWord, wordX, lineY);
+			}
 			ctx.textAlign = 'left';
 			ctx.fillText(displayWord, wordX, lineY);
 
