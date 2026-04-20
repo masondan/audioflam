@@ -901,12 +901,14 @@
     z-index: 1100;
     display: flex;
     align-items: flex-end;
+    justify-content: center;
   }
 
   .edit-drawer {
     background: var(--bg-white);
     border-radius: var(--radius-xl) var(--radius-xl) 0 0;
     width: 100%;
+    max-width: 480px;
     max-height: 80vh;
     display: flex;
     flex-direction: column;
