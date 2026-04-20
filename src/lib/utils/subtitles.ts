@@ -38,6 +38,9 @@ export interface SubtitleStyle {
 	shadowEnabled: boolean;
 	shadowColor: string;         // hex, default #000000
 	shadowOpacity: number;       // 0–1, default 0.5
+	textAlign: 'left' | 'center' | 'right';
+	boldEnabled: boolean;
+	uppercaseEnabled: boolean;
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -53,6 +56,9 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
 	shadowEnabled: false,
 	shadowColor: '#000000',
 	shadowOpacity: 0.5,
+	textAlign: 'center',
+	boldEnabled: true,
+	uppercaseEnabled: false,
 };
 
 // --- Font size mapping ---
@@ -144,8 +150,9 @@ export function drawSubtitle(
 	if (lines.length === 0) return;
 
 	ctx.save();
-	ctx.font = `600 ${fontPx}px 'Inter', sans-serif`;
-	ctx.textAlign = 'center';
+	const fontWeight = style.boldEnabled ? 700 : 400;
+	ctx.font = `${fontWeight} ${fontPx}px 'Inter', sans-serif`;
+	ctx.textAlign = style.textAlign;
 	ctx.textBaseline = 'top';
 
 	const lineHeight = fontPx * 1.3;
@@ -160,6 +167,26 @@ export function drawSubtitle(
 	}
 
 	ctx.restore();
+}
+
+// Helper functions for text alignment and transformation
+function getTextStartX(
+	canvasWidth: number,
+	textAlign: 'left' | 'center' | 'right',
+	totalLineWidth: number
+): number {
+	switch (textAlign) {
+		case 'left':
+			return canvasWidth * 0.05; // 5% padding from left edge
+		case 'center':
+			return (canvasWidth - totalLineWidth) / 2;
+		case 'right':
+			return canvasWidth * 0.95 - totalLineWidth; // 5% padding from right edge
+	}
+}
+
+function transformText(text: string, uppercaseEnabled: boolean): string {
+	return uppercaseEnabled ? text.toUpperCase() : text;
 }
 
 function drawFocusSubtitle(
@@ -195,11 +222,14 @@ function drawFocusSubtitle(
 		const lineY = blockY + li * lineHeight;
 		const lineWords = lines[li].split(/\s+/);
 
+		// Apply uppercase transformation if enabled
+		const transformedLineWords = lineWords.map(word => transformText(word, style.uppercaseEnabled));
+		const transformedLineText = transformedLineWords.join(' ');
+		
 		// Render word by word to apply spotlight colour
 		// We need to measure and position each word manually
-		const lineText = lines[li];
-		const totalLineWidth = ctx.measureText(lineText).width;
-		let wordX = centerX - totalLineWidth / 2;
+		const totalLineWidth = ctx.measureText(transformedLineText).width;
+		let wordX = getTextStartX(centerX * 2, style.textAlign, totalLineWidth);
 
 		for (let wi = 0; wi < lineWords.length; wi++) {
 			const word = lineWords[wi];

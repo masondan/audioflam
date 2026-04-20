@@ -259,6 +259,70 @@
     </div>
   </div>
 
+  <!-- Style row: alignment + bold + all caps -->
+  <div class="panel-row">
+    <span class="row-label">Style</span>
+    <div class="style-controls">
+      <!-- Alignment buttons -->
+      <div class="align-group">
+        <button
+          type="button"
+          class="icon-btn"
+          class:active={style.textAlign === 'left'}
+          onclick={() => updateStyle({ textAlign: 'left' })}
+          aria-label="Align left"
+          title="Align left"
+        >
+          <img src="/icons/icon-align-left.svg" alt="" />
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          class:active={style.textAlign === 'center'}
+          onclick={() => updateStyle({ textAlign: 'center' })}
+          aria-label="Align center"
+          title="Align center"
+        >
+          <img src="/icons/icon-align-center.svg" alt="" />
+        </button>
+        <button
+          type="button"
+          class="icon-btn"
+          class:active={style.textAlign === 'right'}
+          onclick={() => updateStyle({ textAlign: 'right' })}
+          aria-label="Align right"
+          title="Align right"
+        >
+          <img src="/icons/icon-align-right.svg" alt="" />
+        </button>
+      </div>
+
+      <!-- Bold button -->
+      <button
+        type="button"
+        class="text-btn"
+        class:active={style.boldEnabled}
+        onclick={() => updateStyle({ boldEnabled: !style.boldEnabled })}
+        aria-label="Toggle bold"
+        title="Toggle bold"
+      >
+        <img src="/icons/icon-bold.svg" alt="" />
+      </button>
+
+      <!-- All caps button -->
+      <button
+        type="button"
+        class="text-btn"
+        class:active={style.uppercaseEnabled}
+        onclick={() => updateStyle({ uppercaseEnabled: !style.uppercaseEnabled })}
+        aria-label="Toggle all caps"
+        title="Toggle all caps"
+      >
+        Aa
+      </button>
+    </div>
+  </div>
+
   <!-- Vertical position -->
   <div class="panel-row vertical">
     <span class="row-label">Position</span>
@@ -1018,5 +1082,90 @@
 
   .shadow-opacity-row .position-slider {
     width: 100%;
+  }
+
+  /* Style controls row */
+  .style-controls {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    flex: 1;
+  }
+
+  .align-group {
+    display: flex;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .icon-btn {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    border: none;
+    background: var(--bg-white);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: background var(--transition-normal), color var(--transition-normal);
+    flex-shrink: 0;
+  }
+
+  .icon-btn img {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .icon-btn:hover {
+    background: var(--color-highlight);
+  }
+
+  .icon-btn.active {
+    background: var(--color-primary);
+  }
+
+  .icon-btn.active img {
+    filter: brightness(0) invert(1);
+  }
+
+  .text-btn {
+    padding: 6px var(--spacing-sm);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    background: var(--bg-white);
+    color: var(--text-secondary);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-semibold);
+    cursor: pointer;
+    transition: background var(--transition-normal), color var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    min-width: 44px;
+  }
+
+  .text-btn img {
+    width: 16px;
+    height: 16px;
+    display: block;
+  }
+
+  .text-btn:hover {
+    border-color: var(--color-border-active);
+    background: var(--color-highlight);
+  }
+
+  .text-btn.active {
+    background: var(--color-primary);
+    color: #fff;
+    border-color: var(--color-primary);
+  }
+
+  .text-btn.active img {
+    filter: brightness(0) invert(1);
   }
 </style>
