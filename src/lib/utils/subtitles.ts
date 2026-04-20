@@ -52,7 +52,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
 	spotlightEnabled: true,
 	spotlightColor: '#FFD700',
 	outlineEnabled: true,
-	outlineColor: '#000000',
+	outlineColor: '#555555',
 	shadowEnabled: false,
 	shadowColor: '#000000',
 	shadowOpacity: 0.5,
