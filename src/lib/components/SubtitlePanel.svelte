@@ -645,7 +645,7 @@
 
   .template-btn.active,
   .stop-btn.active {
-    background: var(--color-primary);
+    background: #555555;
     color: #fff;
   }
 
@@ -1124,7 +1124,7 @@
   }
 
   .icon-btn.active {
-    background: var(--color-primary);
+    background: #555555;
   }
 
   .icon-btn.active img {
@@ -1159,9 +1159,9 @@
   }
 
   .bold-btn.active {
-    background: var(--color-primary);
+    background: #555555;
     color: #fff;
-    border-color: var(--color-primary);
+    border-color: #555555;
   }
 
   .bold-btn.active img {
@@ -1190,8 +1190,8 @@
   }
 
   .caps-btn.active {
-    background: var(--color-primary);
+    background: #555555;
     color: #fff;
-    border-color: var(--color-primary);
+    border-color: #555555;
   }
 </style>
