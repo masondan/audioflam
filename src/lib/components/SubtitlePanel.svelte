@@ -328,23 +328,40 @@
     </div>
 
     <!-- Shadow -->
-    <div class="style-row">
-      <span class="style-label">Shadow</span>
-      <button
-        type="button"
-        class="toggle-switch"
-        class:active={style.shadowEnabled}
-        onclick={() => updateStyle({ shadowEnabled: !style.shadowEnabled })}
-        aria-pressed={style.shadowEnabled}
-        aria-label="Toggle shadow"
-      ><span class="toggle-thumb"></span></button>
-      <button
-        type="button"
-        class="color-swatch"
-        style="background: {style.shadowColor}"
-        onclick={() => colorPickerTarget = 'shadow'}
-        aria-label="Shadow colour"
-      ></button>
+    <div class="style-group" class:expanded={style.shadowEnabled}>
+      <div class="style-row">
+        <span class="style-label">Shadow</span>
+        <button
+          type="button"
+          class="toggle-switch"
+          class:active={style.shadowEnabled}
+          onclick={() => updateStyle({ shadowEnabled: !style.shadowEnabled })}
+          aria-pressed={style.shadowEnabled}
+          aria-label="Toggle shadow"
+        ><span class="toggle-thumb"></span></button>
+        <button
+          type="button"
+          class="color-swatch"
+          style="background: {style.shadowColor}"
+          onclick={() => colorPickerTarget = 'shadow'}
+          aria-label="Shadow colour"
+        ></button>
+      </div>
+      {#if style.shadowEnabled}
+        <div class="shadow-opacity-row">
+          <span class="row-label">Opacity</span>
+          <input
+            type="range"
+            class="position-slider"
+            min="0"
+            max="1"
+            step="0.01"
+            value={style.shadowOpacity ?? 0.5}
+            oninput={(e) => updateStyle({ shadowOpacity: parseFloat((e.target as HTMLInputElement).value) })}
+            aria-label="Shadow opacity"
+          />
+        </div>
+      {/if}
     </div>
   </div>
 
@@ -978,5 +995,28 @@
   .merge-btn:hover {
     border-color: var(--color-primary);
     color: var(--color-primary);
+  }
+
+  /* Shadow group — expands to show opacity slider when shadow is on */
+  .style-group {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+  }
+
+  .shadow-opacity-row {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: var(--spacing-xs);
+    padding-top: var(--spacing-sm);
+  }
+
+  .shadow-opacity-row .row-label {
+    min-width: unset;
+  }
+
+  .shadow-opacity-row .position-slider {
+    width: 100%;
   }
 </style>

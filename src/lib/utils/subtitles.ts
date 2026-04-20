@@ -36,7 +36,8 @@ export interface SubtitleStyle {
 	outlineEnabled: boolean;
 	outlineColor: string;        // hex, default #000000
 	shadowEnabled: boolean;
-	shadowColor: string;         // hex, default #000000 (at 50% opacity, hardcoded)
+	shadowColor: string;         // hex, default #000000
+	shadowOpacity: number;       // 0–1, default 0.5
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -51,6 +52,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
 	outlineColor: '#000000',
 	shadowEnabled: false,
 	shadowColor: '#000000',
+	shadowOpacity: 0.5,
 };
 
 // --- Font size mapping ---
@@ -304,7 +306,8 @@ function applyTextEffects(
 ): void {
 	if (style.shadowEnabled) {
 		const rgb = hexToRgb(style.shadowColor);
-		ctx.shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, 0.5)`;
+		const opacity = style.shadowOpacity ?? 0.5;
+		ctx.shadowColor = `rgba(${rgb.r}, ${rgb.g}, ${rgb.b}, ${opacity})`;
 		ctx.shadowBlur = 4;
 		ctx.shadowOffsetX = 1;
 		ctx.shadowOffsetY = 1;
