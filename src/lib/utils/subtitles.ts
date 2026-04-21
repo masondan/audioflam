@@ -196,14 +196,29 @@ function getVisiblePage(
 
 /**
  * Derives how many characters fit per line from canvas width and font size.
- * Internal to the engine.
+ * Responsive constraint: tighter on mobile, looser on desktop.
+ * Additional reduction for uppercase text due to wider character widths.
  */
-export function calculateCharsPerLine(canvasWidth: number, fontSize: FontSize): number {
+export function calculateCharsPerLine(
+	canvasWidth: number,
+	fontSize: FontSize,
+	uppercaseEnabled: boolean = false
+): number {
 	// Approximate: Inter at medium size ~0.55 * fontSize width per char
 	const fontPx = canvasWidth * FONT_SIZE_RATIOS[fontSize];
 	const charWidth = fontPx * 0.55;
-	// Use 80% of canvas width for text
-	return Math.floor((canvasWidth * 0.8) / charWidth);
+	
+	// Responsive width constraint based on canvas size
+	// Mobile (< 400px): 70% to prevent overflow on small screens
+	// Desktop (>= 400px): 80% for better UX on larger screens
+	let widthConstraint = canvasWidth < 400 ? 0.70 : 0.80;
+	
+	// Additional reduction for uppercase text (wider characters)
+	if (uppercaseEnabled) {
+		widthConstraint -= 0.05; // Reduce by 5% when uppercase
+	}
+	
+	return Math.floor((canvasWidth * widthConstraint) / charWidth);
 }
 
 /**
@@ -223,7 +238,7 @@ export function drawSubtitle(
 	currentTime: number
 ): void {
 	const fontPx = canvasHeight * FONT_SIZE_RATIOS[style.fontSize];
-	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize);
+	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize, style.uppercaseEnabled);
 
 	// Find active word index (needed for sliding window calculation)
 	let activeWordIndex = -1;
@@ -531,7 +546,7 @@ export function reflow(
 	canvasWidth: number,
 	_canvasHeight: number
 ): SubtitleSegment[] {
-	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize);
+	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize, style.uppercaseEnabled);
 	// reflow only validates wrapping — text content and timestamps unchanged
 	return segments.map(seg => ({
 		...seg,
