@@ -1278,7 +1278,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-top: var(--spacing-md);
+    margin-top: var(--spacing-sm);
   }
 
   .language-btn {
