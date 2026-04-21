@@ -559,10 +559,11 @@
               <button
                 type="button"
                 class="split-btn"
+                class:active={splitPickerSegmentIdx === idx}
                 onclick={() => toggleSplitPicker(idx)}
                 title="Split segment"
                 aria-label="Split segment"
-              >÷</button>
+              >SPLIT</button>
             </div>
 
             <textarea
@@ -960,14 +961,14 @@
     padding: var(--spacing-md) var(--spacing-lg);
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-xs);
+    gap: 0;
   }
 
   .segment-card {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    padding: var(--spacing-sm);
-    background: var(--bg-white);
+    border: none;
+    border-radius: 0;
+    padding: var(--spacing-xs) 0;
+    background: transparent;
   }
 
   .segment-meta {
@@ -984,22 +985,24 @@
   }
 
   .split-btn {
-    width: 28px;
-    height: 28px;
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-sm);
-    background: var(--bg-white);
+    padding: 0;
+    border: none;
+    background: transparent;
     color: var(--text-secondary);
-    font-size: var(--font-size-base);
+    font-size: var(--font-size-xs);
+    font-weight: var(--font-weight-semibold);
     cursor: pointer;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: border-color var(--transition-normal);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    transition: color var(--transition-normal);
   }
 
   .split-btn:hover {
-    border-color: var(--color-border-active);
+    color: var(--color-primary);
+  }
+
+  .split-btn.active {
+    color: var(--color-primary);
   }
 
   .segment-text-input {
@@ -1060,16 +1063,17 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    width: 28px;
-    height: 28px;
+    width: 20px;
+    height: 20px;
     margin: 0 auto;
     border: 1px solid var(--color-border);
-    border-radius: var(--radius-round);
+    border-radius: 50%;
     background: var(--bg-white);
     color: var(--text-secondary);
     font-size: var(--font-size-base);
     cursor: pointer;
     transition: border-color var(--transition-normal), color var(--transition-normal);
+    flex-shrink: 0;
   }
 
   .merge-btn:hover {

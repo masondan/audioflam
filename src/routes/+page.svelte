@@ -1435,23 +1435,28 @@
           <img src="/icons/icon-back-five.svg" alt="Back 5s" />
         </button>
 
-        <button 
-          type="button" 
-          class="play-btn" 
+        <button
+          type="button"
+          class="play-btn"
           class:active={hasTextInput && !loading && !isPlaying}
           class:loading={loading}
           class:playing={isPlaying}
           onclick={generateAndPlay}
           disabled={!hasTextInput || $textInput.length > 4000}
+          aria-label={isPlaying ? 'Pause' : 'Play'}
         >
-          {#if isPlaying || loading}
-            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM9 9V15H11V9H9ZM13 9V15H15V9H13Z" fill="currentColor"></path>
-            </svg>
+          {#if isPlaying}
+            <img
+              src="/icons/icon-pause-new.svg"
+              alt="Pause"
+              class="play-icon"
+            />
           {:else}
-            <svg class="play-icon" viewBox="0 0 24 24" aria-hidden="true">
-              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM10.6219 8.41459C10.5562 8.37078 10.479 8.34741 10.4 8.34741C10.1791 8.34741 10 8.52649 10 8.74741V15.2526C10 15.3316 10.0234 15.4088 10.0672 15.4745C10.1897 15.6583 10.4381 15.708 10.6219 15.5854L15.5008 12.3328C15.5447 12.3035 15.5824 12.2658 15.6117 12.2219C15.7343 12.0381 15.6846 11.7897 15.5008 11.6672L10.6219 8.41459Z" fill="currentColor"></path>
-            </svg>
+            <img
+              src="/icons/icon-play-new.svg"
+              alt="Play"
+              class="play-icon"
+            />
           {/if}
         </button>
 
@@ -1891,40 +1896,45 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    background: var(--bg-white);
-    border: 3px solid #777777 !important;
+    background: #999999;
+    border: 3px solid #999999 !important;
     border-radius: var(--radius-round);
     cursor: pointer;
-    transition: border-color var(--transition-fast), background-color var(--transition-fast);
+    transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
     flex-shrink: 0;
     position: relative;
     overflow: visible;
     -webkit-appearance: none;
     appearance: none;
+    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px #999999;
   }
 
   .play-btn .play-icon {
-    width: 40px;
-    height: 40px;
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
+    width: 24px;
+    height: 24px;
+    transition: filter var(--transition-fast);
     position: relative;
     z-index: 2;
     display: block;
+    color: white;
+    filter: brightness(0) invert(1);
   }
 
   .play-btn.active {
     border-color: var(--color-primary) !important;
-    background: var(--bg-white);
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
   }
 
   .play-btn.active .play-icon {
-    color: var(--color-primary);
+    color: white;
+    filter: brightness(0) invert(1);
   }
 
   .play-btn.loading {
-    border-color: transparent !important;
-    background: transparent;
+    border-color: var(--color-primary) !important;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
   }
 
   .play-btn.loading::before {
@@ -1946,13 +1956,20 @@
     z-index: 1;
   }
 
-  .play-btn.loading .play-icon,
-  .play-btn.playing .play-icon {
-    color: var(--color-primary);
+  .play-btn.loading .play-icon {
+    color: white;
+    filter: brightness(0) invert(1);
   }
 
   .play-btn.playing {
     border-color: var(--color-primary) !important;
+    background: var(--color-primary);
+    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
+  }
+
+  .play-btn.playing .play-icon {
+    color: white;
+    filter: brightness(0) invert(1);
   }
 
   @keyframes spinner-rotate {
