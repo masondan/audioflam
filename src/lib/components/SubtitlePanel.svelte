@@ -1,5 +1,6 @@
 <script lang="ts">
   import ColorPicker from '$lib/components/ColorPicker.svelte';
+  import { SUPPORTED_LANGUAGES } from '$lib/utils/transcription';
   import {
     type SubtitleStyle,
     type SubtitleSegment,
@@ -44,6 +45,10 @@
   let generating = $state(false);
   let generateError = $state<string | null>(null);
   let generateStage = $state('');
+
+  // Language selection state
+  let selectedLanguage = $state('auto');
+  let languageDropdownOpen = $state(false);
 
   // Edit drawer state
   let editDrawerOpen = $state(false);
@@ -112,6 +117,7 @@
       // Ensure the blob has a filename so the server can detect MIME type
       const audioFile = new File([audioBlob], 'audio.mp3', { type: audioBlob.type || 'audio/mpeg' });
       formData.append('audio', audioFile);
+      formData.append('language', selectedLanguage);
 
       const response = await fetch('/api/transcribe-deepgram', {
         method: 'POST',
@@ -496,6 +502,39 @@
     {#if generateError}
       <p class="generate-error">{generateError}</p>
     {/if}
+
+    <!-- Language selector dropdown -->
+    <div class="language-selector">
+      <button
+        type="button"
+        class="language-btn"
+        class:active={selectedLanguage !== 'auto'}
+        onclick={() => languageDropdownOpen = !languageDropdownOpen}
+      >
+        Language: {SUPPORTED_LANGUAGES[selectedLanguage] || 'Auto detect'}
+        <svg class="chevron" class:open={languageDropdownOpen} viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+          <polyline points="6 9 12 15 18 9"></polyline>
+        </svg>
+      </button>
+
+      {#if languageDropdownOpen}
+        <div class="language-dropdown">
+          {#each Object.entries(SUPPORTED_LANGUAGES) as [code, name]}
+            <button
+              type="button"
+              class="language-option"
+              class:selected={selectedLanguage === code}
+              onclick={() => {
+                selectedLanguage = code;
+                languageDropdownOpen = false;
+              }}
+            >
+              {name}
+            </button>
+          {/each}
+        </div>
+      {/if}
+    </div>
   </div>
 </div>
 
@@ -1231,5 +1270,84 @@
     background: #555555;
     color: #fff;
     border-color: #555555;
+  }
+
+  /* Language selector */
+  .language-selector {
+    position: relative;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    margin-top: var(--spacing-md);
+  }
+
+  .language-btn {
+    background: none;
+    border: none;
+    padding: var(--spacing-sm) var(--spacing-md);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+    transition: color var(--transition-normal);
+  }
+
+  .language-btn:hover {
+    color: var(--color-primary);
+  }
+
+  .language-btn.active {
+    color: var(--color-primary);
+  }
+
+  .chevron {
+    width: 16px;
+    height: 16px;
+    transition: transform var(--transition-normal);
+  }
+
+  .chevron.open {
+    transform: rotate(180deg);
+  }
+
+  .language-dropdown {
+    position: absolute;
+    bottom: 100%;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    min-width: 200px;
+    max-height: 300px;
+    overflow-y: auto;
+    margin-bottom: var(--spacing-xs);
+  }
+
+  .language-option {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: none;
+    border: none;
+    text-align: left;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: background-color var(--transition-normal);
+  }
+
+  .language-option:hover {
+    background-color: var(--color-highlight);
+  }
+
+  .language-option.selected {
+    background-color: var(--color-highlight);
+    color: var(--color-primary);
+    font-weight: var(--font-weight-semibold);
   }
 </style>

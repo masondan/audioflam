@@ -23,6 +23,7 @@ export const POST: RequestHandler = async ({ request }) => {
 	try {
 		const formData = await request.formData();
 		const audioFile = formData.get('audio') as File | null;
+		const language = (formData.get('language') as string)?.trim() || 'auto';
 
 		if (!audioFile) {
 			return json({ error: 'No audio file provided' }, { status: 400 });
@@ -31,14 +32,20 @@ export const POST: RequestHandler = async ({ request }) => {
 		const audioBuffer = await audioFile.arrayBuffer();
 		const mimeType = audioFile.type || 'audio/mpeg';
 
-		// Call Deepgram Nova-3 with word-level timestamps
-		const deepgramUrl = 'https://api.deepgram.com/v1/listen?' + new URLSearchParams({
+		// Build URL params: include language if not 'auto'
+		const urlParams: Record<string, string> = {
 			model: 'nova-3',
 			smart_format: 'true',
 			punctuate: 'true',
 			utterances: 'false',
 			words: 'true',
-		}).toString();
+		};
+		if (language !== 'auto') {
+			urlParams.language = language;
+		}
+
+		// Call Deepgram Nova-3 with word-level timestamps
+		const deepgramUrl = 'https://api.deepgram.com/v1/listen?' + new URLSearchParams(urlParams).toString();
 
 		const deepgramResponse = await fetch(deepgramUrl, {
 			method: 'POST',
@@ -116,7 +123,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			}
 		}
 
-		console.log(`[Deepgram] Transcribed ${words.length} words into ${segments.length} segments`);
+		console.log(`[Deepgram] Language: ${language}, Transcribed ${words.length} words into ${segments.length} segments`);
 
 		return json({ segments }, { status: 200 });
 
