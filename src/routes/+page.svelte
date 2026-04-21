@@ -10,19 +10,20 @@
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
   import TranscribePage from '$lib/components/TranscribePage.svelte';
+  import VideoSubtitlePage from '$lib/components/VideoSubtitlePage.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
-  type ActiveTab = 'tts' | 'audiogram' | 'transcribe';
+  type ActiveTab = 'tts' | 'audiogram' | 'transcribe' | 'subtitle-video';
 
   // Navigation state - restore from localStorage on mount
   let activeTab = $state<ActiveTab>('tts');
 
   onMount(() => {
     const saved = localStorage.getItem('activeTab');
-    if (saved === 'tts' || saved === 'audiogram' || saved === 'transcribe') {
-      activeTab = saved;
+    if (saved === 'tts' || saved === 'audiogram' || saved === 'transcribe' || saved === 'subtitle-video') {
+      activeTab = saved as ActiveTab;
     }
   });
 
@@ -1230,6 +1231,16 @@
       >
         <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
       </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={activeTab === 'subtitle-video'}
+        onclick={() => activeTab = 'subtitle-video'}
+        aria-label="Subtitle video"
+        aria-pressed={activeTab === 'subtitle-video'}
+      >
+        <img src="/icons/icon-videogram.svg" alt="" class="nav-tab-icon" />
+      </button>
     </nav>
   </header>
 
@@ -1591,6 +1602,9 @@
     </div>
     <div class="tab-panel" class:hidden={activeTab !== 'transcribe'}>
       <TranscribePage />
+    </div>
+    <div class="tab-panel" class:hidden={activeTab !== 'subtitle-video'}>
+      <VideoSubtitlePage />
     </div>
   </main>
 </div>
