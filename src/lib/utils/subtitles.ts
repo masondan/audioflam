@@ -222,6 +222,43 @@ export function calculateCharsPerLine(
 }
 
 /**
+ * Rebuilds the words array from edited text, preserving timing from original words.
+ * When a user edits subtitle text, the words array still contains the original words.
+ * This function regenerates the words array to match the edited text, distributing
+ * the original timing across the new words.
+ *
+ * @param segment - The subtitle segment with edited text
+ * @returns A new segment with updated words array matching the edited text
+ */
+export function rebuildWordsFromText(segment: SubtitleSegment): SubtitleSegment {
+	const words = segment.text.trim().split(/\s+/);
+	const segmentDuration = segment.end - segment.start;
+	const wordDuration = segmentDuration / Math.max(words.length, 1);
+
+	const newWords: WordTimestamp[] = words.map((word, i) => ({
+		word,
+		start: segment.start + i * wordDuration,
+		end: segment.start + (i + 1) * wordDuration,
+	}));
+
+	return {
+		...segment,
+		words: newWords,
+	};
+}
+
+/**
+ * Rebuilds words array for all segments in a list.
+ * Call this after editing segment text to ensure rendering uses the correct words.
+ *
+ * @param segments - Array of subtitle segments
+ * @returns Array with updated words arrays
+ */
+export function rebuildAllWords(segments: SubtitleSegment[]): SubtitleSegment[] {
+	return segments.map(rebuildWordsFromText);
+}
+
+/**
  * Draws the subtitle block for the active segment onto a 2D canvas context.
  * Handles both Flow and Focus rendering.
  * Called from renderFrame() in the export pipeline and during live playback preview.

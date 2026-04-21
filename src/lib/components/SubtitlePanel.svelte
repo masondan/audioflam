@@ -10,6 +10,7 @@
     mergeSegments,
     splitSegmentAtWord,
     reflow,
+    rebuildAllWords,
   } from '$lib/utils/subtitles';
 
   interface Props {
@@ -53,6 +54,17 @@
 
   // Color picker state
   let colorPickerTarget = $state<'text' | 'spotlight' | 'outline' | 'shadow' | null>(null);
+
+  // Local reactive copy of segments — ensures edits are captured before reflow
+  let localSegments = $state<SubtitleSegment[]>([]);
+
+  // Sync prop changes into local state ONLY when drawer is closed
+  // This prevents the effect from overwriting edits while the drawer is open
+  $effect(() => {
+    if (!editDrawerOpen) {
+      localSegments = segments;
+    }
+  });
 
   const hasSegments = $derived(segments.length > 0);
 
@@ -169,43 +181,49 @@
   function closeEditDrawer() {
     editDrawerOpen = false;
     splitPickerSegmentIdx = null;
-    // Reflow all segments on close
-    if (segments.length > 0) {
-      onSegmentsChange(reflow(segments, style, canvasWidth, canvasHeight));
+    // Reflow all segments on close (using localSegments to capture any edits)
+    if (localSegments.length > 0) {
+      // CRITICAL: Rebuild words array from edited text before reflow
+      // This ensures the rendering engine uses the correct edited words, not the original ones
+      const withRebuiltWords = rebuildAllWords(localSegments);
+      const reflowed = reflow(withRebuiltWords, style, canvasWidth, canvasHeight);
+      console.log('[SubtitlePanel] closeEditDrawer: rebuilt words and reflowed segments');
+      onSegmentsChange(reflowed);
     }
   }
 
   function handleSegmentTextEdit(idx: number, newText: string) {
-    const updated = segments.map((seg, i) =>
+    const updated = localSegments.map((seg, i) =>
       i === idx ? { ...seg, text: newText } : seg
     );
-    onSegmentsChange(updated);
+    localSegments = updated;
+    console.log('[SubtitlePanel] handleSegmentTextEdit:', { idx, newText, updatedText: updated[idx]?.text });
   }
 
   function handleMerge(idxA: number) {
     const idxB = idxA + 1;
-    if (idxB >= segments.length) return;
-    const merged = mergeSegments(segments[idxA], segments[idxB]);
+    if (idxB >= localSegments.length) return;
+    const merged = mergeSegments(localSegments[idxA], localSegments[idxB]);
     const updated = [
-      ...segments.slice(0, idxA),
+      ...localSegments.slice(0, idxA),
       merged,
-      ...segments.slice(idxB + 1),
+      ...localSegments.slice(idxB + 1),
     ];
-    onSegmentsChange(updated);
+    localSegments = updated;
     if (splitPickerSegmentIdx !== null && splitPickerSegmentIdx >= idxA) {
       splitPickerSegmentIdx = null;
     }
   }
 
   function handleSplit(segIdx: number, wordIdx: number) {
-    const [segA, segB] = splitSegmentAtWord(segments[segIdx], wordIdx);
+    const [segA, segB] = splitSegmentAtWord(localSegments[segIdx], wordIdx);
     const updated = [
-      ...segments.slice(0, segIdx),
+      ...localSegments.slice(0, segIdx),
       segA,
       segB,
-      ...segments.slice(segIdx + 1),
+      ...localSegments.slice(segIdx + 1),
     ];
-    onSegmentsChange(updated);
+    localSegments = updated;
     splitPickerSegmentIdx = null;
   }
 
@@ -551,7 +569,7 @@
       </div>
 
       <div class="drawer-segments">
-        {#each segments as seg, idx}
+        {#each localSegments as seg, idx}
           <!-- Segment -->
           <div class="segment-card">
             <div class="segment-meta">
@@ -594,7 +612,7 @@
           </div>
 
           <!-- Merge button between segments -->
-          {#if idx < segments.length - 1}
+          {#if idx < localSegments.length - 1}
             <button
               type="button"
               class="merge-btn"

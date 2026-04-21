@@ -121,6 +121,11 @@
   let subtitleSegments = $state<SubtitleSegment[]>([]);
   let subtitleStyle = $state<SubtitleStyle>({ ...DEFAULT_SUBTITLE_STYLE });
 
+  // Debug: log when subtitleSegments changes
+  $effect(() => {
+    console.log('[AudiogramPage] subtitleSegments changed:', { count: subtitleSegments.length, firstText: subtitleSegments[0]?.text });
+  });
+
   // Subtitle placeholder animation state
   // Loops 0 → PLACEHOLDER_CYCLE_DURATION when subtitles are active but not yet generated
   let subtitlePlaceholderTime = $state(0);
@@ -1889,7 +1894,10 @@
         segments={subtitleSegments}
         subtitlesEnabled={subtitleActive}
         onStyleChange={(s) => subtitleStyle = s}
-        onSegmentsChange={(segs) => subtitleSegments = segs}
+        onSegmentsChange={(segs) => {
+          console.log('[AudiogramPage] onSegmentsChange received:', { count: segs.length, firstText: segs[0]?.text });
+          subtitleSegments = segs;
+        }}
         onEnabledChange={(en) => subtitleActive = en}
       />
     </TogglePanel>
