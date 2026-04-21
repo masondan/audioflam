@@ -2,8 +2,10 @@
   import { onMount } from 'svelte';
   import SubtitlePanel from './SubtitlePanel.svelte';
   import TitlePanel from './TitlePanel.svelte';
+  import { drawSubtitle, getActiveSegment } from '$lib/utils/subtitles';
   import type { SubtitleSegment, SubtitleStyle } from '$lib/utils/subtitles';
   import type { TitleFont, TitleAlign } from '$lib/utils/compositor';
+  import { renderTitleLayer } from '$lib/utils/compositor';
 
   // Video state
   let videoBlob: Blob | null = null;
@@ -178,7 +180,7 @@
     isDraggingEnd = false;
   }
 
-  // Canvas rendering
+  // Canvas rendering with title & subtitle support
   function renderFrame(time: number) {
     if (!canvasContext || !videoElement) return;
 
@@ -186,12 +188,52 @@
     videoElement.currentTime = seekTime;
 
     requestAnimationFrame(() => {
-      if (!canvasContext || !videoElement) return;
+      if (!canvasContext || !videoElement || !canvasElement) return;
 
-      // Draw video frame
+      // Draw black background
       canvasContext.fillStyle = '#000000';
       canvasContext.fillRect(0, 0, canvasWidth, canvasHeight);
-      canvasContext.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
+
+      // Draw video frame
+      try {
+        canvasContext.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
+      } catch (error) {
+        console.warn('[VideoSubtitle] drawImage failed (iOS Safari?):', error);
+        // Fallback: just show black frame
+      }
+
+      // Draw title layer if enabled
+      if (titleText) {
+        renderTitleLayer(canvasContext, canvasElement, {
+          enabled: true,
+          text: titleText,
+          font: titleFont,
+          align: titleAlign,
+          bold: titleBold,
+          lineHeight: titleLineHeight,
+          letterSpacing: titleLetterSpacing,
+          color: titleColor,
+          labelEnabled: labelEnabled,
+          labelOpacity: labelOpacity,
+          labelSpace: labelSpace,
+          labelColor: labelColor,
+        });
+      }
+
+      // Draw subtitle layer if enabled
+      if (subtitlesEnabled && subtitleSegments.length > 0) {
+        const activeSegment = getActiveSegment(subtitleSegments, time);
+        if (activeSegment) {
+          drawSubtitle(
+            canvasContext,
+            activeSegment,
+            subtitleStyle,
+            canvasWidth,
+            canvasHeight,
+            time
+          );
+        }
+      }
     });
   }
 
