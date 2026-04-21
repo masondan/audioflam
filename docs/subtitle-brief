@@ -208,9 +208,9 @@ Add a tab to the main navigation alongside TTS, Audiogram, and Transcribe. Label
 
 Modelled on the audiogram page but simplified. Present: video upload, trim control, title panel (reuse `TitlePanel.svelte` unchanged), subtitle panel (reuse `SubtitlePanel.svelte` unchanged), export button. Absent: image upload, audio upload, waveform panel, light effect panel.
 
-**Upload zone** — single dashed upload area accepting MP4, MOV, WebM. On mobile, triggers device camera roll. Displays a `<video>` preview element once loaded.
+**Upload zone** — single dashed upload area accepting MP4, MOV, WebM. Helper text inside the upload areas states: Upload a video to add subtitles. On mobile, triggers device camera roll. Displays a `<video>` preview element once loaded.
 
-**Trim control** — a scrubber below the video preview with two drag handles representing in-point and out-point. Displays the selected clip duration. Trim is applied at export time; it is not destructive on the uploaded file. This is a convenience tool — frame-accurate precision is not required.
+**Trim control** — a scrubber below the video preview with two drag handles representing in-point and out-point. Displays the selected clip duration. Trim is applied at export time; it is not destructive on the uploaded file.
 
 **Playback** — play/pause control. During playback, the canvas renders video frames with subtitles burned in via `drawSubtitle()`, serving as the subtitle preview. No separate preview step is needed.
 

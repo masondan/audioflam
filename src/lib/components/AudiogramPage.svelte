@@ -9,6 +9,7 @@
   import WaveformPanel from './WaveformPanel.svelte';
   import TitlePanel from './TitlePanel.svelte';
   import LightEffectPanel from './LightEffectPanel.svelte';
+  import PlayButton from './PlayButton.svelte';
   import type { WaveformStyle } from './WaveformPanel.svelte';
   import type { TitleFont, TitleAlign } from './TitlePanel.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, precomputeFrequencyFrames, type WaveformData } from '$lib/utils/waveform';
@@ -1745,39 +1746,13 @@
         </svg>
       </button>
 
-      <button
-        type="button"
-        class="play-btn"
-        class:active={hasAudio || isMicActive}
-        class:playing={isPlaying || recordingPhase === 'recording'}
+      <PlayButton
+        state={recordingPhase === 'countdown' ? 'active' : recordingPhase === 'recording' ? 'loading' : isPlaying ? 'playing' : (hasAudio || isMicActive) ? 'active' : 'inactive'}
+        countdownNumber={recordingPhase === 'countdown' ? countdownNumber : null}
         onclick={isMicActive ? handleRecordPlayPause : handlePlayPause}
         disabled={(!hasAudio && !isMicActive) || isExporting}
-        aria-label={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
-      >
-        {#if recordingPhase === 'countdown'}
-          <span class="countdown-number-text">{countdownNumber}</span>
-        {:else if recordingPhase === 'recording'}
-          <img
-            src="/icons/icon-square-new.svg"
-            alt="Stop"
-            class="play-icon"
-          />
-        {:else}
-          {#if isPlaying}
-            <img
-              src="/icons/icon-pause-new.svg"
-              alt="Pause"
-              class="play-icon"
-            />
-          {:else}
-            <img
-              src="/icons/icon-play-new.svg"
-              alt="Play"
-              class="play-icon"
-            />
-          {/if}
-        {/if}
-      </button>
+        ariaLabel={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
+      />
 
       <button
         type="button"
@@ -2167,7 +2142,7 @@
   }
 
   .countdown-number-text {
-    font-size: 2rem;
+    font-size: 2.5rem;
     font-weight: var(--font-weight-bold);
     color: white;
     display: flex;
@@ -2335,71 +2310,6 @@
     transition: color var(--transition-fast);
   }
 
-  .play-btn {
-    width: 50px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #999999;
-    border: 3px solid #999999 !important;
-    border-radius: var(--radius-round);
-    cursor: pointer;
-    transition: border-color var(--transition-fast), background-color var(--transition-fast);
-    flex-shrink: 0;
-    -webkit-appearance: none;
-    appearance: none;
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px #999999;
-  }
-
-  .play-btn:disabled {
-    cursor: not-allowed;
-  }
-
-  .play-btn.active {
-    border-color: var(--color-primary) !important;
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
-  }
-
-  .play-btn.active .play-icon {
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  .play-btn.active:disabled {
-    border-color: #777777 !important;
-    background: #777777;
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px #777777;
-  }
-
-  .play-btn.active:disabled .play-icon {
-    color: var(--bg-white);
-  }
-
-  .play-btn.playing {
-    border-color: var(--color-primary) !important;
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
-  }
-
-  .play-btn.playing .play-icon {
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  .play-icon {
-    width: 24px;
-    height: 24px;
-    color: white;
-    transition: color var(--transition-fast);
-    display: block;
-    filter: brightness(0) invert(1);
-  }
-
-  .countdown-icon {
-    filter: brightness(0) invert(1);
-  }
 
   .toggle-panels {
     display: flex;

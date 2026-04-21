@@ -10,6 +10,7 @@
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
   import TranscribePage from '$lib/components/TranscribePage.svelte';
+  import PlayButton from '$lib/components/PlayButton.svelte';
   import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
@@ -1435,30 +1436,12 @@
           <img src="/icons/icon-back-five.svg" alt="Back 5s" />
         </button>
 
-        <button
-          type="button"
-          class="play-btn"
-          class:active={hasTextInput && !loading && !isPlaying}
-          class:loading={loading}
-          class:playing={isPlaying}
-          onclick={generateAndPlay}
+        <PlayButton
+          state={loading ? 'loading' : isPlaying ? 'playing' : hasTextInput ? 'active' : 'inactive'}
           disabled={!hasTextInput || $textInput.length > 4000}
-          aria-label={isPlaying ? 'Pause' : 'Play'}
-        >
-          {#if isPlaying}
-            <img
-              src="/icons/icon-pause-new.svg"
-              alt="Pause"
-              class="play-icon"
-            />
-          {:else}
-            <img
-              src="/icons/icon-play-new.svg"
-              alt="Play"
-              class="play-icon"
-            />
-          {/if}
-        </button>
+          onclick={generateAndPlay}
+          ariaLabel={isPlaying ? 'Pause' : 'Play'}
+        />
 
         <button 
           type="button" 
@@ -1890,96 +1873,6 @@
     opacity: 0.4;
   }
 
-  .play-btn {
-    width: 50px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: #999999;
-    border: 3px solid #999999 !important;
-    border-radius: var(--radius-round);
-    cursor: pointer;
-    transition: border-color var(--transition-fast), background-color var(--transition-fast), box-shadow var(--transition-fast);
-    flex-shrink: 0;
-    position: relative;
-    overflow: visible;
-    -webkit-appearance: none;
-    appearance: none;
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px #999999;
-  }
-
-  .play-btn .play-icon {
-    width: 24px;
-    height: 24px;
-    transition: filter var(--transition-fast);
-    position: relative;
-    z-index: 2;
-    display: block;
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  .play-btn.active {
-    border-color: var(--color-primary) !important;
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
-  }
-
-  .play-btn.active .play-icon {
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  .play-btn.loading {
-    border-color: var(--color-primary) !important;
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
-  }
-
-  .play-btn.loading::before {
-    content: '';
-    position: absolute;
-    inset: -3px;
-    border-radius: var(--radius-round);
-    background: conic-gradient(from 0deg, var(--color-primary), var(--color-highlight), var(--color-primary));
-    animation: spinner-rotate 1s linear infinite;
-    z-index: 0;
-  }
-
-  .play-btn.loading::after {
-    content: '';
-    position: absolute;
-    inset: 0;
-    border-radius: var(--radius-round);
-    background: var(--bg-white);
-    z-index: 1;
-  }
-
-  .play-btn.loading .play-icon {
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  .play-btn.playing {
-    border-color: var(--color-primary) !important;
-    background: var(--color-primary);
-    box-shadow: 0 0 0 3px var(--bg-white), 0 0 0 6px var(--color-primary);
-  }
-
-  .play-btn.playing .play-icon {
-    color: white;
-    filter: brightness(0) invert(1);
-  }
-
-  @keyframes spinner-rotate {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  .play-btn:disabled {
-    cursor: not-allowed;
-  }
 
 
 

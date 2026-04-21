@@ -1,6 +1,7 @@
 <script lang="ts">
   import { get } from 'svelte/store';
   import { transcriptionSettingsStore } from '$lib/stores';
+  import PlayButton from './PlayButton.svelte';
   import { decodeAudioFile, extractWaveformData, drawWaveform, type WaveformData } from '$lib/utils/waveform';
   import {
     requestMicrophonePermission,
@@ -817,37 +818,13 @@
         </svg>
       </button>
 
-      <button
-        type="button"
-        class="play-btn"
-        class:active={hasAudio || isMicActive}
-        class:playing={isPlaying || recordingPhase === 'recording'}
+      <PlayButton
+        state={recordingPhase === 'countdown' ? 'active' : recordingPhase === 'recording' ? 'loading' : isPlaying ? 'playing' : (hasAudio || isMicActive) ? 'active' : 'inactive'}
+        countdownNumber={recordingPhase === 'countdown' ? countdownNumber : null}
         onclick={isMicActive ? handleRecordPlayPause : handlePlayPause}
         disabled={(!hasAudio && !isMicActive) || isTranscribing}
-        aria-label={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
-      >
-        {#if recordingPhase === 'countdown'}
-          <img
-            src="/icons/icon-{countdownNumber === 3 ? 'three' : countdownNumber === 2 ? 'two' : 'one'}.svg"
-            alt={String(countdownNumber)}
-            class="play-icon countdown-icon"
-          />
-        {:else if recordingPhase === 'recording'}
-          <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-            <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM7 7H17V17H7V7Z"></path>
-          </svg>
-        {:else}
-          {#if isPlaying}
-            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM9 9V15H11V9H9ZM13 9V15H15V9H13Z"></path>
-            </svg>
-          {:else}
-            <svg class="play-icon" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-              <path d="M12 22C6.47715 22 2 17.5228 2 12C2 6.47715 6.47715 2 12 2C17.5228 2 22 6.47715 22 12C22 17.5228 17.5228 22 12 22ZM10.6219 8.41459C10.5562 8.37078 10.479 8.34741 10.4 8.34741C10.1791 8.34741 10 8.52649 10 8.74741V15.2526C10 15.3316 10.0234 15.4088 10.0672 15.4745C10.1897 15.6583 10.4381 15.708 10.6219 15.5854L15.5008 12.3328C15.5447 12.3035 15.5824 12.2658 15.6117 12.2219C15.7343 12.0381 15.6846 11.7897 15.5008 11.6672L10.6219 8.41459Z"></path>
-            </svg>
-          {/if}
-        {/if}
-      </button>
+        ariaLabel={recordingPhase === 'recording' ? 'Stop' : isPlaying ? 'Pause' : 'Play'}
+      />
 
       <button
         type="button"
@@ -1303,58 +1280,6 @@
     transition: color var(--transition-fast);
   }
 
-  .play-btn {
-    width: 50px;
-    height: 50px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: var(--bg-white);
-    border: 3px solid #999999 !important;
-    border-radius: var(--radius-round);
-    cursor: pointer;
-    transition: border-color var(--transition-fast), background-color var(--transition-fast);
-    flex-shrink: 0;
-    -webkit-appearance: none;
-    appearance: none;
-  }
-
-  .play-btn:disabled {
-    cursor: not-allowed;
-  }
-
-  .play-btn.active {
-    border-color: var(--color-primary) !important;
-    background: var(--bg-white);
-  }
-
-  .play-btn.active .play-icon {
-    color: var(--color-primary);
-  }
-
-  .play-btn.active:disabled {
-    border-color: #777777 !important;
-  }
-
-  .play-btn.active:disabled .play-icon {
-    color: var(--text-secondary);
-  }
-
-  .play-btn.playing {
-    border-color: var(--color-primary) !important;
-  }
-
-  .play-btn.playing .play-icon {
-    color: var(--color-primary);
-  }
-
-  .play-icon {
-    width: 40px;
-    height: 40px;
-    color: var(--text-secondary);
-    transition: color var(--transition-fast);
-    display: block;
-  }
 
   /* --- Helper text --- */
   .helper-text {
