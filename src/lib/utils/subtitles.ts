@@ -201,23 +201,23 @@ function getVisiblePage(
  */
 export function calculateCharsPerLine(
 	canvasWidth: number,
+	canvasHeight: number,
 	fontSize: FontSize,
 	uppercaseEnabled: boolean = false
 ): number {
-	// Approximate: Inter at medium size ~0.55 * fontSize width per char
-	const fontPx = canvasWidth * FONT_SIZE_RATIOS[fontSize];
+	const shortSide = Math.min(canvasWidth, canvasHeight);
+	const fontPx = shortSide * FONT_SIZE_RATIOS[fontSize];
 	const charWidth = fontPx * 0.55;
-	
-	// Responsive width constraint based on canvas size
-	// Mobile (< 400px): 70% to prevent overflow on small screens
-	// Desktop (>= 400px): 80% for better UX on larger screens
-	let widthConstraint = canvasWidth < 400 ? 0.70 : 0.80;
-	
-	// Additional reduction for uppercase text (wider characters)
-	if (uppercaseEnabled) {
-		widthConstraint -= 0.05; // Reduce by 5% when uppercase
+
+	const aspectRatio = canvasWidth / canvasHeight;
+	let widthConstraint: number;
+	if (aspectRatio > 1.2) {
+		widthConstraint = 0.60; // landscape
+	} else {
+		widthConstraint = 0.75; // square or vertical
 	}
-	
+	if (uppercaseEnabled) widthConstraint -= 0.05;
+
 	return Math.floor((canvasWidth * widthConstraint) / charWidth);
 }
 
@@ -274,8 +274,9 @@ export function drawSubtitle(
 	canvasHeight: number,
 	currentTime: number
 ): void {
-	const fontPx = canvasHeight * FONT_SIZE_RATIOS[style.fontSize];
-	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize, style.uppercaseEnabled);
+	const shortSide = Math.min(canvasWidth, canvasHeight);
+	const fontPx = shortSide * FONT_SIZE_RATIOS[style.fontSize];
+	const charsPerLine = calculateCharsPerLine(canvasWidth, canvasHeight, style.fontSize, style.uppercaseEnabled);
 
 	// Find active word index (needed for sliding window calculation)
 	let activeWordIndex = -1;
@@ -319,7 +320,7 @@ export function drawSubtitle(
 
 	const lineHeight = fontPx * 1.3;
 	const totalHeight = lines.length * lineHeight;
-	const blockY = canvasHeight * style.verticalPosition - totalHeight / 2;
+	const blockY = canvasHeight * style.verticalPosition;
 	const centerX = canvasWidth / 2;
 
 	if (style.template === 'focus') {
@@ -581,9 +582,9 @@ export function reflow(
 	segments: SubtitleSegment[],
 	style: SubtitleStyle,
 	canvasWidth: number,
-	_canvasHeight: number
+	canvasHeight: number
 ): SubtitleSegment[] {
-	const charsPerLine = calculateCharsPerLine(canvasWidth, style.fontSize, style.uppercaseEnabled);
+	const charsPerLine = calculateCharsPerLine(canvasWidth, canvasHeight, style.fontSize, style.uppercaseEnabled);
 	// reflow only validates wrapping — text content and timestamps unchanged
 	return segments.map(seg => ({
 		...seg,
