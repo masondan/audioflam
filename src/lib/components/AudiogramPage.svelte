@@ -784,9 +784,9 @@
       const percentage = Math.max(0, Math.min(1, (moveEvent.clientX - rect.left) / rect.width));
       
       if (draggingHandle === 'start') {
-        trimStart = Math.min(percentage, trimEnd - 0.05);
+        trimStart = Math.min(percentage, trimEnd - 0.01);
       } else if (draggingHandle === 'end') {
-        trimEnd = Math.max(percentage, trimStart + 0.05);
+        trimEnd = Math.max(percentage, trimStart + 0.01);
       }
     };
     
@@ -814,9 +814,9 @@
       const percentage = Math.max(0, Math.min(1, (touch.clientX - rect.left) / rect.width));
       
       if (draggingHandle === 'start') {
-        trimStart = Math.min(percentage, trimEnd - 0.05);
+        trimStart = Math.min(percentage, trimEnd - 0.01);
       } else if (draggingHandle === 'end') {
-        trimEnd = Math.max(percentage, trimStart + 0.05);
+        trimEnd = Math.max(percentage, trimStart + 0.01);
       }
     };
     
@@ -862,8 +862,11 @@
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('ended', () => {
       isPlaying = false;
+      stopWaveformAnimation();
       if (audioData) {
-        currentTime = audioData.duration * trimStart;
+        const resetTime = audioData.duration * trimStart;
+        audio.currentTime = resetTime;
+        currentTime = resetTime;
       }
     });
     audioElement = audio;
