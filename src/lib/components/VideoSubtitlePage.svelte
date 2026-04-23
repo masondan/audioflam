@@ -4,6 +4,7 @@
   import SubtitlePanel from './SubtitlePanel.svelte';
   import { drawSubtitle, getActiveSegment, DEFAULT_SUBTITLE_STYLE, type FontSize } from '$lib/utils/subtitles';
   import type { SubtitleSegment, SubtitleStyle } from '$lib/utils/subtitles';
+  import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress } from '$lib/utils/video-export';
 
   // Video state
   let videoBlob: Blob | null = $state(null);
@@ -43,6 +44,12 @@
   let exportError: string | null = $state(null);
   let uploadError: string | null = $state(null);
   let videoLoading = $state(false);
+  let exportProgress = $state<ExportProgress | null>(null);
+  let exportCancelled = $state(false);
+  let showFilenameModal = $state(false);
+  let exportFilename = $state('');
+  let pendingVideoBlob = $state<Blob | null>(null);
+  let pendingVideoMimeType = $state('');
 
   // Derived
   let hasVideo = $derived(videoBlob !== null);
@@ -417,45 +424,233 @@
     fileInput?.click();
   }
 
+  // ─── Pre-extract video frames for export ───────────────────────────────────
+  async function extractVideoFrames(
+    videoSrc: string,
+    duration: number,
+    canvasW: number,
+    canvasH: number,
+    fps: number = 24,
+    onProgress?: (progress: ExportProgress) => void
+  ): Promise<HTMLCanvasElement[]> {
+    const frames: HTMLCanvasElement[] = [];
+    const extractCanvas = document.createElement('canvas');
+    extractCanvas.width = canvasW;
+    extractCanvas.height = canvasH;
+    const extractCtx = extractCanvas.getContext('2d')!;
+
+    const extractVideo = document.createElement('video');
+    extractVideo.src = videoSrc;
+    extractVideo.muted = false;
+    extractVideo.crossOrigin = 'anonymous';
+
+    await new Promise<void>((resolve, reject) => {
+      extractVideo.onloadedmetadata = () => resolve();
+      extractVideo.onerror = () => reject(new Error('Failed to load video for frame extraction'));
+      setTimeout(() => reject(new Error('Frame extraction timeout')), 15000);
+    });
+
+    const numFrames = Math.ceil(duration * fps);
+    const frameTimeStep = 1 / fps;
+
+    console.log(`[VideoSubtitle Export] Starting frame extraction: ${numFrames} frames at ${fps} fps, duration ${duration.toFixed(2)}s`);
+
+    for (let i = 0; i < numFrames; i++) {
+      const frameTime = i * frameTimeStep;
+      
+      // Seek to the frame time
+      extractVideo.currentTime = frameTime;
+      
+      // Wait for seek to complete
+      await new Promise<void>((seekResolve) => {
+        const onSeeked = () => {
+          extractVideo.removeEventListener('seeked', onSeeked);
+          seekResolve();
+        };
+        extractVideo.addEventListener('seeked', onSeeked, { once: true });
+        
+        // Safety timeout in case seeked never fires
+        setTimeout(seekResolve, 500);
+      });
+
+      // Draw the current frame
+      extractCtx.fillStyle = '#000';
+      extractCtx.fillRect(0, 0, canvasW, canvasH);
+      try {
+        extractCtx.drawImage(extractVideo, 0, 0, canvasW, canvasH);
+      } catch (e) {
+        console.warn(`[VideoSubtitle Export] Frame ${i} drawImage failed:`, e);
+      }
+
+      // Clone the canvas as a frame
+      const frameCanvas = document.createElement('canvas');
+      frameCanvas.width = canvasW;
+      frameCanvas.height = canvasH;
+      const frameCtx = frameCanvas.getContext('2d')!;
+      frameCtx.drawImage(extractCanvas, 0, 0);
+      frames.push(frameCanvas);
+
+      // Report progress during frame extraction (every ~10 frames for smooth animation)
+      if (i % 10 === 0) {
+        const progress = i / numFrames;
+        onProgress?.({
+          phase: 'preparing',
+          progress,
+          message: `Extracting frames… ${Math.round(progress * 100)}%`
+        });
+        console.log(`[VideoSubtitle Export] Extracted frame ${i + 1}/${numFrames}`);
+      }
+    }
+
+    console.log(`[VideoSubtitle Export] Frame extraction complete: ${frames.length} frames`);
+    return frames;
+  }
+
   // ─── Export ───────────────────────────────────────────────────────────────
   async function handleExport() {
-    if (!videoBlob || !canvasElement) {
+    if (!videoBlob || !canvasElement || !videoObjectUrl) {
       alert('Upload a video first');
       return;
     }
 
     isExporting = true;
     exportError = null;
+    exportCancelled = false;
 
     try {
-      const { smartExportVideo } = await import('$lib/utils/video-export');
+      // Create a dedicated off-screen export canvas (willReadFrequently for efficient pixel reads during encoding)
+      const exportCanvas = document.createElement('canvas');
+      exportCanvas.width = canvasWidth;
+      exportCanvas.height = canvasHeight;
+      const exportCtx = exportCanvas.getContext('2d', { willReadFrequently: true })!;
 
-      const audioUrl = URL.createObjectURL(
-        new Blob([], { type: 'audio/webm' })
-      );
-      const audioElement = document.createElement('audio');
-      audioElement.src = audioUrl;
-
-      const renderCallback = (time: number) => {
-        renderFrame(time + trimStartSec);
+      // Pre-extract all video frames before export
+      console.log(`[VideoSubtitle Export] Beginning frame extraction for ${trimmedDuration.toFixed(2)}s video`);
+      exportProgress = {
+        phase: 'preparing',
+        progress: 0,
+        message: 'Extracting frames…'
       };
 
-      await smartExportVideo(
-        canvasElement,
-        audioElement,
-        undefined,
+      const videoFrames = await extractVideoFrames(
+        videoObjectUrl,
         trimmedDuration,
-        undefined,
+        canvasWidth,
+        canvasHeight,
+        24, // 24 fps to match WebCodecs export
+        (progress) => { exportProgress = progress; }
+      );
+
+      // Render callback that uses pre-extracted frames
+      let frameCount = 0;
+      const renderCallback = (time: number) => {
+        const frameIndex = Math.floor(time * 24); // 24 fps
+        if (frameIndex < 0 || frameIndex >= videoFrames.length) {
+          console.warn(`[VideoSubtitle Export] Frame index ${frameIndex} out of bounds (${videoFrames.length} frames)`);
+          return;
+        }
+
+        // Draw the pre-extracted frame onto the export canvas
+        const preExtractedFrame = videoFrames[frameIndex];
+        exportCtx.drawImage(preExtractedFrame, 0, 0, canvasWidth, canvasHeight);
+
+        // Draw subtitles if enabled
+        if (subtitlesEnabled && subtitleSegments.length > 0) {
+          const relTime = time;
+          const activeSegment = getActiveSegment(subtitleSegments, relTime);
+          if (activeSegment) {
+            drawSubtitle(exportCtx, activeSegment, subtitleStyle, canvasWidth, canvasHeight, relTime);
+          }
+        }
+
+        frameCount++;
+        if (frameCount % 50 === 0) {
+          console.log(`[VideoSubtitle Export] Processing frame ${frameCount}/${videoFrames.length}`);
+        }
+      };
+
+      // Decode audio from the original video blob for muxing into the export
+      const arrayBuffer = await videoBlob!.arrayBuffer();
+      const audioContext = new AudioContext();
+      let audioBuffer: AudioBuffer | undefined;
+      try {
+        const decoded = await audioContext.decodeAudioData(arrayBuffer);
+        console.log('[VideoSubtitle Export] Audio decoded:', { duration: decoded.duration.toFixed(2), channels: decoded.numberOfChannels, sampleRate: decoded.sampleRate });
+
+        // Slice to the trimmed region
+        if (trimStartSec > 0 || trimEndSec < videoDuration) {
+          const sampleRate = decoded.sampleRate;
+          const startSample = Math.floor(trimStartSec * sampleRate);
+          const endSample = Math.floor(trimEndSec * sampleRate);
+          const trimmed = audioContext.createBuffer(
+            decoded.numberOfChannels,
+            endSample - startSample,
+            sampleRate
+          );
+          for (let ch = 0; ch < decoded.numberOfChannels; ch++) {
+            trimmed.getChannelData(ch).set(
+              decoded.getChannelData(ch).subarray(startSample, endSample)
+            );
+          }
+          audioBuffer = trimmed;
+          console.log('[VideoSubtitle Export] Audio trimmed to:', trimmed.duration.toFixed(2) + 's');
+        } else {
+          audioBuffer = decoded;
+        }
+      } catch (e) {
+        console.warn('[VideoSubtitle Export] Could not decode audio from videoBlob:', e);
+      } finally {
+        audioContext.close();
+      }
+
+      console.log('[VideoSubtitle Export] Audio for export:', audioBuffer ? `${audioBuffer.duration.toFixed(2)}s (${audioBuffer.numberOfChannels}ch)` : 'none (video-only)');
+
+      // Create a dummy audio element (required by smartExportVideo signature; WebCodecs path uses audioBuffer directly)
+      const audioVideo = document.createElement('video');
+      audioVideo.src = videoObjectUrl!;
+      audioVideo.muted = false;
+      audioVideo.crossOrigin = 'anonymous';
+
+      const result = await smartExportVideo(
+        exportCanvas,
+        audioVideo,
+        audioBuffer,
+        trimmedDuration,
+        (progress) => { exportProgress = progress; },
         renderCallback
       );
 
-      alert('Video exported successfully');
+      if (!exportCancelled) {
+        pendingVideoBlob = result.blob;
+        pendingVideoMimeType = result.mimeType;
+        exportFilename = generateFilename(result.mimeType);
+        showFilenameModal = true;
+      }
     } catch (error) {
       exportError = error instanceof Error ? error.message : 'Export failed';
       console.error('[VideoSubtitle] Export error:', error);
     } finally {
       isExporting = false;
     }
+  }
+
+  function handleFilenameConfirm() {
+    if (pendingVideoBlob && exportFilename) {
+      const extension = getExtensionFromMimeType(pendingVideoMimeType);
+      const filename = exportFilename.endsWith(`.${extension}`)
+        ? exportFilename
+        : `${exportFilename}.${extension}`;
+      downloadBlob(pendingVideoBlob, filename);
+    }
+    handleFilenameCancel();
+  }
+
+  function handleFilenameCancel() {
+    showFilenameModal = false;
+    pendingVideoBlob = null;
+    pendingVideoMimeType = '';
+    exportFilename = '';
+    exportProgress = null;
   }
 
   // ─── Lifecycle ────────────────────────────────────────────────────────────
@@ -541,12 +736,14 @@
   <!-- Canvas preview (only visible when video loaded) -->
   {#if hasVideo}
     <div class="canvas-container">
-      <canvas
-        bind:this={canvasElement}
-        width={canvasWidth}
-        height={canvasHeight}
-        class="preview-canvas"
-      ></canvas>
+      <div class="canvas-wrapper" class:exporting={isExporting}>
+        <canvas
+          bind:this={canvasElement}
+          width={canvasWidth}
+          height={canvasHeight}
+          class="preview-canvas"
+        ></canvas>
+      </div>
       {#if videoLoading}
         <div class="canvas-loading">Loading video…</div>
       {/if}
@@ -705,16 +902,46 @@
   <div class="export-section">
     <button
       class="export-button"
+      class:exporting={isExporting || (exportProgress && exportProgress.phase !== 'complete')}
       onclick={handleExport}
       disabled={isExporting || !hasVideo}
     >
-      {isExporting ? 'Exporting…' : 'Download video'}
+      {#if exportProgress}
+        <div class="export-progress">
+          <span class="export-message">{exportProgress.message}</span>
+          <div class="export-bar">
+            <div class="export-bar-fill" style="width: {exportProgress.progress * 100}%"></div>
+          </div>
+        </div>
+      {:else}
+        {isExporting ? 'Exporting…' : 'Download video'}
+      {/if}
     </button>
     {#if exportError}
       <div class="error-msg">{exportError}</div>
     {/if}
   </div>
 </div>
+
+{#if showFilenameModal}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <div class="modal-overlay" onclick={handleFilenameCancel} role="presentation">
+    <div class="modal-content" onclick={(e) => e.stopPropagation()} role="dialog" aria-modal="true" aria-labelledby="modal-title" tabindex="-1">
+      <h3 id="modal-title" class="modal-title">Save video</h3>
+      <input
+        type="text"
+        class="filename-input"
+        bind:value={exportFilename}
+        placeholder="Enter filename"
+        onkeydown={(e) => e.key === 'Enter' && handleFilenameConfirm()}
+      />
+      <div class="modal-actions">
+        <button type="button" class="modal-btn cancel" onclick={handleFilenameCancel}>Cancel</button>
+        <button type="button" class="modal-btn confirm" onclick={handleFilenameConfirm}>Download</button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <style>
   .video-page {
@@ -1029,4 +1256,157 @@
     opacity: 0.5;
     pointer-events: none;
   }
+
+  /* ── Modal ── */
+  .modal-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: var(--spacing-md);
+  }
+
+  .modal-content {
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    padding: var(--spacing-lg);
+    width: 100%;
+    max-width: 320px;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+    margin: 0;
+  }
+
+  .filename-input {
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-family: inherit;
+    outline: none;
+    transition: border-color var(--transition-fast);
+  }
+
+  .filename-input:focus {
+    border-color: var(--color-primary);
+  }
+
+  .modal-actions {
+    display: flex;
+    gap: var(--spacing-sm);
+    justify-content: flex-end;
+  }
+
+  .modal-btn {
+    padding: var(--spacing-sm) var(--spacing-md);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+  }
+
+  .modal-btn.cancel {
+    background: transparent;
+    border: 1px solid var(--color-border);
+    color: var(--text-secondary);
+  }
+
+  .modal-btn.cancel:hover {
+    background: var(--bg-main);
+  }
+
+  .modal-btn.confirm {
+    background: var(--color-primary);
+    border: none;
+    color: var(--bg-white);
+  }
+
+  .modal-btn.confirm:hover {
+    background: #4a1d9e;
+  }
+
+ /* Spinning purple border on canvas during export */
+ .canvas-wrapper {
+   position: relative;
+ }
+
+ .canvas-wrapper.exporting::before {
+   content: '';
+   position: absolute;
+   top: -2px; left: -2px; right: -2px; bottom: -2px;
+   border-radius: calc(var(--radius-md) + 2px);
+   background: conic-gradient(
+     from var(--export-angle, 0deg),
+     var(--color-primary) 0deg,
+     transparent 60deg,
+     transparent 180deg,
+     var(--color-primary) 180deg,
+     transparent 240deg,
+     transparent 360deg
+   );
+   z-index: 1;
+   pointer-events: none;
+   animation: export-spin 5s linear infinite;
+   mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+   mask-composite: exclude;
+   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+   -webkit-mask-composite: xor;
+   padding: var(--spacing-xs);
+ }
+
+ @keyframes export-spin {
+   to { --export-angle: 360deg; }
+ }
+
+ :global {
+   @property --export-angle {
+     syntax: '<angle>';
+     initial-value: 0deg;
+     inherits: false;
+   }
+ }
+
+ /* Progress bar inside download button */
+ .export-button.exporting {
+   cursor: default;
+ }
+
+ .export-progress {
+   display: flex;
+   flex-direction: column;
+   gap: var(--spacing-xs);
+   width: 100%;
+ }
+
+ .export-message {
+   font-size: var(--font-size-sm);
+   font-weight: var(--font-weight-medium);
+ }
+
+ .export-bar {
+   width: 100%;
+   height: 6px;
+   background: rgba(255, 255, 255, 0.25);
+   border-radius: var(--radius-round);
+   overflow: hidden;
+ }
+
+ .export-bar-fill {
+   height: 100%;
+   background: white;
+   border-radius: var(--radius-round);
+   transition: width 0.15s ease-out;
+ }
 </style>
