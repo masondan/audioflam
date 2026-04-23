@@ -114,8 +114,9 @@
 
     try {
       const formData = new FormData();
-      // Ensure the blob has a filename so the server can detect MIME type
-      const audioFile = new File([audioBlob], 'audio.mp3', { type: audioBlob.type || 'audio/mpeg' });
+      // Use the blob's actual MIME type (e.g., audio/webm from MediaRecorder)
+      // Don't force it to MP3 — Deepgram needs the real format to decode correctly
+      const audioFile = new File([audioBlob], 'audio', { type: audioBlob.type || 'audio/mpeg' });
       formData.append('audio', audioFile);
       formData.append('language', selectedLanguage);
 
@@ -1278,7 +1279,7 @@
     display: flex;
     flex-direction: column;
     align-items: center;
-    margin-top: var(--spacing-sm);
+    margin-top: calc(-1 * var(--spacing-sm));
   }
 
   .language-btn {

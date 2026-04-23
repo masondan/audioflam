@@ -30,7 +30,10 @@ export const POST: RequestHandler = async ({ request }) => {
 		}
 
 		const audioBuffer = await audioFile.arrayBuffer();
+		// Use the actual file MIME type (video or audio), or default to MP3
+		// Deepgram accepts: audio/webm, audio/mpeg, video/mp4, video/webm, video/quicktime, etc.
 		const mimeType = audioFile.type || 'audio/mpeg';
+		console.log(`[Deepgram] File MIME type: ${mimeType}, File name: ${audioFile.name}`);
 
 		// Build URL params: include language if not 'auto'
 		const urlParams: Record<string, string> = {
