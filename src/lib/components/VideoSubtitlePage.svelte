@@ -75,11 +75,7 @@
       currentTime = t;
 
       // Read trim bounds fresh each frame without tracking them as reactive deps.
-      // stopTime mirrors the playhead CSS clamp: trimEnd * barWidth - 20px.
-      // Subtract a ~2-frame lookahead (≈33ms) so the RAF polling interval
-      // doesn't let the video slip past the visual stop point before we catch it.
-      const barWidth = progressBarContainer?.getBoundingClientRect().width || 1000;
-      const stopTime = (trimEnd - 20 / barWidth) * videoDuration - 0.3;
+      const stopTime = trimEnd * videoDuration;
       const frameTrimStartSec = trimStart * videoDuration;
 
       if (t >= stopTime) {
