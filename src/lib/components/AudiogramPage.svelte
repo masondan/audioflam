@@ -1572,6 +1572,16 @@
 </script>
 
 <div class="audiogram-page">
+  <!-- Helper text (shown when no image loaded) -->
+  {#if !imageData}
+    <div class="helper-section">
+      <h2 class="helper-headline">Audiogram</h2>
+      <p class="helper-text">
+        Import an image and audio file, add effects and subtitles, then download as a video
+      </p>
+    </div>
+  {/if}
+
   <!-- Image Upload -->
   {#if !imageData}
     <button
@@ -1962,16 +1972,42 @@
     gap: var(--spacing-md);
   }
 
+  /* --- Helper section --- */
+  .helper-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
+  }
+
+  .helper-headline {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: #555555;
+    margin: 0;
+    text-align: center;
+  }
+
+  .helper-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: var(--line-height-normal);
+    margin: 0;
+  }
+
   .upload-box {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-lg) var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
     border: 2px dashed var(--text-secondary);
     border-radius: var(--radius-md);
     background: var(--bg-white);
     cursor: pointer;
     transition: border-color var(--transition-fast), background var(--transition-fast);
+    min-height: 85px;
   }
 
   .upload-box:hover {

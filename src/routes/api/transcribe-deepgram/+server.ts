@@ -71,7 +71,7 @@ export const POST: RequestHandler = async ({ request }) => {
 		const deepgramData = await deepgramResponse.json();
 
 		// Extract word-level data from Deepgram response
-		const words: Array<{ word: string; start: number; end: number }> =
+		const words: Array<{ word: string; punctuated_word?: string; start: number; end: number }> =
 			deepgramData?.results?.channels?.[0]?.alternatives?.[0]?.words ?? [];
 
 		if (words.length === 0) {
@@ -100,7 +100,7 @@ export const POST: RequestHandler = async ({ request }) => {
 			const next = words[i + 1];
 
 			// Apply sentence-case: capitalize first word and words after sentence-ending punctuation
-			let wordText = w.word;
+			let wordText = w.punctuated_word ?? w.word;
 			if (capitalizeNext && wordText.length > 0) {
 				wordText = wordText.charAt(0).toUpperCase() + wordText.slice(1);
 			}

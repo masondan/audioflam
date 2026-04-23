@@ -695,6 +695,16 @@
 </script>
 
 <div class="transcribe-page">
+  <!-- Helper text (shown when no audio loaded and not recording) -->
+  {#if !hasAudio && recordingPhase === 'idle' && !audioLoading}
+    <div class="helper-section">
+      <h2 class="helper-headline">Audio Transcription</h2>
+      <p class="helper-text">
+        Upload an audio or video file, or record your voice, to convert to text. Multiple languages supported.
+      </p>
+    </div>
+  {/if}
+
   <!-- Audio Upload / Recording (mirrors Audiogram exactly) -->
   {#if !audioData && recordingPhase === 'idle'}
     <button
@@ -856,13 +866,6 @@
     </button>
   </div>
 
-  <!-- Helper text (shown when no audio loaded and not recording) -->
-  {#if !hasAudio && recordingPhase === 'idle' && !audioLoading}
-    <p class="helper-text">
-      Upload audio or video, or record your voice to transcribe. Multiple languages supported.
-    </p>
-  {/if}
-
   <!-- Error message -->
   {#if transcriptionError}
     <p class="error-msg">{transcriptionError}</p>
@@ -1016,12 +1019,13 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: var(--spacing-lg) var(--spacing-md);
+    padding: var(--spacing-sm) var(--spacing-md);
     border: 2px dashed var(--text-secondary);
     border-radius: var(--radius-md);
     background: var(--bg-white);
     cursor: pointer;
     transition: border-color var(--transition-fast), background var(--transition-fast);
+    min-height: 85px;
   }
 
   .upload-box:hover {
@@ -1056,6 +1060,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--bg-white);
+    min-height: 85px;
   }
 
   .recording-box.recording-active {
@@ -1281,14 +1286,29 @@
   }
 
 
-  /* --- Helper text --- */
+  /* --- Helper section --- */
+  .helper-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
+  }
+
+  .helper-headline {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: #555555;
+    margin: 0;
+    text-align: center;
+  }
+
   .helper-text {
     font-size: var(--font-size-sm);
     color: var(--text-secondary);
     text-align: center;
     line-height: var(--line-height-normal);
     margin: 0;
-    padding: 0 var(--spacing-md);
   }
 
   .error-msg {

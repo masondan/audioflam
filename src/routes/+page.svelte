@@ -1239,7 +1239,7 @@
         aria-label="Subtitle video"
         aria-pressed={activeTab === 'subtitle-video'}
       >
-        <img src="/icons/icon-videogram.svg" alt="" class="nav-tab-icon" />
+        <img src="/icons/icon-subtitles.svg" alt="" class="nav-tab-icon nav-tab-icon-subtitles" />
       </button>
     </nav>
   </header>
@@ -1705,6 +1705,11 @@
 
   .nav-tab-btn.active .nav-tab-icon {
     filter: brightness(0) invert(1);
+  }
+
+  .nav-tab-icon-subtitles {
+    width: 18px;
+    height: 18px;
   }
 
   .main-content {

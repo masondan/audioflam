@@ -4,7 +4,7 @@
   import SubtitlePanel from './SubtitlePanel.svelte';
   import { drawSubtitle, getActiveSegment, DEFAULT_SUBTITLE_STYLE, type FontSize } from '$lib/utils/subtitles';
   import type { SubtitleSegment, SubtitleStyle } from '$lib/utils/subtitles';
-  import { smartExportVideo, downloadBlob, generateFilename, getExtensionFromMimeType, type ExportProgress } from '$lib/utils/video-export';
+  import { smartExportVideo, downloadBlob, generateFilename, generateSubtitleFilename, getExtensionFromMimeType, type ExportProgress } from '$lib/utils/video-export';
 
   // Video state
   let videoBlob: Blob | null = $state(null);
@@ -619,7 +619,7 @@
       if (!exportCancelled) {
         pendingVideoBlob = result.blob;
         pendingVideoMimeType = result.mimeType;
-        exportFilename = generateFilename(result.mimeType);
+        exportFilename = generateSubtitleFilename(result.mimeType);
         showFilenameModal = true;
       }
     } catch (error) {
@@ -693,40 +693,41 @@
 {/if}
 
 <div class="video-page">
+  <!-- Helper text (shown when no video loaded) -->
+  {#if !hasVideo}
+    <div class="helper-section">
+      <h2 class="helper-headline">Video Subtitles</h2>
+      <p class="helper-text">
+        Select a video or drag and drop to add subtitles (MP4, MOV, WebM)
+      </p>
+    </div>
+  {/if}
+
   <!-- Upload zone (hidden when video is present) -->
   {#if !hasVideo}
-    <div
-      class="upload-zone"
+    <button
+      type="button"
+      class="upload-box"
       ondrop={handleDrop}
       ondragover={(e) => e.preventDefault()}
       onclick={triggerFileInput}
-      role="button"
       tabindex="0"
       onkeydown={(e) => { if (e.key === 'Enter' || e.key === ' ') triggerFileInput(); }}
     >
-      <div class="upload-prompt">
-        <h2 class="upload-title">Video subtitles</h2>
-        <p class="upload-sub">Select a video or drag and drop to get started (MP4, MOV, WebM)</p>
-        <input
-          type="file"
-          bind:this={fileInput}
-          accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
-          onchange={handleFileInput}
-          style="display: none;"
-        />
-        <button
-          type="button"
-          class="upload-btn"
-          onclick={(e) => { e.stopPropagation(); triggerFileInput(); }}
-        >
-          Select video
-        </button>
-      </div>
+      <span class="upload-label">Video</span>
+      <img src="/icons/icon-upload.svg" alt="Upload" class="upload-icon" />
+      <input
+        type="file"
+        bind:this={fileInput}
+        accept="video/mp4,video/quicktime,video/webm,.mp4,.mov,.webm"
+        onchange={handleFileInput}
+        style="display: none;"
+      />
 
       {#if uploadError}
         <div class="error-msg">{uploadError}</div>
       {/if}
-    </div>
+    </button>
   {/if}
 
   <!-- Canvas preview (only visible when video loaded) -->
@@ -943,62 +944,64 @@
   .video-page {
     display: flex;
     flex-direction: column;
-    gap: var(--spacing-lg);
-    padding: var(--spacing-lg);
+    gap: var(--spacing-md);
     max-width: 100%;
   }
 
-  /* ── Upload zone ── */
-  .upload-zone {
-    border: 2px dashed #777777;
-    border-radius: var(--radius-md);
-    padding: var(--spacing-xl);
-    text-align: center;
-    cursor: pointer;
-    transition: all var(--transition-normal);
-    background: var(--bg-white);
-  }
-
-  .upload-zone:hover {
-    border-color: var(--accent-brand);
-    background: var(--color-highlight);
-  }
-
-  .upload-prompt {
+  /* --- Helper section --- */
+  .helper-section {
     display: flex;
     flex-direction: column;
     align-items: center;
-    justify-content: center;
-    gap: var(--spacing-md);
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
   }
 
-  .upload-title {
-    margin: 0;
-    font-size: var(--font-size-base);
+  .helper-headline {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
     color: #555555;
-    font-weight: var(--font-weight-semibold);
-  }
-
-  .upload-sub {
     margin: 0;
+    text-align: center;
+  }
+
+  .helper-text {
     font-size: var(--font-size-sm);
-    color: #777777;
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: var(--line-height-normal);
+    margin: 0;
   }
 
-  .upload-btn {
+  /* --- Audio upload box --- */
+  .upload-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
     padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--accent-brand);
-    color: white;
+    border: 2px dashed var(--text-secondary);
     border-radius: var(--radius-md);
+    background: var(--bg-white);
     cursor: pointer;
-    font-weight: var(--font-weight-medium);
-    border: none;
-    font-size: var(--font-size-base);
-    transition: opacity var(--transition-normal);
+    transition: border-color var(--transition-fast), background var(--transition-fast);
+    min-height: 85px;
   }
 
-  .upload-btn:hover {
-    opacity: 0.9;
+  .upload-box:hover {
+    border-color: var(--color-primary);
+    background: var(--color-highlight);
+  }
+
+  .upload-label {
+    font-size: var(--font-size-base);
+    color: #1f1f1f;
+    font-weight: var(--font-weight-medium);
+  }
+
+  .upload-icon {
+    width: 24px;
+    height: 24px;
+    filter: invert(0.46);
   }
 
   /* ── Canvas preview ── */
