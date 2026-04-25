@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const splashScreenVisible = writable(true);
 
 // TTS Provider Types
-export type TTSProvider = 'yarngpt' | 'azure';
+export type TTSProvider = 'yarngpt' | 'azure' | 'minimax';
 
 export interface VoiceOption {
 	name: string;
@@ -34,10 +34,23 @@ export const AZURE_VOICES: VoiceOption[] = [
 	{ name: 'en-GB-OliverNeural', ssmlGender: 'MALE', displayName: 'Oliver', description: 'British male', provider: 'azure' },
 ];
 
-// Combined voices for the UI (Nigerian first, then British)
+// MiniMax Voice Clones (Malawi + Zimbabwe English)
+// Cloned via: node --env-file=.env scripts/minimax-clone-voices.js (April 2026)
+// voice_id rules: min 10 chars, alphanumeric only (no underscores)
+export const MINIMAX_VOICES: VoiceOption[] = [
+	// Malawi English
+	{ name: 'chisomom01', ssmlGender: 'MALE', displayName: 'Chisomo', description: 'Malawi English male', provider: 'minimax' },
+	{ name: 'mercyf0001', ssmlGender: 'FEMALE', displayName: 'Mercy', description: 'Malawi English female', provider: 'minimax' },
+	// Zimbabwe English
+	{ name: 'tawandam01', ssmlGender: 'MALE', displayName: 'Tawanda', description: 'Zimbabwe English male', provider: 'minimax' },
+	{ name: 'preciousf1', ssmlGender: 'FEMALE', displayName: 'Precious', description: 'Zimbabwe English female', provider: 'minimax' }
+];
+
+// Combined voices for the UI (Nigerian first, then MiniMax Malawi/Zim, then British)
 export const ALL_VOICES: VoiceOption[] = [
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-NG')),
 	...YARNGPT_VOICES,
+	...MINIMAX_VOICES,
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
 ];
 

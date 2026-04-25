@@ -16,6 +16,8 @@ export const POST: RequestHandler = async ({ request }) => {
 		// Route to appropriate provider
 		if (provider === 'azure') {
 			return await handleAzure(text, voiceName);
+		} else if (provider === 'minimax') {
+			return await handleMiniMax(text, voiceName);
 		} else {
 			return await handleYarnGPT(text, voiceName);
 		}
@@ -124,8 +126,71 @@ async function handleYarnGPT(text: string, voiceName: string) {
 		binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
 	}
 	const base64Audio = btoa(binaryString);
-
-	return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
+return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 }
 
+async function handleMiniMax(text: string, voiceName: string) {
+const MINIMAX_API_KEY = env.MINIMAX_SPEECH_KEY;
+if (!MINIMAX_API_KEY) {
+	console.error('[MiniMax] MINIMAX_SPEECH_KEY missing');
+	return json({ error: 'MiniMax API key not configured' }, { status: 500 });
+}
+
+const trimmedText = text.slice(0, 4000);
+
+console.log(`[MiniMax] Generating TTS for voice: ${voiceName}`);
+
+const response = await fetch('https://api.minimax.io/v1/text_to_speech', {
+	method: 'POST',
+	headers: {
+		'Authorization': `Bearer ${MINIMAX_API_KEY}`,
+		'Content-Type': 'application/json'
+	},
+	body: JSON.stringify({
+		model: 'speech-02-turbo',
+		text: trimmedText,
+		voice_id: voiceName,
+		emotion: 'neutral',
+		response_format: 'mp3'
+	})
+});
+
+if (!response.ok) {
+	const errorText = await response.text();
+	console.error('[MiniMax] API error:', response.status, errorText);
+	return json(
+		{ error: 'MiniMax TTS generation failed', status: response.status, details: errorText },
+		{ status: response.status }
+	);
+}
+
+// MiniMax may return JSON with base64 audio_content, or raw binary audio
+const contentType = response.headers.get('content-type') || '';
+if (contentType.includes('application/json')) {
+	const data = await response.json() as { audio_content?: string; base_resp?: { status_code: number; status_msg: string } };
+	if (data.base_resp && data.base_resp.status_code !== 0) {
+		console.error('[MiniMax] API error in JSON response:', data.base_resp);
+		return json(
+			{ error: 'MiniMax TTS generation failed', details: data.base_resp.status_msg },
+			{ status: 500 }
+		);
+	}
+	if (data.audio_content) {
+		return json({ audioContent: data.audio_content, format: 'mp3' }, { status: 200 });
+	}
+}
+
+// Raw binary audio response
+const audioBuffer = await response.arrayBuffer();
+const uint8Array = new Uint8Array(audioBuffer);
+let binaryString = '';
+const chunkSize = 8192;
+for (let i = 0; i < uint8Array.length; i += chunkSize) {
+	binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
+}
+const base64Audio = btoa(binaryString);
+
+console.log('[MiniMax] TTS generated successfully');
+return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
+}
 

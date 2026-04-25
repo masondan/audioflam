@@ -57,9 +57,11 @@
 
   let imageData = $state<ImageData | null>(null);
   let imageLoading = $state(false);
+  let imageUploadError = $state<string | null>(null);
   let showCropDrawer = $state(false);
   let audioData = $state<AudioData | null>(null);
   let audioLoading = $state(false);
+  let audioUploadError = $state<string | null>(null);
   
   let isPlaying = $state(false);
   let isRecording = $state(false);
@@ -121,6 +123,7 @@
   let subtitleActive = $state(false);
   let subtitleSegments = $state<SubtitleSegment[]>([]);
   let subtitleStyle = $state<SubtitleStyle>({ ...DEFAULT_SUBTITLE_STYLE });
+  let subtitleResetKey = $state(0);
 
   // Debug: log when subtitleSegments changes
   $effect(() => {
@@ -420,6 +423,7 @@
   }
 
   async function handleImageFile(file: File) {
+    imageUploadError = null;
     imageLoading = true;
     try {
       const resized = await resizeImage(file);
@@ -437,6 +441,7 @@
         aspectRatio: 'none'
       };
     } catch (err) {
+      imageUploadError = err instanceof Error ? err.message : 'Failed to load image. Please try a different file.';
       console.error('Failed to process image:', err);
     } finally {
       imageLoading = false;
@@ -551,6 +556,7 @@
   }
 
   async function handleAudioFile(file: File) {
+    audioUploadError = null;
     audioLoading = true;
     try {
       const buffer = await decodeAudioFile(file);
@@ -577,6 +583,7 @@
       subtitleSegments = [];
       subtitleActive = false;
     } catch (err) {
+      audioUploadError = err instanceof Error ? err.message : 'Failed to load audio file. Please try a different file.';
       console.error('Failed to decode audio:', err);
     } finally {
       audioLoading = false;
@@ -605,6 +612,8 @@
     // Clear subtitles when audio is deleted
     subtitleSegments = [];
     subtitleActive = false;
+    subtitleStyle = { ...DEFAULT_SUBTITLE_STYLE };
+    subtitleResetKey++;
     
     openPanel = null;
     
@@ -1597,6 +1606,9 @@
       <span class="upload-label">Image</span>
       <img src="/icons/icon-upload.svg" alt="Upload" class="upload-icon" />
     </button>
+    {#if imageUploadError}
+      <p class="error-msg">{imageUploadError}</p>
+    {/if}
   {:else}
     <div class="image-section">
       <div class="canvas-wrapper" class:exporting={isExporting}>
@@ -1648,6 +1660,9 @@
         <img src="/icons/icon-upload.svg" alt="Upload" class="upload-icon" />
       {/if}
     </button>
+    {#if audioUploadError}
+      <p class="error-msg">{audioUploadError}</p>
+    {/if}
   {:else if !audioData && recordingPhase === 'ready'}
     <!-- Mic ready - show instructions -->
     <div class="recording-box">
@@ -1874,20 +1889,22 @@
       }}
       onOpenChange={(open) => handlePanelOpenChange('subtitle', open)}
     >
-      <SubtitlePanel
-        audioBlob={audioData?.file ?? null}
-        canvasWidth={compositionCanvasRef?.getCanvas()?.width ?? 720}
-        canvasHeight={compositionCanvasRef?.getCanvas()?.height ?? 1280}
-        style={subtitleStyle}
-        segments={subtitleSegments}
-        subtitlesEnabled={subtitleActive}
-        onStyleChange={(s) => subtitleStyle = s}
-        onSegmentsChange={(segs) => {
-          console.log('[AudiogramPage] onSegmentsChange received:', { count: segs.length, firstText: segs[0]?.text });
-          subtitleSegments = segs;
-        }}
-        onEnabledChange={(en) => subtitleActive = en}
-      />
+      {#key subtitleResetKey}
+        <SubtitlePanel
+          audioBlob={audioData?.file ?? null}
+          canvasWidth={compositionCanvasRef?.getCanvas()?.width ?? 720}
+          canvasHeight={compositionCanvasRef?.getCanvas()?.height ?? 1280}
+          style={subtitleStyle}
+          segments={subtitleSegments}
+          subtitlesEnabled={subtitleActive}
+          onStyleChange={(s) => subtitleStyle = s}
+          onSegmentsChange={(segs) => {
+            console.log('[AudiogramPage] onSegmentsChange received:', { count: segs.length, firstText: segs[0]?.text });
+            subtitleSegments = segs;
+          }}
+          onEnabledChange={(en) => subtitleActive = en}
+        />
+      {/key}
     </TogglePanel>
   </div>
 
@@ -2126,6 +2143,13 @@
     width: 20px;
     height: 20px;
     border-width: 2px;
+  }
+
+  .error-msg {
+    color: #d32f2f;
+    font-size: var(--font-size-sm);
+    margin: 0;
+    padding: var(--spacing-xs) var(--spacing-md);
   }
 
   /* Recording UI */

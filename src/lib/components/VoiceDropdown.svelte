@@ -17,6 +17,10 @@
       if (voice.name.startsWith('en-GB')) return '🇬🇧';
     }
     if (voice.provider === 'yarngpt') return '🇳🇬';
+    if (voice.provider === 'minimax') {
+      if (voice.description.includes('Malawi')) return '🇲🇼';
+      if (voice.description.includes('Zimbabwe')) return '🇿🇼';
+    }
     return '';
   }
   
