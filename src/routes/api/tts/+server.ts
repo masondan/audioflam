@@ -131,33 +131,46 @@ return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 
 async function handleMiniMax(text: string, voiceName: string) {
 const MINIMAX_API_KEY = env.MINIMAX_SPEECH_KEY;
+const MINIMAX_GROUP_ID = env.MINIMAX_GROUP_ID;
 if (!MINIMAX_API_KEY) {
 	console.error('[MiniMax] MINIMAX_SPEECH_KEY missing');
 	return json({ error: 'MiniMax API key not configured' }, { status: 500 });
 }
+if (!MINIMAX_GROUP_ID) {
+	console.error('[MiniMax] MINIMAX_GROUP_ID missing');
+	return json({ error: 'MiniMax Group ID not configured' }, { status: 500 });
+}
 
 const trimmedText = text.slice(0, 4000);
 
-console.log(`[MiniMax] Generating TTS for voice: ${voiceName}`);
+console.log(`[MiniMax] Generating TTS for voice: ${voiceName}, text length: ${trimmedText.length}`);
+console.log(`[MiniMax] API Key set: ${MINIMAX_API_KEY ? 'yes' : 'no'}`);
 
-const response = await fetch('https://api.minimax.io/v1/text_to_speech', {
+const requestBody = {
+	model: 'speech-02-turbo',
+	text: trimmedText,
+	voice_id: voiceName,
+	emotion: 'neutral',
+	response_format: 'mp3'
+};
+console.log(`[MiniMax] Request payload:`, JSON.stringify(requestBody, null, 2));
+
+const response = await fetch(`https://api.minimax.io/v1/text_to_speech?GroupId=${MINIMAX_GROUP_ID}`, {
 	method: 'POST',
 	headers: {
 		'Authorization': `Bearer ${MINIMAX_API_KEY}`,
 		'Content-Type': 'application/json'
 	},
-	body: JSON.stringify({
-		model: 'speech-02-turbo',
-		text: trimmedText,
-		voice_id: voiceName,
-		emotion: 'neutral',
-		response_format: 'mp3'
-	})
+	body: JSON.stringify(requestBody)
 });
+
+console.log(`[MiniMax] Response status: ${response.status}`);
+console.log(`[MiniMax] Response headers:`, Object.fromEntries(response.headers.entries()));
 
 if (!response.ok) {
 	const errorText = await response.text();
-	console.error('[MiniMax] API error:', response.status, errorText);
+	console.error('[MiniMax] Full API error response:', errorText);
+	console.error('[MiniMax] Error status:', response.status);
 	return json(
 		{ error: 'MiniMax TTS generation failed', status: response.status, details: errorText },
 		{ status: response.status }

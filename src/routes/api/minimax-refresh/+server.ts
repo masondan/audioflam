@@ -16,9 +16,14 @@ const VOICE_IDS = [
 // Sends a single-character TTS request per voice — cost is negligible (~$0.000002/week total).
 export const POST: RequestHandler = async () => {
 	const MINIMAX_API_KEY = env.MINIMAX_SPEECH_KEY;
+	const MINIMAX_GROUP_ID = env.MINIMAX_GROUP_ID;
 	if (!MINIMAX_API_KEY) {
 		console.error('[MiniMax] MINIMAX_SPEECH_KEY not configured');
 		return json({ error: 'MiniMax API key not configured' }, { status: 500 });
+	}
+	if (!MINIMAX_GROUP_ID) {
+		console.error('[MiniMax] MINIMAX_GROUP_ID not configured');
+		return json({ error: 'MiniMax Group ID not configured' }, { status: 500 });
 	}
 
 	console.log('[MiniMax] Starting weekly voice clone refresh...');
@@ -26,14 +31,14 @@ export const POST: RequestHandler = async () => {
 
 	for (const voiceId of VOICE_IDS) {
 		try {
-			const response = await fetch('https://api.minimax.io/v1/text_to_speech', {
+			const response = await fetch(`https://api.minimax.io/v1/text_to_speech?GroupId=${MINIMAX_GROUP_ID}`, {
 				method: 'POST',
 				headers: {
 					'Authorization': `Bearer ${MINIMAX_API_KEY}`,
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					model: 'speech-02-turbo',
+					model: 'speech-2.8-turbo',
 					text: 'a', // Single character — minimal cost, just enough to reset TTL
 					voice_id: voiceId,
 					emotion: 'neutral',
