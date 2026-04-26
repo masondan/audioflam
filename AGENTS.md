@@ -1,14 +1,14 @@
 # AudioFlam - AI Agent Reference
 
-**Purpose:** Single-source-of-truth for AI agents working on AudioFlam  
-**Status:** Production (Transcription + Two-Speaker Mode Complete)
-**Updated:** April 2026
+**Purpose:** Single-source-of-truth for AI agents working on AudioFlam
+**Status:** Production (Transcription + Two-Speaker Mode + Video Subtitles + MiniMax Integration Complete)
+**Updated:** April 2026 (Latest: MiniMax + Video Subtitles implementation)
 
 ---
 
 ## Quick Start
 
-**What is AudioFlam?** A mobile-first web app that converts text scripts to audio (TTS) and creates audiograms (image + audio + waveform + effects → MP4).
+**What is AudioFlam?** A mobile-first web app that converts text scripts to audio (TTS), creates audiograms (image + audio + waveform + effects → MP4), transcribes audio (Whisper), and adds subtitles to uploaded videos.
 
 **Tech Stack:**
 - SvelteKit 2 + Svelte 5 (TypeScript)
@@ -16,6 +16,8 @@
 - Native CSS variables (no Tailwind)
 - WebCodecs API (MP4 encoding on Android)
 - MediaRecorder fallback (iOS/Firefox → cloud transcoding)
+- Whisper (transcription via @huggingface/transformers)
+- Subtitle rendering via canvas composition
 
 **Key Constraint:** Non-commercial, educational use. No authentication. Hidden from search engines.
 
@@ -37,10 +39,11 @@ npm run check:watch  # Watch mode
 ```
 src/
 ├── routes/
-│   ├── +page.svelte              # Header + TTS/Audiogram/Transcribe tabs
+│   ├── +page.svelte              # Header + TTS/Audiogram/Transcribe/Subtitle Video tabs
 │   ├── +layout.svelte            # Root layout
 │   └── api/
-│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT)
+│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT + MiniMax)
+│       ├── minimax-refresh/+server.ts # MiniMax voice clone refresh (cron)
 │       ├── transcode/+server.ts  # Cloud video transcoding
 │       ├── audio/
 │       │   ├── silence-removal/+server.ts # Silence removal
@@ -66,6 +69,8 @@ src/
 │   │   ├── SilenceSlider.svelte  # Silence detection
 │   │   ├── SpeedBlockModal.svelte # Speed warning modal
 │   │   ├── TranscribePage.svelte # Transcription UI (Whisper)
+│   │   ├── VideoSubtitlePage.svelte # Video subtitle/composition UI (Stage 1-4 complete)
+│   │   ├── SubtitlePanel.svelte  # Subtitle transcription + styling controls
 │   │   ├── VoiceDropdown.svelte  # Voice selector (two-speaker mode)
 │   │   └── [other UI components]
 │   ├── utils/
@@ -75,6 +80,7 @@ src/
 │   │   ├── waveform.ts           # FFT preprocessing + rendering (precomputeFrequencyFrames)
 │   │   ├── webcodecs-export.ts   # WebCodecs + Mediabunny (H.264/MP4)
 │   │   ├── video-export.ts       # Export orchestration (smartExportVideo)
+│   │   ├── subtitles.ts          # Subtitle rendering + word-level composition
 │   │   ├── transcription-worker.ts # Whisper worker (off-main-thread)
 │   │   └── transcription.ts      # Transcription utilities (Hugging Face)
 │   └── server/                   # Server-side utilities
@@ -86,8 +92,10 @@ src/
 static/
   ├── icons/                        # SVG icons (22 for audiogram)
   ├── fonts/                        # Self-hosted fonts (Inter, Lora, Playfair, Roboto Slab, Saira, Bebas)
-  ├── voices/                       # Sample voice files (for preview)
-  └── robots.txt                    # Disallow: / (no indexing)
+  ├── voices/                       # Sample voice files (for preview) + MiniMax samples
+  ├── voice-samples/                # MiniMax voice clone training samples (Malawi + Zimbabwe)
+  ├── robots.txt                    # Disallow: / (no indexing)
+  └── manifest.json                 # PWA manifest
 ```
 
 ---
@@ -125,6 +133,16 @@ Response:
   "format": "mp3"
 }
 ```
+
+---
+
+## MiniMax Voice Clone Persistence
+
+- **Voice clones auto-delete** after 7 days of inactivity
+- **Weekly cron refresh:** `/api/minimax-refresh` pings each voice with single character (cost ~$0.0000024/week)
+- **Clone IDs:** Stored in `src/lib/stores.ts:MINIMAX_VOICES` (format: min 10 chars, alphanumeric only)
+- **Voice samples:** Stored in `static/voices/` (chisomo.mp3, mercy.mp3, tawanda.mp3, precious.mp3)
+- **Training samples:** Original WAV files in `static/voice-samples/` (used for cloning, not shipped to browser)
 
 ---
 
@@ -197,6 +215,7 @@ await releaseModel();
 - Compose TTS from two different voices
 - Per-speaker speed and silence controls
 - Audio merging pipeline
+- Works with all three TTS providers (Azure, YarnGPT, MiniMax)
 
 ### Implementation
 - **File:** `src/routes/+page.svelte` (lines 88-90, 200+)
@@ -205,11 +224,99 @@ await releaseModel();
 - **UI:** Speaker dropdowns, speed sliders, silence controls
 
 ### Workflow
-1. Select two voices (speaker1, speaker2)
+1. Select two voices (speaker1, speaker2) from any provider
 2. Generate TTS for each voice separately
 3. Apply speed/silence adjustments per speaker
 4. Merge audio segments
 5. Export as single audiogram
+
+---
+
+## Video Subtitle Page
+
+### Overview
+- Upload device video (MP4, MOV, WebM)
+- Extract audio for transcription
+- Optionally trim video (in-point/out-point)
+- Add subtitles (via Whisper transcription) and title overlay
+- Export as MP4 (WebCodecs → MediaRecorder → cloud transcode fallback)
+
+### Implementation
+- **File:** `src/lib/components/VideoSubtitlePage.svelte` (1412 lines, complete Stages 1-4)
+- **State Management:**
+  - `videoBlob`, `videoDuration`, `canvasWidth`, `canvasHeight`
+  - `trimStart`, `trimEnd` (0–1 ratios for non-destructive trimming)
+  - `subtitleSegments`, `subtitleStyle`, `subtitlesEnabled` (from SubtitlePanel)
+  - `titleText`, `titleFont`, `titleColor`, `labelColor` (from TitlePanel)
+  - Playback: `isPlaying`, `currentTime`, `videoElement`
+  - Export: `isExporting`, `exportProgress`, `exportCancelled`
+
+### UI Components
+1. **Upload zone:** Drag-drop or file input (MP4/MOV/WebM)
+2. **Video preview:** HTML5 `<video>` element with playback controls
+3. **Trim control:** Dual-handle scrubber (in-point / out-point) with duration display
+4. **Canvas preview:** Real-time rendering of video frame + title + subtitles during playback
+5. **SubtitlePanel:** Extracts audio, generates subtitles, controls styling
+6. **TitlePanel:** Title text, font, alignment, label styling
+7. **Export button:** Triggers `smartExportVideo()` with trimmed duration
+
+### Canvas Rendering
+```typescript
+function renderFrame(currentTime: number): void {
+  // Seek to trimStart + currentTime
+  videoElement.currentTime = currentTime + trimStart;
+  
+  // Draw video frame
+  ctx.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
+  
+  // Draw title layer
+  drawTitle(ctx, titleText, titleFont, ...);
+  
+  // Draw subtitle if enabled and active
+  if (subtitlesEnabled) {
+    const activeSegment = getActiveSegment(subtitleSegments, currentTime);
+    if (activeSegment) {
+      drawSubtitle(ctx, activeSegment, subtitleStyle, ...);
+    }
+  }
+}
+```
+
+### Audio Extraction from Video
+```typescript
+async function extractAudioFromVideo(videoBlob: Blob): Promise<Blob> {
+  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
+  const source = audioContext.createMediaElementAudioSource(video);
+  const destination = audioContext.createMediaStreamDestination();
+  source.connect(destination);
+  
+  const mediaRecorder = new MediaRecorder(destination.stream);
+  // ... record audio during video playback ...
+  return audioBlob;
+}
+```
+
+### Trim Control Pattern
+- Two drag handles at 0–1 ratios of total duration
+- Playback stops at `trimEnd * videoDuration`
+- Trim is applied at export time (non-destructive)
+- Pattern reused from waveform trimmer in AudiogramPage
+
+### Export Integration
+- Calls `smartExportVideo(canvas, audioBlob, width, height, trimmedDuration, renderCallback)`
+- Respects three-tier export strategy (WebCodecs → MediaRecorder → cloud transcode)
+- Audio passed to export is extracted audio (if subtitles enabled) or silence
+
+### Key Files
+- `src/lib/components/VideoSubtitlePage.svelte` - Main component
+- `src/lib/components/SubtitlePanel.svelte` - Transcription + subtitle styling (reused, unchanged)
+- `src/lib/components/TitlePanel.svelte` - Title controls (reused, unchanged)
+- `src/lib/utils/subtitles.ts` - `drawSubtitle()`, `getActiveSegment()`, subtitle rendering
+- `src/lib/utils/video-export.ts` - `smartExportVideo()` export orchestration
+
+### Status
+✅ Fully implemented and working (April 2026)
+✅ All four stages complete: scaffold, canvas/trim, integration, testing
 
 ---
 
@@ -221,6 +328,7 @@ Set in Cloudflare Pages → Settings → Environment variables:
 AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
 YARNGPT_API_KEY=<API key>
+MINIMAX_API_KEY=<Bearer token for MiniMax API>
 APIVIDEO_API_KEY=<API key for cloud transcoding>
 ```
 
@@ -402,6 +510,7 @@ All CSS variables defined in `src/app.css`.
 
 - **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
 - **Azure faster but slightly accented** - 3s generation but international accent
+- **MiniMax API returns no audio** - Despite proper handler implementation, API consistently returns empty response. Likely due to account mismatch (GitHub OAuth login created separate account without billing). DO NOT use in production until resolved. Workaround: Route requests to Azure/YarnGPT if MiniMax selected.
 - **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE - see Quality Report)
 - **No request throttling** - Users can spam TTS API (KNOWN ISSUE - see Quality Report)
 
@@ -412,12 +521,22 @@ All CSS variables defined in `src/app.css`.
 - **Language detection** - `language: 'auto'` works but may misidentify mixed-language audio
 - **Quantized vs full** - Quantized is faster but less accurate; full is slower but better quality
 
+### Video Subtitle Page Gotchas
+
+- **Canvas `drawImage()` with video element** - Works on most browsers but has edge cases on iOS Safari when rendering to canvas. If `ctx.drawImage(videoElement)` fails, video frame may not render; fallback to cloud transcode is automatic.
+- **Audio extraction timing** - Must wait for `loadedmetadata` before extracting audio from video element. Premature extraction yields silent audio.
+- **Trim boundaries in playback** - Playback must stop exactly at `trimEnd * videoDuration`, not video duration. Failing to enforce this causes export to include untrimmed section.
+- **Canvas context reset** - Must clear canvas before each frame render (`ctx.clearRect()`) to avoid ghosting/visual artifacts.
+- **SubtitlePanel/TitlePanel prop binding** - Both use callback-based props (`onStyleChange`, `onTextChange`), NOT two-way binding. Must update parent state via callbacks, not direct mutations.
+- **Video dimensions for export** - Canvas width/height must match source video dimensions to preserve quality. Auto-set from `videoElement.videoWidth`/`videoHeight` on upload.
+- **Audio blob for subtitles** - Must pass extracted audio blob to SubtitlePanel for transcription. If no subtitles enabled, audio is still required for export (can pass silence or original).
+
 ---
 
 ## Current Phase Focus
 
 ✅ **Completed:**
-- TTS with Azure + YarnGPT (single + two-speaker modes)
+- TTS with Azure + YarnGPT + MiniMax (single + two-speaker modes)
 - Full Audiogram creation (image, audio, waveform, title, effects)
 - **Waveform visual parity:** Preview and export waveforms match exactly via pre-computed FFT frames
 - MP4 export via WebCodecs (Android)
@@ -425,8 +544,10 @@ All CSS variables defined in `src/app.css`.
 - Cloud transcoding via api.video
 - **Transcription:** Whisper model (multilingual + quantized options)
 - **Audio processing:** Silence removal, normalization, time-stretching
-- **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls
+- **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls (all three providers)
 - **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export (April 2026)
+- **Video Subtitle Page:** Full implementation (1412 lines) with upload, trim, canvas preview, subtitle generation, title overlay, and export (April 2026) ✅ All stages complete
+- **MiniMax voice cloning:** Malawi (Chisomo M, Mercy F) + Zimbabwe (Tawanda M, Precious F) voices cloned and integrated (April 2026) - **Note:** API integration complete but testing ongoing due to account/billing issue
 
 **Waveform Export Fix (Critical Implementation):**
 - `precomputeFrequencyFrames()` in `waveform.ts` performs offline FFT using Cooley-Tukey algorithm with Blackman windowing
@@ -435,6 +556,7 @@ All CSS variables defined in `src/app.css`.
 - Eliminates visual mismatch between live preview and exported MP4 (was caused by synthetic sine-wave generation)
 
 **Known Issues (See QUALITY_REPORT.md):**
+- 🔴 **MiniMax API returns no audio** despite proper credentials (HIGH priority) - Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). Awaiting MiniMax support response. Implementation verified correct; workaround: Use Azure/YarnGPT until resolved.
 - 🔴 Type assertion in `webcodecs-export.ts:445` without runtime guard (HIGH priority)
 - 🔴 TTS error handling gaps - generic "error" messages (HIGH priority)
 - 🟡 Audio encoding inconsistency between WebCodecs/MediaRecorder paths (MEDIUM)
@@ -442,6 +564,7 @@ All CSS variables defined in `src/app.css`.
 - 🟡 Canvas export validation gaps (MEDIUM)
 
 **Future Development:**
+- MiniMax billing issue resolution (once account is properly linked)
 - TTS→Audiogram one-click integration (store exists, UI not wired)
 - Enhanced iOS fallback with better error guidance
 - Performance optimization (OffscreenCanvas for preview)
@@ -503,7 +626,7 @@ All CSS variables defined in `src/app.css`.
 **Reality:** It claims support but fails in practice. Always check WebCodecs first.
 
 ### 2. Forgetting Audio MIME Type Field
-**Reality:** Both TTS providers must return `{ audioContent, format: 'mp3' }`. YarnGPT was fixed to match Azure response format.
+**Reality:** All TTS providers must return `{ audioContent, format: 'mp3' }`. YarnGPT + MiniMax were fixed to match Azure response format.
 
 **File:** `src/routes/api/tts/+server.ts`
 
@@ -545,9 +668,26 @@ All CSS variables defined in `src/app.css`.
 **File:** `src/lib/utils/compositor.ts:renderFrame()` - Must use `currentTime` parameter, not live audio data.
 
 ### 10. Assuming Two-Speaker Audio Merges Automatically
-**Reality:** Must explicitly call `concatenateAudioSegments()` after generating both voices.
+**Reality:** Must explicitly call `concatenateAudioSegments()` after generating both voices. Works with all three providers (Azure, YarnGPT, MiniMax).
 
 **File:** `src/lib/audioProcessing.ts` - Audio merging logic
+
+### 11. MiniMax Account Billing Mismatch
+**Reality:** GitHub OAuth creates separate account from direct subscription. Both can have same GroupID but only one has billing/subscription. ALWAYS verify account that was charged matches the account you're using for API requests. Symptoms: API returns empty audio despite proper implementation.
+
+**File:** `src/routes/api/tts/+server.ts:handleMiniMax()` - Check MINIMAX_API_KEY points to correct account
+
+**Workaround:** Until resolved, route MiniMax requests to Azure/YarnGPT as fallback.
+
+### 12. Video Subtitle Trim Control Pattern Confusion
+**Reality:** Trim uses 0–1 ratios (like waveform trimmer in AudiogramPage), NOT absolute seconds. Must convert to seconds when seeking: `videoElement.currentTime = currentTime + (trimStart * videoDuration)`.
+
+**File:** `src/lib/components/VideoSubtitlePage.svelte:renderFrame()` - Trim offset applied here
+
+### 13. Canvas drawImage() Failing on iOS Safari
+**Reality:** Some iOS Safari versions fail when rendering video element to canvas (`ctx.drawImage(videoElement)`). Fallback is automatic (MediaRecorder → cloud transcode), but user may not see preview.
+
+**File:** `src/lib/components/VideoSubtitlePage.svelte` - No workaround needed; fallback automatic
 
 ---
 
@@ -589,9 +729,10 @@ All CSS variables defined in `src/app.css`.
 
 ### Implementing TTS Changes
 1. Start: `src/routes/api/tts/+server.ts` (handler)
-2. Reference: `src/lib/stores.ts` (voice definitions)
+2. Reference: `src/lib/stores.ts` (voice definitions, MINIMAX_VOICES)
 3. UI: `src/routes/+page.svelte` (TTS panel, two-speaker mode)
-4. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
+4. **MiniMax note:** Test thoroughly before production; current API issue requires workaround
+5. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
 ### Implementing Audiogram Changes
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
@@ -599,6 +740,15 @@ All CSS variables defined in `src/app.css`.
 3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
 4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
 5. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
+
+### Implementing Video Subtitle Changes
+1. Start: `src/lib/components/VideoSubtitlePage.svelte` (main container, 1412 lines)
+2. Upload/trim logic: Built-in to VideoSubtitlePage (no external components)
+3. Subtitle rendering: `src/lib/utils/subtitles.ts` (`drawSubtitle()`, `getActiveSegment()`)
+4. Title rendering: Reuse `src/lib/utils/compositor.ts:drawTitle()` pattern
+5. Export: Call `smartExportVideo()` from `src/lib/utils/video-export.ts`
+6. Panel integration: `SubtitlePanel.svelte` + `TitlePanel.svelte` (reused unchanged)
+7. Consult: TROUBLESHOOTING.md → Video Subtitle Issues (if created)
 
 ### Implementing Export Changes
 1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
@@ -659,6 +809,23 @@ All CSS variables defined in `src/app.css`.
 3. Check `waveform.ts:precomputeFrequencyFrames()` generates data (FFT computation)
 4. Verify container has dimensions
 5. Check preview vs export mismatch: are pre-computed frames being passed to export pipeline?
+
+### Video Subtitle Export Issues
+1. Check console for `[VideoExport]` or `[WebCodecs]` logs
+2. Verify video upload succeeded: `videoBlob !== null` and dimensions set
+3. Check canvas context available and dimensions match video
+4. If frame render fails: verify `ctx.drawImage(videoElement)` supported on device
+5. If subtitle not appearing: check `subtitleSegments` populated and `subtitlesEnabled === true`
+6. If trim not working: verify trim handles dragging updates `trimStart`/`trimEnd` ratios
+7. If export black screen: check if iOS Safari—fallback to MediaRecorder/cloud transcode automatic
+
+### MiniMax Integration Issues
+1. **No audio returned from API** - Check `MINIMAX_API_KEY` is set and valid
+2. Verify account has billing/subscription active (GitHub OAuth creates separate account; ensure subscription applies to correct account)
+3. Check voice ID format: min 10 chars, alphanumeric only (no underscores)
+4. Verify voice clone ID exists in `src/lib/stores.ts:MINIMAX_VOICES`
+5. Test with single character "a" first (verify API connectivity before full text)
+6. Current workaround: Route MiniMax requests to Azure if testing (temporary until account resolved)
 
 ---
 

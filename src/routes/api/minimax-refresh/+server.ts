@@ -38,7 +38,7 @@ export const POST: RequestHandler = async () => {
 					'Content-Type': 'application/json'
 				},
 				body: JSON.stringify({
-					model: 'speech-2.8-turbo',
+					model: 'speech-02',
 					text: 'a', // Single character — minimal cost, just enough to reset TTL
 					voice_id: voiceId,
 					emotion: 'neutral',

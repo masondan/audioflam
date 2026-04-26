@@ -147,7 +147,7 @@ console.log(`[MiniMax] Generating TTS for voice: ${voiceName}, text length: ${tr
 console.log(`[MiniMax] API Key set: ${MINIMAX_API_KEY ? 'yes' : 'no'}`);
 
 const requestBody = {
-	model: 'speech-02-turbo',
+	model: 'speech-02',
 	text: trimmedText,
 	voice_id: voiceName,
 	emotion: 'neutral',
