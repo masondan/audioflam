@@ -1247,6 +1247,14 @@
   <main class="main-content">
     <div class="tab-panel" class:hidden={activeTab !== 'tts'}>
     
+    <!-- Helper Section -->
+    <div class="helper-section">
+      <h2 class="helper-headline">Text-to-Speech</h2>
+      <p class="helper-text">
+        Select a speaker voice (or two), add text, download MP3 or create an audiogram
+      </p>
+    </div>
+
     <!-- Mode Toggle at Top -->
     <div class="mode-toggle-container">
       <button
@@ -2166,6 +2174,31 @@
 
   .speaker-preview-btn.playing .speaker-preview-icon {
     filter: invert(0.32) sepia(0.6) hue-rotate(248deg) saturate(1.5);
+  }
+
+  /* --- Helper section --- */
+  .helper-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
+  }
+
+  .helper-headline {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: #555555;
+    margin: 0;
+    text-align: center;
+  }
+
+  .helper-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: var(--line-height-normal);
+    margin: 0;
   }
 
   /* Mode Toggle Container */
