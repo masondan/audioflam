@@ -38,11 +38,6 @@ export const AZURE_VOICES: VoiceOption[] = [
 // Cloned via: node --env-file=.env scripts/minimax-clone-voices.js (April 2026)
 // voice_id rules: min 10 chars, alphanumeric only (no underscores)
 export const MINIMAX_VOICES: VoiceOption[] = [
-	// TEST: MiniMax Preset Voices (for API connectivity testing)
-	// TODO: Remove these after testing with cloned voices
-	{ name: 'female0001', ssmlGender: 'FEMALE', displayName: 'Test Female', description: 'MiniMax preset (TEST)', provider: 'minimax' },
-	{ name: 'male0001', ssmlGender: 'MALE', displayName: 'Test Male', description: 'MiniMax preset (TEST)', provider: 'minimax' },
-	
 	// Malawi English
 	{ name: 'chisomom01', ssmlGender: 'MALE', displayName: 'Chisomo', description: 'Malawi English male', provider: 'minimax' },
 	{ name: 'mercyf0001', ssmlGender: 'FEMALE', displayName: 'Mercy', description: 'Malawi English female', provider: 'minimax' },
