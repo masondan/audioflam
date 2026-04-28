@@ -93,6 +93,53 @@
     stopBulletinAudio();
   }
 
+  // ─── Story preview (single story TTS) ───────────────────────────────────────
+
+  let previewAudioElement = $state<HTMLAudioElement | null>(null);
+
+  async function handlePreviewStory(story: BulletinStory): Promise<HTMLAudioElement | null> {
+    const text = getStorySource(story);
+    if (!text.trim()) return null;
+
+    try {
+      const response = await fetch('/api/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          text,
+          voiceName: selectedVoiceName,
+          provider: 'azure',
+        }),
+      });
+
+      if (!response.ok) throw new Error('TTS failed');
+      const { audioContent } = await response.json();
+
+      // Stop any existing preview audio
+      if (previewAudioElement) {
+        previewAudioElement.pause();
+      }
+
+      // Create and play new preview audio
+      const blob = base64ToBlob(audioContent, 'audio/mp3');
+      const url = URL.createObjectURL(blob);
+      previewAudioElement = new Audio(url);
+      previewAudioElement.play();
+      
+      return previewAudioElement;
+    } catch (e) {
+      console.error('[Bulletin] Preview TTS error:', e);
+      return null;
+    }
+  }
+
+  function handlePreviewStop() {
+    if (previewAudioElement) {
+      previewAudioElement.pause();
+      previewAudioElement = null;
+    }
+  }
+
   // ─── Audio helpers ─────────────────────────────────────────────────────────
 
   function base64ToBlob(base64: string, mimeType: string): Blob {
@@ -395,19 +442,83 @@
   });
 </script>
 
-<div class="bulletin-page">
+<div class="app-container">
 
   <!-- Header -->
-  <header class="bulletin-header">
-    <h1 class="bulletin-title">Bulletin</h1>
+  <header class="app-header">
+    <div class="header-left">
+      <flam-nav current="audioflam"></flam-nav>
+      <img src="/icons/logotype-purple.png" alt="AudioFlam" class="logotype" />
+    </div>
+    <nav class="nav-tabs">
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={false}
+        onclick={() => {
+          localStorage.setItem('activeTab', 'tts');
+          goto('/');
+        }}
+        aria-label="Text to Speech"
+        aria-pressed={false}
+      >
+        <img src="/icons/icon-tts.svg" alt="" class="nav-tab-icon" />
+      </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={false}
+        onclick={() => {
+          localStorage.setItem('activeTab', 'audiogram');
+          goto('/');
+        }}
+        aria-label="Audiogram"
+        aria-pressed={false}
+      >
+        <img src="/icons/icon-audiogram.svg" alt="" class="nav-tab-icon" />
+      </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={false}
+        onclick={() => {
+          localStorage.setItem('activeTab', 'transcribe');
+          goto('/');
+        }}
+        aria-label="Transcribe"
+        aria-pressed={false}
+      >
+        <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
+      </button>
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={false}
+        onclick={() => {
+          localStorage.setItem('activeTab', 'subtitle-video');
+          goto('/');
+        }}
+        aria-label="Subtitle video"
+        aria-pressed={false}
+      >
+        <img src="/icons/icon-subtitles.svg" alt="" class="nav-tab-icon nav-tab-icon-subtitles" />
+      </button>
+    </nav>
   </header>
 
   <main class="bulletin-main">
 
+    <!-- Helper Section -->
+    <div class="helper-section">
+      <h2 class="helper-headline">Bulletin</h2>
+      <p class="helper-text">
+        Create a 'top stories' audio bulletin with spoken intro, outro and sound effects
+      </p>
+    </div>
+
     <!-- Voice selector -->
     <section class="section">
       <VoiceDropdown
-        label="Voice"
         voices={ALL_VOICES}
         value={selectedVoiceObj}
         onchange={handleVoiceChange}
@@ -445,6 +556,8 @@
               onEdit={handleEditStory}
               onMoveUp={handleMoveUp}
               onMoveDown={handleMoveDown}
+              onPreviewClick={handlePreviewStory}
+              onPreviewStop={handlePreviewStop}
             />
           {/each}
         </div>
@@ -534,27 +647,97 @@
 {/if}
 
 <style>
-  .bulletin-page {
+  /* --- Helper section --- */
+  .helper-section {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: var(--spacing-sm);
+    padding: 0 var(--spacing-md);
+    margin-bottom: var(--spacing-lg);
+  }
+
+  .helper-headline {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: #555555;
+    margin: 0;
+    text-align: center;
+  }
+
+  .helper-text {
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    text-align: center;
+    line-height: var(--line-height-normal);
+    margin: 0;
+  }
+
+  .app-container {
     max-width: 480px;
     margin: 0 auto;
     min-height: 100vh;
     background-color: var(--bg-white);
   }
 
-  .bulletin-header {
+  .app-header {
     padding: var(--spacing-md) var(--spacing-lg);
     border-bottom: 1px solid var(--color-border);
-    position: sticky;
-    top: 0;
-    background: var(--bg-white);
-    z-index: 10;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
   }
 
-  .bulletin-title {
-    font-size: var(--font-size-xl);
-    font-weight: var(--font-weight-bold);
-    color: var(--text-primary);
-    margin: 0;
+  .header-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .logotype {
+    height: 26px;
+    width: auto;
+  }
+
+  .nav-tabs {
+    display: flex;
+    gap: var(--spacing-sm);
+  }
+
+  .nav-tab-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: var(--radius-round);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: #f0f0f0;
+    border: none;
+    cursor: pointer;
+    transition: background-color var(--transition-fast);
+  }
+
+  .nav-tab-btn:hover {
+    background-color: #e4e4e4;
+  }
+
+  .nav-tab-btn.active {
+    background: var(--color-primary);
+  }
+
+  .nav-tab-icon {
+    width: 22px;
+    height: 22px;
+    filter: brightness(0) saturate(100%) invert(25%) sepia(0%) saturate(0%) brightness(100%) contrast(90%);
+  }
+
+  .nav-tab-btn.active .nav-tab-icon {
+    filter: brightness(0) invert(1);
+  }
+
+  .nav-tab-icon-subtitles {
+    width: 18px;
+    height: 18px;
   }
 
   .bulletin-main {
@@ -576,19 +759,20 @@
     justify-content: center;
     gap: var(--spacing-sm);
     padding: 14px var(--spacing-md);
-    background: var(--bg-white);
-    border: 2px dashed var(--color-border);
+    background: var(--color-highlight);
+    border: 1px solid var(--color-primary);
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-semibold);
     color: var(--color-primary);
     cursor: pointer;
-    transition: border-color var(--transition-normal), background-color var(--transition-normal);
+    transition: border-color var(--transition-normal), background-color var(--transition-normal), color var(--transition-normal);
   }
 
   .add-story-btn:hover:not(.disabled) {
     border-color: var(--color-primary);
-    background-color: var(--color-highlight);
+    background-color: var(--color-primary);
+    color: var(--bg-white);
   }
 
   .add-story-btn.disabled {

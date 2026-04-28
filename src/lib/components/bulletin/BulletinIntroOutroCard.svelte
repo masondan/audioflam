@@ -343,7 +343,7 @@
         <textarea
           id="intro-text"
           class="script-textarea"
-          placeholder="Type your intro here…"
+          placeholder="Add your intro here…"
           value={introScript}
           oninput={handleIntroInput}
           rows="3"
@@ -359,7 +359,7 @@
         <textarea
           id="outro-text"
           class="script-textarea"
-          placeholder="Type your outro here…"
+          placeholder="Add your outro here…"
           value={outroScript}
           oninput={handleOutroInput}
           rows="3"

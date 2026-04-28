@@ -9,9 +9,15 @@
     onEdit: (story: BulletinStory) => void;
     onMoveUp: (index: number) => void;
     onMoveDown: (index: number) => void;
+    onPreviewClick?: (story: BulletinStory) => Promise<HTMLAudioElement | null>;
+    onPreviewStop?: () => void;
   }
 
-  let { story, index, total, onEdit, onMoveUp, onMoveDown }: Props = $props();
+  let { story, index, total, onEdit, onMoveUp, onMoveDown, onPreviewClick, onPreviewStop }: Props = $props();
+
+  let isGeneratingPreview = $state(false);
+  let isPlayingPreview = $state(false);
+  let previewAudio = $state<HTMLAudioElement | null>(null);
 
   function getSnippet(text: string): string {
     const trimmed = text.trim();
@@ -23,9 +29,39 @@
     return (lastSpace > 80 ? cut.slice(0, lastSpace) : cut) + '…';
   }
 
+  async function handlePreviewClick() {
+    // If currently playing, stop playback
+    if (isPlayingPreview && previewAudio) {
+      previewAudio.pause();
+      isPlayingPreview = false;
+      onPreviewStop?.();
+      return;
+    }
+
+    // If generating, do nothing
+    if (isGeneratingPreview || !onPreviewClick) return;
+
+    isGeneratingPreview = true;
+    try {
+      const audio = await onPreviewClick(story);
+      if (audio) {
+        previewAudio = audio;
+        isPlayingPreview = true;
+        
+        // Listen for playback end
+        audio.onended = () => {
+          isPlayingPreview = false;
+          onPreviewStop?.();
+        };
+      }
+    } finally {
+      isGeneratingPreview = false;
+    }
+  }
+
   const sourceText = $derived(getStorySource(story));
   const snippet = $derived(getSnippet(sourceText));
-  const isScriptActive = $derived(story.scriptActive && story.script.trim().length > 0);
+  const sourceLabel = $derived(story.scriptActive ? 'Script' : 'Original');
 </script>
 
 <div class="story-card">
@@ -54,13 +90,30 @@
 
   <div class="card-body">
     <div class="card-meta">
-      <span class="story-number">Story {index + 1}</span>
-      {#if isScriptActive}
-        <span class="script-badge">Script</span>
-      {/if}
-      {#if story.ttsAudio}
-        <span class="audio-badge">Audio ✓</span>
-      {/if}
+      <div class="meta-left">
+        <span class="story-number">Story {index + 1}</span>
+        <span class="source-badge">{sourceLabel}</span>
+      </div>
+      <button
+        type="button"
+        class="preview-badge"
+        class:generating={isGeneratingPreview}
+        class:playing={isPlayingPreview}
+        onclick={handlePreviewClick}
+        disabled={isGeneratingPreview}
+        aria-label={isPlayingPreview ? 'Stop preview' : isGeneratingPreview ? 'Generating preview' : 'Preview story audio'}
+      >
+        {#if isGeneratingPreview}
+          <span class="badge-text">Generating</span>
+          <img src="/icons/icon-square-fill.svg" alt="" class="badge-icon" />
+        {:else if isPlayingPreview}
+          <span class="badge-text">Playing</span>
+          <img src="/icons/icon-square-fill.svg" alt="" class="badge-icon" />
+        {:else}
+          <span class="badge-text">Preview</span>
+          <img src="/icons/icon-play-fill.svg" alt="" class="badge-icon" />
+        {/if}
+      </button>
     </div>
     <p class="card-snippet">{snippet}</p>
   </div>
@@ -71,7 +124,7 @@
     onclick={() => onEdit(story)}
     aria-label="Edit story"
   >
-    <img src="/icons/icon-bold.svg" alt="" class="edit-icon" />
+    <img src="/icons/icon-edit.svg" alt="" class="edit-icon" />
   </button>
 </div>
 
@@ -139,6 +192,12 @@
     margin-bottom: 4px;
   }
 
+  .meta-left {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-xs);
+  }
+
   .story-number {
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-semibold);
@@ -147,22 +206,73 @@
     letter-spacing: 0.04em;
   }
 
-  .script-badge {
+  .source-badge {
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
     color: var(--color-primary);
     background: var(--color-highlight);
-    padding: 1px 6px;
+    padding: 2px 6px;
     border-radius: var(--radius-sm);
+    line-height: 1;
+    display: inline-block;
+    height: 20px;
+    display: flex;
+    align-items: center;
   }
 
-  .audio-badge {
+  .preview-badge {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: var(--font-size-xs);
     font-weight: var(--font-weight-medium);
-    color: #2e7d32;
-    background: #e8f5e9;
-    padding: 1px 6px;
+    color: var(--color-primary);
+    background: var(--color-highlight);
+    padding: 2px 6px;
     border-radius: var(--radius-sm);
+    cursor: pointer;
+    border: none;
+    transition: background-color var(--transition-normal);
+    white-space: nowrap;
+    flex-shrink: 0;
+    height: 20px;
+  }
+
+  .badge-text {
+    display: inline;
+  }
+
+  .badge-icon {
+    width: 12px;
+    height: 12px;
+    filter: invert(0.3);
+  }
+
+  .preview-badge:hover:not(.generating):not(.playing):not(:disabled) {
+    background-color: #e8d9f5;
+  }
+
+  .preview-badge.generating {
+    animation: shimmer 1.5s ease-in-out infinite;
+    cursor: default;
+  }
+
+  .preview-badge.playing {
+    animation: shimmer 1.5s ease-in-out infinite;
+    cursor: pointer;
+  }
+
+  .preview-badge:disabled {
+    cursor: default;
+  }
+
+  @keyframes shimmer {
+    0%, 100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.6;
+    }
   }
 
   .card-snippet {

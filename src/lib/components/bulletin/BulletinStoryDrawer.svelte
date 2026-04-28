@@ -48,7 +48,8 @@
 
   let scriptCardOpen = $state(draft.scriptActive);
   let originalTextExpanded = $state(false);
-  let adjustAudioOpen = $state(false);
+  let textareaElement: HTMLTextAreaElement | null = null;
+
 
   // Toast state
   let toastMessage = $state('');
@@ -65,15 +66,6 @@
 
   let isGeneratingScript = $state(false);
   let scriptError = $state('');
-
-  // ─── TTS / playback state ─────────────────────────────────────────────────────
-
-  let isGeneratingAudio = $state(false);
-  let isPlaying = $state(false);
-  let audioElement = $state<HTMLAudioElement | null>(null);
-  // SpeedSlider.speed is a number (1.0 = default, 1.25 = lively, 1.5 = fast)
-  let speedLevel = $state<number>(1.0);
-  let silenceLevel = $state<SilenceLevel>('default');
 
   // ─── Derived ──────────────────────────────────────────────────────────────────
 
@@ -224,13 +216,6 @@
 
   // ─── Script card ─────────────────────────────────────────────────────────────
 
-  function toggleScriptCard() {
-    scriptCardOpen = !scriptCardOpen;
-    // Keep scriptActive in sync with the card open state
-    // (scriptActive = true means "use script as TTS source")
-    draft.scriptActive = scriptCardOpen && draft.script.trim().length > 0;
-  }
-
   function setScriptLength(len: ScriptLength) {
     draft.scriptLength = len;
   }
@@ -239,17 +224,25 @@
     draft.scriptType = type;
   }
 
-  // When script textarea is edited, mark scriptActive if there's content
+  // When script textarea is edited, just update the script text
+  // Don't auto-set scriptActive; let the toggle control that
   function handleScriptInput(e: Event) {
     draft.script = (e.target as HTMLTextAreaElement).value;
-    draft.scriptActive = draft.script.trim().length > 0;
   }
 
-  // Auto-resize textarea on input
-  function autoResize(e: Event) {
+  // Auto-resize textarea on input (only for collapsed state)
+  function autoResize(e: Event | { target: HTMLTextAreaElement }) {
     const el = e.target as HTMLTextAreaElement;
-    el.style.height = 'auto';
-    el.style.height = el.scrollHeight + 'px';
+    // Always clear inline height — CSS min-height handles sizing
+    el.style.height = '';
+  }
+
+  // Toggle expand/collapse and immediately apply height
+  function toggleExpand() {
+    originalTextExpanded = !originalTextExpanded;
+    if (textareaElement) {
+      textareaElement.style.height = '';
+    }
   }
 
   // ─── TTS helpers ─────────────────────────────────────────────────────────────
@@ -260,80 +253,6 @@
     return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
   }
 
-  // Derived: PlayButton state
-  const playButtonState = $derived(
-    isGeneratingAudio ? 'loading'
-    : isPlaying        ? 'playing'
-    : draft.ttsAudio   ? 'active'
-    : getStorySource(draft).trim() ? 'active'
-    : 'inactive'
-  ) as 'inactive' | 'active' | 'loading' | 'playing';
-
-  // Tapping the play button: generate if no audio, play/pause if audio exists
-  async function handlePlayButton() {
-    if (isGeneratingAudio) return;
-
-    if (!draft.ttsAudio) {
-      // Generate audio
-      const scriptText = getStorySource(draft);
-      if (!scriptText.trim()) return;
-
-      isGeneratingAudio = true;
-      try {
-        const response = await fetch('/api/tts', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            text: scriptText,
-            voiceName: $bulletinStore.selectedVoice,
-            provider: 'azure',
-          }),
-        });
-        if (!response.ok) throw new Error('TTS failed');
-        const { audioContent } = await response.json();
-        draft.ttsAudio = audioContent;
-
-        const blob = base64ToBlob(audioContent, 'audio/mp3');
-        const url = URL.createObjectURL(blob);
-        audioElement = new Audio(url);
-        audioElement.onended = () => { isPlaying = false; };
-        audioElement.play();
-        isPlaying = true;
-      } catch (e) {
-        console.error('[BulletinScript] TTS error:', e);
-        showToast('Could not generate audio. Please try again.');
-      } finally {
-        isGeneratingAudio = false;
-      }
-      return;
-    }
-
-    // Toggle play/pause
-    if (!audioElement) {
-      // Reconstruct audio element from stored base64
-      const blob = base64ToBlob(draft.ttsAudio, 'audio/mp3');
-      const url = URL.createObjectURL(blob);
-      audioElement = new Audio(url);
-      audioElement.onended = () => { isPlaying = false; };
-    }
-    if (isPlaying) {
-      audioElement.pause();
-      isPlaying = false;
-    } else {
-      audioElement.play();
-      isPlaying = true;
-    }
-  }
-
-  function skipBackward() {
-    if (!audioElement) return;
-    audioElement.currentTime = Math.max(0, audioElement.currentTime - 5);
-  }
-
-  function skipForward() {
-    if (!audioElement) return;
-    audioElement.currentTime = Math.min(audioElement.duration, audioElement.currentTime + 5);
-  }
 </script>
 
 <!-- ─── Drawer overlay ──────────────────────────────────────────────────────── -->
@@ -368,6 +287,7 @@
       <!-- ── Original Text card ─────────────────────────────────────────────── -->
       <div class="text-card" class:expanded={originalTextExpanded}>
         <textarea
+          bind:this={textareaElement}
           class="original-textarea"
           placeholder="Paste text"
           value={draft.originalText}
@@ -375,7 +295,6 @@
             draft.originalText = (e.target as HTMLTextAreaElement).value;
             autoResize(e);
           }}
-          rows={originalTextExpanded ? 16 : 8}
         ></textarea>
 
         {#if originalWordCount > 0}
@@ -406,7 +325,7 @@
           <button
             type="button"
             class="text-action-btn expand-btn"
-            onclick={() => { originalTextExpanded = !originalTextExpanded; }}
+            onclick={toggleExpand}
             aria-label={originalTextExpanded ? 'Collapse text area' : 'Expand text area'}
           >
             <img
@@ -418,191 +337,109 @@
         </div>
       </div>
 
-      <!-- ── Create Script card ─────────────────────────────────────────────── -->
-      <div class="script-card" class:open={scriptCardOpen}>
-
-        <!-- Script card header (toggle) -->
-        <div class="script-card-header">
-          <button
-            type="button"
-            class="chevron-btn"
-            onclick={toggleScriptCard}
-            aria-expanded={scriptCardOpen}
-            aria-label={scriptCardOpen ? 'Collapse script' : 'Expand script'}
-          >
-            <img
-              src={scriptCardOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
-              alt=""
-              class="chevron-icon"
-            />
-          </button>
-          <span class="script-card-label">Create Script</span>
-          <!-- Toggle switch -->
-          <button
-            type="button"
-            class="toggle-switch"
-            class:active={scriptCardOpen}
-            onclick={toggleScriptCard}
-            aria-pressed={scriptCardOpen}
-            aria-label="Toggle script creation"
-          >
-            <span class="toggle-thumb"></span>
-          </button>
-        </div>
-
-        {#if scriptCardOpen}
-          <div class="script-card-body">
-
-            <!-- Script length selector -->
-            <div class="field-group">
-              <span class="field-label">Length</span>
-              <div class="toggle-boxes">
-                {#each ([20, 30, 60, 90] as const) as len}
-                  <button
-                    type="button"
-                    class="toggle-box"
-                    class:active={draft.scriptLength === len}
-                    onclick={() => setScriptLength(len)}
-                  >{len}s</button>
-                {/each}
-              </div>
-            </div>
-
-            <!-- Script type selector -->
-            <div class="field-group">
-              <span class="field-label">Type</span>
-              <div class="toggle-boxes">
-                <button
-                  type="button"
-                  class="toggle-box toggle-box--wide"
-                  class:active={draft.scriptType === 'summary'}
-                  onclick={() => setScriptType('summary')}
-                >Summary</button>
-                <button
-                  type="button"
-                  class="toggle-box toggle-box--wide"
-                  class:active={draft.scriptType === 'explainer'}
-                  onclick={() => setScriptType('explainer')}
-                >Explainer</button>
-              </div>
-            </div>
-
-            <!-- Script textarea -->
-            <div class="field-group">
-              <textarea
-                class="script-textarea"
-                placeholder="Script will appear here"
-                value={draft.script}
-                oninput={handleScriptInput}
-                rows="6"
-              ></textarea>
-              {#if scriptWordCount > 0}
-                <span class="word-count word-count--right">{scriptWordCount} words · ~{scriptDuration}s</span>
-              {/if}
-            </div>
-
-            <!-- Generate Script button -->
-            <button
-              type="button"
-              class="btn-generate"
-              onclick={generateScript}
-              disabled={isGeneratingScript || !draft.originalText.trim()}
-            >
-              {#if isGeneratingScript}
-                GENERATING <span class="spinner"></span>
-              {:else}
-                GENERATE SCRIPT
-              {/if}
-            </button>
-
-            {#if scriptError}
-              <p class="error-text">{scriptError}</p>
-            {/if}
-
-          </div>
-        {/if}
+      <!-- ── Use original / Create script toggle ────────────────────────────── -->
+      <div class="choice-section">
+        <button
+          type="button"
+          class="choice-btn"
+          class:active={!draft.scriptActive}
+          onclick={() => {
+            draft.scriptActive = false;
+          }}
+          aria-pressed={!draft.scriptActive}
+        >
+          Use original
+        </button>
+        <button
+          type="button"
+          class="choice-btn"
+          class:active={draft.scriptActive}
+          onclick={() => {
+            draft.scriptActive = true;
+            // Collapse text input when Create script is activated
+            originalTextExpanded = false;
+          }}
+          aria-pressed={draft.scriptActive}
+        >
+          Create script
+        </button>
       </div>
 
-      <!-- ── Player row + Adjust audio + Delete ────────────────────────────── -->
-      <div class="controls-section">
+      <!-- ── Script card (only shown when Create script is active) ──────────── -->
+      {#if draft.scriptActive}
+        <div class="script-card">
 
-        <!-- Player row: back · PlayButton · forward -->
-        <div class="player-row">
-          <button
-            type="button"
-            class="skip-btn"
-            onclick={skipBackward}
-            disabled={!audioElement}
-            aria-label="Skip back 5 seconds"
-          >
-            <img src="/icons/icon-back-five.svg" alt="Back 5s" />
-          </button>
-
-          <PlayButton
-            state={playButtonState}
-            disabled={!getStorySource(draft).trim() || !$bulletinStore.selectedVoice}
-            onclick={handlePlayButton}
-            ariaLabel={isPlaying ? 'Pause' : 'Play'}
-          />
-
-          <button
-            type="button"
-            class="skip-btn"
-            onclick={skipForward}
-            disabled={!audioElement}
-            aria-label="Skip forward 5 seconds"
-          >
-            <img src="/icons/icon-forward-five.svg" alt="Forward 5s" />
-          </button>
-        </div>
-
-        <!-- Adjust audio dropdown — matches TTS tab exactly -->
-        <div class="adjust-audio-section" class:inactive={!draft.ttsAudio}>
-          <button
-            type="button"
-            class="adjust-audio-header"
-            class:inactive={!draft.ttsAudio}
-            onclick={() => { if (draft.ttsAudio) adjustAudioOpen = !adjustAudioOpen; }}
-            aria-expanded={adjustAudioOpen && !!draft.ttsAudio}
-            disabled={!draft.ttsAudio}
-          >
-            <span class="adjust-audio-label">Adjust audio</span>
-            <img
-              src={adjustAudioOpen && draft.ttsAudio ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
-              alt=""
-              class="adjust-audio-chevron"
-            />
-          </button>
-
-          {#if adjustAudioOpen && draft.ttsAudio}
-            <div class="adjust-audio-content">
-              <div class="adjust-audio-row">
-                <div class="adjust-audio-slider">
-                  <div class="slider-header">
-                    <span class="slider-label-text">Speed</span>
-                  </div>
-                  <SpeedSlider
-                    speed={speedLevel}
-                    isActive={!isPlaying}
-                    onSpeedChange={(l) => { speedLevel = l; }}
-                    size="small"
-                  />
-                </div>
-                <div class="adjust-audio-slider">
-                  <div class="slider-header">
-                    <span class="slider-label-text">Silence</span>
-                  </div>
-                  <SilenceSlider
-                    level={silenceLevel}
-                    isActive={!isPlaying}
-                    onLevelChange={(l) => { silenceLevel = l; }}
-                    size="small"
-                  />
-                </div>
-              </div>
+          <!-- Script length selector -->
+          <div class="field-group">
+            <span class="field-label">Length</span>
+            <div class="toggle-boxes">
+              {#each ([20, 30, 60, 90] as const) as len}
+                <button
+                  type="button"
+                  class="toggle-box"
+                  class:active={draft.scriptLength === len}
+                  onclick={() => setScriptLength(len)}
+                >{len}s</button>
+              {/each}
             </div>
+          </div>
+
+          <!-- Script type selector -->
+          <div class="field-group">
+            <span class="field-label">Format</span>
+            <div class="toggle-boxes">
+              <button
+                type="button"
+                class="toggle-box toggle-box--wide"
+                class:active={draft.scriptType === 'summary'}
+                onclick={() => setScriptType('summary')}
+              >Summary</button>
+              <button
+                type="button"
+                class="toggle-box toggle-box--wide"
+                class:active={draft.scriptType === 'explainer'}
+                onclick={() => setScriptType('explainer')}
+              >Explainer</button>
+            </div>
+          </div>
+
+          <!-- Script textarea -->
+          <div class="field-group">
+            <textarea
+              class="script-textarea"
+              placeholder="Script will appear here"
+              value={draft.script}
+              oninput={handleScriptInput}
+              rows="6"
+            ></textarea>
+            {#if scriptWordCount > 0}
+              <span class="word-count word-count--right">{scriptWordCount} words · ~{scriptDuration}s</span>
+            {/if}
+          </div>
+
+          <!-- Generate Script button -->
+          <button
+            type="button"
+            class="btn-generate"
+            onclick={generateScript}
+            disabled={isGeneratingScript || !draft.originalText.trim()}
+          >
+            {#if isGeneratingScript}
+              Generating <span class="spinner"></span>
+            {:else}
+              Generate script
+            {/if}
+          </button>
+
+          {#if scriptError}
+            <p class="error-text">{scriptError}</p>
           {/if}
+
         </div>
+      {/if}
+
+      <!-- ── Delete Story ────────────────────────────────────────────────────── -->
+      <div class="controls-section">
 
         <!-- Delete Story — centred modest text button with trash icon -->
         {#if isEditMode}
@@ -760,7 +597,8 @@
 
   /* ── Original text card ─────────────────────────────────────────────────── */
   .text-card {
-    background: var(--bg-main);
+    background: var(--bg-white);
+    border: 1px solid var(--color-border);
     border-radius: var(--radius-lg);
     padding: var(--spacing-sm);
     display: flex;
@@ -780,12 +618,13 @@
     resize: none;
     box-sizing: border-box;
     padding: var(--spacing-xs) var(--spacing-sm);
-    min-height: 160px;
+    min-height: 100px;
     transition: min-height var(--transition-normal);
+    overflow-y: auto;
   }
 
   .text-card.expanded .original-textarea {
-    min-height: 320px;
+    min-height: calc(100vh - 280px);
   }
 
   .original-textarea::placeholder {
@@ -892,53 +731,46 @@
     filter: invert(0.43);
   }
 
-  .script-card-label {
-    flex: 1;
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-medium);
-    color: var(--text-secondary);
-    transition: color var(--transition-normal);
+  /* ── Choice section — Use original / Create script ────────────────────────── */
+  .choice-section {
+    display: flex;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-md);
+    margin-bottom: var(--spacing-md);
   }
 
-  .script-card.open .script-card-label {
+  .choice-btn {
+    flex: 1;
+    padding: 8px var(--spacing-xs);
+    background: var(--bg-main);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-secondary);
+    cursor: pointer;
+    text-align: center;
+    transition: all var(--transition-normal);
+  }
+
+  .choice-btn:hover:not(.active) {
+    border-color: var(--color-border-active);
     color: var(--text-primary);
   }
 
-  /* Toggle switch — matches BulletinIntroOutroCard exactly */
-  .toggle-switch {
-    width: 44px;
-    height: 24px;
-    background: #999999;
-    border: none;
-    border-radius: var(--radius-round);
-    cursor: pointer;
-    position: relative;
-    transition: background var(--transition-normal);
-    padding: 0;
-    flex-shrink: 0;
-  }
-
-  .toggle-switch.active {
+  .choice-btn.active {
     background: var(--color-primary);
+    border-color: var(--color-primary);
+    color: var(--bg-white);
+    font-weight: var(--font-weight-semibold);
   }
 
-  .toggle-thumb {
-    position: absolute;
-    top: 2px;
-    left: 2px;
-    width: 20px;
-    height: 20px;
+  /* ── Script card ────────────────────────────────────────────────────────── */
+  .script-card {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
     background: var(--bg-white);
-    border-radius: 50%;
-    transition: transform var(--transition-normal);
-  }
-
-  .toggle-switch.active .toggle-thumb {
-    transform: translateX(20px);
-  }
-
-  .script-card-body {
-    padding: 0 var(--spacing-md) var(--spacing-md);
+    padding: var(--spacing-md);
     display: flex;
     flex-direction: column;
     gap: var(--spacing-md);
@@ -1072,118 +904,6 @@
     flex-direction: column;
     gap: var(--spacing-md);
     padding-bottom: var(--spacing-xl);
-  }
-
-  /* ── Player row ─────────────────────────────────────────────────────────── */
-  .player-row {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: var(--spacing-xl);
-  }
-
-  .skip-btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    width: 40px;
-    height: 40px;
-    background: none;
-    border: none;
-    cursor: pointer;
-    padding: 0;
-    transition: all var(--transition-normal);
-  }
-
-  .skip-btn img {
-    width: 32px;
-    height: 32px;
-    filter: brightness(0) saturate(100%) invert(47%);
-    transition: filter var(--transition-normal);
-  }
-
-  .skip-btn:hover:not(:disabled) img {
-    filter: brightness(0) saturate(100%) invert(33%);
-  }
-
-  .skip-btn:disabled {
-    cursor: default;
-  }
-
-  .skip-btn:disabled img {
-    opacity: 0.4;
-  }
-
-  /* ── Adjust audio — matches TTS tab exactly ─────────────────────────────── */
-  .adjust-audio-section {
-    border: 1px solid var(--color-border);
-    border-radius: var(--radius-md);
-    background: var(--bg-white);
-    overflow: hidden;
-    transition: border-color var(--transition-normal);
-  }
-
-  .adjust-audio-section.inactive {
-    cursor: not-allowed;
-  }
-
-  .adjust-audio-section.inactive .adjust-audio-label {
-    color: var(--text-secondary);
-  }
-
-  .adjust-audio-header {
-    width: 100%;
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px var(--spacing-md);
-    background: none;
-    border: none;
-    cursor: pointer;
-    transition: background var(--transition-normal);
-    font-size: var(--font-size-base);
-    text-align: left;
-  }
-
-  .adjust-audio-header:disabled {
-    cursor: not-allowed;
-  }
-
-  .adjust-audio-label {
-    color: var(--text-primary);
-    font-weight: var(--font-weight-medium);
-    flex: 1;
-  }
-
-  .adjust-audio-chevron {
-    width: 16px;
-    height: 16px;
-    filter: brightness(0) saturate(100%) invert(47%);
-    transition: transform var(--transition-normal);
-  }
-
-  .adjust-audio-content {
-    padding: 0 var(--spacing-md) var(--spacing-md);
-  }
-
-  .adjust-audio-row {
-    display: flex;
-    gap: var(--spacing-sm);
-  }
-
-  .adjust-audio-slider {
-    flex: 1;
-  }
-
-  .slider-header {
-    margin-bottom: var(--spacing-xs);
-  }
-
-  .slider-label-text {
-    font-size: var(--font-size-sm);
-    color: #777777;
-    font-weight: var(--font-weight-medium);
-    display: block;
   }
 
   /* ── Delete section ─────────────────────────────────────────────────────── */

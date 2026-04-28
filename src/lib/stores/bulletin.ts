@@ -20,7 +20,7 @@ export interface BulletinStory {
 
 export interface BulletinState {
 	stories: BulletinStory[];
-	selectedVoice: string;
+	selectedVoice: string | null;
 	introScript: string;
 	outroScript: string;
 	introOutroVoice: string;
@@ -45,7 +45,7 @@ export const TRANSITION_SOUNDS  = ['transition1.mp3', 'transition2.mp3', 'transi
 
 const DEFAULT_STATE: BulletinState = {
 	stories: [],
-	selectedVoice: '',
+	selectedVoice: null,
 	introScript: '',
 	outroScript: '',
 	introOutroVoice: '',
@@ -71,7 +71,10 @@ function loadFromStorage(): BulletinState {
 		if (!raw) return { ...DEFAULT_STATE };
 		const parsed = JSON.parse(raw) as Partial<BulletinState>;
 		// Merge with defaults to handle schema additions gracefully
-		return { ...DEFAULT_STATE, ...parsed };
+		const merged = { ...DEFAULT_STATE, ...parsed };
+		// Never persist selectedVoice — always reset to null on load
+		merged.selectedVoice = null;
+		return merged;
 	} catch {
 		return { ...DEFAULT_STATE };
 	}
@@ -80,7 +83,9 @@ function loadFromStorage(): BulletinState {
 function saveToStorage(state: BulletinState): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+		// Exclude selectedVoice from persistence — it's session-only state
+		const stateToSave = { ...state, selectedVoice: null };
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
 	} catch {
 		// Storage quota exceeded or unavailable — fail silently
 	}
