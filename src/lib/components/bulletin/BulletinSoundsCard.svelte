@@ -1,8 +1,9 @@
 <script lang="ts">
-  import { bulletinStore, INTRO_OUTRO_SOUNDS, TRANSITION_SOUNDS } from '$lib/stores/bulletin';
+  import { bulletinStore, bulletinPanelStore, INTRO_OUTRO_SOUNDS, TRANSITION_SOUNDS } from '$lib/stores/bulletin';
 
   // Local UI state
-  let isOpen = $state(false);
+  let openPanel = $derived($bulletinPanelStore);
+  let isOpen = $derived(openPanel === 'sounds');
 
   // Derived from store
   let soundsEnabled = $derived($bulletinStore.soundsEnabled);
@@ -16,13 +17,17 @@
   function handleToggle() {
     const newEnabled = !soundsEnabled;
     bulletinStore.update(s => ({ ...s, soundsEnabled: newEnabled }));
-    if (newEnabled && !isOpen) isOpen = true;
-    if (!newEnabled) isOpen = false;
+    if (newEnabled && !isOpen) bulletinPanelStore.setOpen('sounds');
+    if (!newEnabled) bulletinPanelStore.close();
   }
 
   function handleChevronClick() {
     if (!soundsEnabled) return;
-    isOpen = !isOpen;
+    if (isOpen) {
+      bulletinPanelStore.close();
+    } else {
+      bulletinPanelStore.setOpen('sounds');
+    }
   }
 
   function selectIntroOutroSound(filename: string | null) {

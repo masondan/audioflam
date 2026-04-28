@@ -11,6 +11,7 @@
   import BulletinStoryCard from '$lib/components/bulletin/BulletinStoryCard.svelte';
   import BulletinIntroOutroCard from '$lib/components/bulletin/BulletinIntroOutroCard.svelte';
   import BulletinSoundsCard from '$lib/components/bulletin/BulletinSoundsCard.svelte';
+  import BulletinAdjustVoiceCard from '$lib/components/bulletin/BulletinAdjustVoiceCard.svelte';
   import BulletinStoryDrawer from '$lib/components/bulletin/BulletinStoryDrawer.svelte';
 
   // Trigger localStorage initialisation on mount
@@ -161,8 +162,12 @@
     return btoa(binary);
   }
 
-  /** Generate TTS for a single story via /api/tts */
-  async function generateStoryTTS(story: BulletinStory): Promise<string> {
+  /** Generate TTS for a single story via /api/tts with speed/silence adjustments */
+  async function generateStoryTTS(
+    story: BulletinStory,
+    speed: number = 1.0,
+    silence: 'default' | 'trim' | 'tight' = 'default'
+  ): Promise<string> {
     const text = getStorySource(story);
     if (!text.trim()) throw new Error(`Story ${story.id} has no text`);
 
@@ -173,6 +178,8 @@
         text,
         voiceName: selectedVoiceName,
         provider: 'azure',
+        speed,
+        silence,
       }),
     });
 
@@ -252,7 +259,11 @@
         let storyAudio = updatedStories[i].ttsAudio;
         if (!storyAudio) {
           console.log('[Bulletin] Generating TTS for story', i + 1);
-          storyAudio = await generateStoryTTS(updatedStories[i]);
+          storyAudio = await generateStoryTTS(
+            updatedStories[i],
+            state.mainVoiceSpeed,
+            state.mainVoiceSilence
+          );
           updatedStories[i] = { ...updatedStories[i], ttsAudio: storyAudio };
           // Persist generated audio back to store
           bulletinStore.updateStory(updatedStories[i]);
@@ -435,6 +446,18 @@
     }
   }
 
+  // ─── New bulletin actions ──────────────────────────────────────────────────────
+
+  function handleContinueWithTemplate() {
+    bulletinStore.clearStoriesOnly();
+    stopBulletinAudio();
+  }
+
+  function handleStartFresh() {
+    bulletinStore.reset();
+    stopBulletinAudio();
+  }
+
   // ─── Cleanup ───────────────────────────────────────────────────────────────
 
   onDestroy(() => {
@@ -611,6 +634,9 @@
         </button>
       </div>
 
+      <!-- Adjust main voice card -->
+      <BulletinAdjustVoiceCard />
+
       <!-- Download button — full width, purple when enabled -->
       <button
         type="button"
@@ -633,6 +659,25 @@
         Add to audiogram
       </button>
 
+    </section>
+
+    <!-- New bulletin actions -->
+    <section class="section bottom-actions">
+      <button
+        type="button"
+        class="new-bulletin-btn secondary"
+        onclick={handleContinueWithTemplate}
+      >
+        Continue with template
+      </button>
+
+      <button
+        type="button"
+        class="new-bulletin-btn primary"
+        onclick={handleStartFresh}
+      >
+        Start fresh
+      </button>
     </section>
 
   </main>
@@ -926,5 +971,49 @@
 
   .audiogram-btn.enabled:hover {
     text-decoration: underline;
+  }
+
+  /* New bulletin action buttons */
+  .bottom-actions {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+    margin-top: var(--spacing-lg);
+    padding-top: var(--spacing-lg);
+    border-top: 1px solid var(--color-border);
+  }
+
+  .new-bulletin-btn {
+    display: block;
+    width: 100%;
+    padding: var(--spacing-md);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-md);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+  }
+
+  .new-bulletin-btn.secondary {
+    background: var(--bg-main);
+    color: var(--text-primary);
+    border-color: var(--color-border);
+  }
+
+  .new-bulletin-btn.secondary:hover {
+    background: #e0e0e0;
+    border-color: #999999;
+  }
+
+  .new-bulletin-btn.primary {
+    background: var(--color-primary);
+    color: var(--bg-white);
+    border-color: var(--color-primary);
+  }
+
+  .new-bulletin-btn.primary:hover {
+    background: #4a1d9e;
+    border-color: #4a1d9e;
   }
 </style>

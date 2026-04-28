@@ -1,13 +1,15 @@
 <script lang="ts">
-  import { bulletinStore } from '$lib/stores/bulletin';
+  import { bulletinStore, bulletinPanelStore } from '$lib/stores/bulletin';
   import { ALL_VOICES } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
   import SilenceSlider from '$lib/components/SilenceSlider.svelte';
-  import { concatenateAudioSegments } from '$lib/audioProcessing';
+  import { concatenateAudioSegments, removeSilence, type SilenceLevel } from '$lib/audioProcessing';
+  import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
 
   // Local UI state
-  let isOpen = $state(false);
+  let openPanel = $derived($bulletinPanelStore);
+  let isOpen = $derived(openPanel === 'intro-outro');
   let adjustAudioOpen = $state(false);
 
   // Derived from store
@@ -40,13 +42,17 @@
   function handleToggle() {
     const newEnabled = !introOutroEnabled;
     bulletinStore.update(s => ({ ...s, introOutroEnabled: newEnabled }));
-    if (newEnabled && !isOpen) isOpen = true;
-    if (!newEnabled) isOpen = false;
+    if (newEnabled && !isOpen) bulletinPanelStore.setOpen('intro-outro');
+    if (!newEnabled) bulletinPanelStore.close();
   }
 
   function handleChevronClick() {
     if (!introOutroEnabled) return;
-    isOpen = !isOpen;
+    if (isOpen) {
+      bulletinPanelStore.close();
+    } else {
+      bulletinPanelStore.setOpen('intro-outro');
+    }
   }
 
   function handleIntroInput(e: Event) {
@@ -149,7 +155,76 @@
     return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
   }
 
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        const base64 = result.split(',')[1];
+        resolve(base64);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function decodeAudio(base64Audio: string): Promise<AudioBuffer> {
+    const binaryString = atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    
+    const audioContext = new AudioContext();
+    try {
+      const audioBuffer = await audioContext.decodeAudioData(bytes.buffer);
+      return audioBuffer;
+    } finally {
+      await audioContext.close();
+    }
+  }
+
+  async function processAudioSegment(base64Audio: string, speed: number, silenceLevel: SilenceLevel): Promise<string> {
+    let processedBase64 = base64Audio;
+
+    // Apply speed adjustment if not 1.0
+    if (speed !== 1.0) {
+      try {
+        const buffer = await decodeAudio(base64Audio);
+        const stretchedBuffer = await timeStretch(buffer, speed);
+        const blob = audioBufferToWav(stretchedBuffer);
+        processedBase64 = await blobToBase64(blob);
+      } catch (e) {
+        console.error('[BulletinIntroOutro] Speed adjustment failed:', e);
+        // Continue with original audio if speed adjustment fails
+      }
+    }
+
+    // Apply silence removal if not default
+    if (silenceLevel !== 'default') {
+      try {
+        const result = await removeSilence(processedBase64, silenceLevel);
+        processedBase64 = await blobToBase64(result.blob);
+      } catch (e) {
+        console.error('[BulletinIntroOutro] Silence removal failed:', e);
+        // Continue with current audio if silence removal fails
+      }
+    }
+
+    return processedBase64;
+  }
+
   async function generatePreview() {
+    // If currently playing, stop playback
+    if (isPlayingPreview && previewAudioElement) {
+      previewAudioElement.pause();
+      isPlayingPreview = false;
+      return;
+    }
+
+    // If generating, do nothing
+    if (isGeneratingPreview) return;
+
     if (!introScript.trim() && !outroScript.trim()) return;
     if (!introOutroVoice) return;
 
@@ -173,8 +248,16 @@
 
         if (!introResponse.ok) throw new Error('Intro TTS failed');
         const introData = await introResponse.json();
-        audioSegments.push(introData.audioContent);
-        bulletinStore.update(s => ({ ...s, introTtsAudio: introData.audioContent }));
+        
+        // Apply speed and silence processing
+        const processedIntroAudio = await processAudioSegment(
+          introData.audioContent,
+          introOutroSpeed,
+          introOutroSilence
+        );
+        
+        audioSegments.push(processedIntroAudio);
+        bulletinStore.update(s => ({ ...s, introTtsAudio: processedIntroAudio }));
       }
 
       // Generate outro TTS if present
@@ -191,8 +274,16 @@
 
         if (!outroResponse.ok) throw new Error('Outro TTS failed');
         const outroData = await outroResponse.json();
-        audioSegments.push(outroData.audioContent);
-        bulletinStore.update(s => ({ ...s, outroTtsAudio: outroData.audioContent }));
+        
+        // Apply speed and silence processing
+        const processedOutroAudio = await processAudioSegment(
+          outroData.audioContent,
+          introOutroSpeed,
+          introOutroSilence
+        );
+        
+        audioSegments.push(processedOutroAudio);
+        bulletinStore.update(s => ({ ...s, outroTtsAudio: processedOutroAudio }));
       }
 
       // Concatenate segments
@@ -373,17 +464,19 @@
       <button
         type="button"
         class="preview-btn"
+        class:playing={isPlayingPreview && previewAudioElement}
         onclick={generatePreview}
         disabled={(!introScript.trim() && !outroScript.trim()) || !introOutroVoice || isGeneratingPreview}
       >
         {#if isGeneratingPreview}
-          GENERATING <span class="spinner" />
+          <span class="btn-text">Generating</span>
+          <span class="spinner" />
         {:else if previewAudioElement && isPlayingPreview}
-          PAUSE
-        {:else if previewAudioElement}
-          PLAY
+          <span class="btn-text">Playing</span>
+          <img src="/icons/icon-square-fill.svg" alt="" class="btn-icon" />
         {:else}
-          PREVIEW
+          <span class="btn-text">Preview</span>
+          <img src="/icons/icon-play-fill.svg" alt="" class="btn-icon" />
         {/if}
       </button>
 
@@ -735,7 +828,7 @@
     gap: var(--spacing-xs);
   }
 
-  .preview-btn:hover:not(:disabled) {
+  .preview-btn:hover:not(:disabled):not(.playing) {
     background: #4a1d9e;
   }
 
@@ -743,6 +836,22 @@
     background: var(--color-border);
     color: var(--text-secondary);
     cursor: not-allowed;
+  }
+
+  .preview-btn:disabled:has(.spinner) {
+    background: var(--color-primary);
+    color: var(--bg-white);
+    cursor: default;
+  }
+
+  .btn-text {
+    display: inline;
+  }
+
+  .btn-icon {
+    width: 16px;
+    height: 16px;
+    filter: invert(1);
   }
 
   .spinner {

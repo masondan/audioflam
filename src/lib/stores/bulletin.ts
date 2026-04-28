@@ -33,6 +33,8 @@ export interface BulletinState {
 	introTtsAudio: string | null;
 	outroTtsAudio: string | null;
 	bulletinAudio: string | null;
+	mainVoiceSpeed: number;  // 1.0 = default, 1.15 = lively, 1.25 = fast (applies to all story segments)
+	mainVoiceSilence: 'default' | 'trim' | 'tight';  // silence removal level for story segments
 }
 
 // ─── Sound file constants ─────────────────────────────────────────────────────
@@ -58,6 +60,8 @@ const DEFAULT_STATE: BulletinState = {
 	introTtsAudio: null,
 	outroTtsAudio: null,
 	bulletinAudio: null,
+	mainVoiceSpeed: 1.0,
+	mainVoiceSilence: 'default',
 };
 
 const STORAGE_KEY = 'audioflam_bulletin';
@@ -72,8 +76,6 @@ function loadFromStorage(): BulletinState {
 		const parsed = JSON.parse(raw) as Partial<BulletinState>;
 		// Merge with defaults to handle schema additions gracefully
 		const merged = { ...DEFAULT_STATE, ...parsed };
-		// Never persist selectedVoice — always reset to null on load
-		merged.selectedVoice = null;
 		return merged;
 	} catch {
 		return { ...DEFAULT_STATE };
@@ -83,9 +85,7 @@ function loadFromStorage(): BulletinState {
 function saveToStorage(state: BulletinState): void {
 	if (typeof localStorage === 'undefined') return;
 	try {
-		// Exclude selectedVoice from persistence — it's session-only state
-		const stateToSave = { ...state, selectedVoice: null };
-		localStorage.setItem(STORAGE_KEY, JSON.stringify(stateToSave));
+		localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
 	} catch {
 		// Storage quota exceeded or unavailable — fail silently
 	}
@@ -138,7 +138,16 @@ function createBulletinStore() {
 		clearBulletinAudio() {
 			update((s) => ({ ...s, bulletinAudio: null }));
 		},
-
+	
+		/** Clear stories only (keep intro/outro, sounds, voice, and adjustments) */
+		clearStoriesOnly() {
+			update((s) => ({
+				...s,
+				stories: [],
+				bulletinAudio: null,
+			}));
+		},
+	
 		/** Reset entire store to defaults */
 		reset() {
 			set({ ...DEFAULT_STATE });
@@ -147,6 +156,26 @@ function createBulletinStore() {
 }
 
 export const bulletinStore = createBulletinStore();
+
+// ─── Panel state store (for auto-collapse) ────────────────────────────────────
+
+export type OpenPanel = 'intro-outro' | 'sounds' | 'adjust-voice' | null;
+
+function createPanelStore() {
+	const { subscribe, set } = writable<OpenPanel>(null);
+
+	return {
+		subscribe,
+		setOpen(panel: OpenPanel) {
+			set(panel);
+		},
+		close() {
+			set(null);
+		},
+	};
+}
+
+export const bulletinPanelStore = createPanelStore();
 
 // ─── Utility ──────────────────────────────────────────────────────────────────
 
