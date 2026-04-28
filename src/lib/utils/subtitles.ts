@@ -24,6 +24,7 @@ export interface SubtitleSegment {
 export type SubtitleTemplate = 'flow' | 'focus';
 export type FontSize = 'small' | 'medium' | 'large';
 export type MaxLines = 1 | 2;
+export type FontName = 'Inter' | 'Roboto Slab' | 'Oswald' | 'Saira';
 
 export interface SubtitleStyle {
 	template: SubtitleTemplate;
@@ -41,6 +42,7 @@ export interface SubtitleStyle {
 	textAlign: 'left' | 'center' | 'right';
 	boldEnabled: boolean;
 	uppercaseEnabled: boolean;
+	fontFamily: FontName;
 }
 
 export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
@@ -59,6 +61,7 @@ export const DEFAULT_SUBTITLE_STYLE: SubtitleStyle = {
 	textAlign: 'center',
 	boldEnabled: true,
 	uppercaseEnabled: false,
+	fontFamily: 'Inter',
 };
 
 // --- Font size mapping ---
@@ -314,7 +317,8 @@ export function drawSubtitle(
 
 	ctx.save();
 	const fontWeight = style.boldEnabled ? 900 : 600;
-	ctx.font = `${fontWeight} ${fontPx}px 'Inter', sans-serif`;
+	const fontStretch = style.fontFamily === 'Saira' ? 'condensed' : 'normal';
+	ctx.font = `${fontStretch} ${fontWeight} ${fontPx}px '${style.fontFamily}', sans-serif`;
 	ctx.textAlign = style.textAlign;
 	ctx.textBaseline = 'top';
 

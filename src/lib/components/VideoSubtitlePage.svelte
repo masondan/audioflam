@@ -109,6 +109,14 @@
     };
   });
 
+  // ─── Re-render on subtitle style changes (when paused) ────────────────────
+  // When user changes font, color, or other style while paused, update the preview
+  $effect(() => {
+    if (isPlaying || !hasVideo) return;
+    // Trigger re-render with current time
+    renderFrame(currentTime);
+  });
+
 
   // ─── Progress bar playhead dragging ───────────────────────────────────────
   function handlePlayheadMouseDown(e: MouseEvent) {

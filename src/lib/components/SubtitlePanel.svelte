@@ -7,6 +7,7 @@
     type SubtitleTemplate,
     type FontSize,
     type MaxLines,
+    type FontName,
     DEFAULT_SUBTITLE_STYLE,
     mergeSegments,
     splitSegmentAtWord,
@@ -50,6 +51,9 @@
   let selectedLanguage = $state('auto');
   let languageDropdownOpen = $state(false);
 
+  // Font dropdown state
+  let fontDropdownOpen = $state(false);
+
   // Edit drawer state
   let editDrawerOpen = $state(false);
   let splitPickerSegmentIdx = $state<number | null>(null);
@@ -82,6 +86,22 @@
     }
   });
 
+  // --- Close font dropdown on click outside ---
+  $effect(() => {
+    if (!fontDropdownOpen) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      const wrapper = document.querySelector('.font-dropdown-wrapper');
+      if (wrapper && !wrapper.contains(target)) {
+        fontDropdownOpen = false;
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  });
+
   // --- Style helpers ---
 
   function updateStyle(patch: Partial<SubtitleStyle>) {
@@ -98,6 +118,10 @@
 
   function setMaxLines(m: MaxLines) {
     updateStyle({ maxLines: m });
+  }
+
+  function setFont(fontName: FontName) {
+    updateStyle({ fontFamily: fontName });
   }
 
   // --- Generate subtitles via Deepgram API ---
@@ -359,6 +383,53 @@
       >
         All caps
       </button>
+    </div>
+  </div>
+
+  <!-- Font dropdown -->
+  <div class="panel-row">
+    <span class="row-label">Font</span>
+    <div class="font-dropdown-wrapper">
+      <button
+        type="button"
+        class="font-dropdown-trigger"
+        class:open={fontDropdownOpen}
+        onclick={() => fontDropdownOpen = !fontDropdownOpen}
+        aria-expanded={fontDropdownOpen}
+      >
+        <span class="font-dropdown-value" style="font-family: {style.fontFamily}">
+          {style.fontFamily}
+        </span>
+        <img
+          src={fontDropdownOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+          alt=""
+          class="font-dropdown-icon"
+        />
+      </button>
+      
+      {#if fontDropdownOpen}
+        <ul class="font-dropdown-menu">
+          {#each ['Inter', 'Roboto Slab', 'Oswald', 'Saira'] as fontName, i}
+            <li>
+              <button
+                type="button"
+                class="font-dropdown-option"
+                class:selected={style.fontFamily === fontName}
+                style="font-family: {fontName}; font-weight: {fontName === 'Inter' || fontName === 'Oswald' ? '600' : fontName === 'Roboto Slab' ? '900' : fontName === 'Saira' ? '600' : '400'}; font-stretch: {fontName === 'Saira' ? 'condensed' : 'normal'}"
+                onclick={() => {
+                  setFont(fontName as FontName);
+                  fontDropdownOpen = false;
+                }}
+              >
+                {fontName}
+              </button>
+            </li>
+            {#if i < 3}
+              <li class="font-dropdown-separator"></li>
+            {/if}
+          {/each}
+        </ul>
+      {/if}
     </div>
   </div>
 
@@ -1350,5 +1421,91 @@
     background-color: var(--color-highlight);
     color: var(--color-primary);
     font-weight: var(--font-weight-semibold);
+  }
+
+  /* Font dropdown */
+  .font-dropdown-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .font-dropdown-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px var(--spacing-sm);
+    background: var(--bg-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color var(--transition-normal);
+  }
+
+  .font-dropdown-trigger:hover {
+    border-color: var(--text-secondary);
+  }
+
+  .font-dropdown-trigger.open {
+    border-color: var(--color-primary);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .font-dropdown-value {
+    text-align: left;
+  }
+
+  .font-dropdown-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .font-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    border: 1px solid var(--color-primary);
+    border-top: none;
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    z-index: 100;
+    animation: slideDown var(--transition-normal);
+  }
+
+  .font-dropdown-option {
+    width: 100%;
+    display: block;
+    padding: 6px var(--spacing-sm);
+    background: none;
+    border: none;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color var(--transition-normal);
+  }
+
+  .font-dropdown-option:hover {
+    background-color: var(--color-highlight);
+  }
+
+  .font-dropdown-option.selected {
+    color: var(--color-primary);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .font-dropdown-separator {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: 0 var(--spacing-md);
   }
 </style>

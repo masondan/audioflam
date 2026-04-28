@@ -59,8 +59,25 @@
 
   let showTextColorPicker = $state(false);
   let showLabelColorPicker = $state(false);
+  let fontDropdownOpen = $state(false);
   
   let isTextWhite = $derived(textColor.toLowerCase() === '#ffffff');
+
+  // --- Close font dropdown on click outside ---
+  $effect(() => {
+    if (!fontDropdownOpen) return;
+
+    function handleClickOutside(e: MouseEvent) {
+      const target = e.target as HTMLElement;
+      const wrapper = document.querySelector('.font-dropdown-wrapper');
+      if (wrapper && !wrapper.contains(target)) {
+        fontDropdownOpen = false;
+      }
+    }
+
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  });
 
   const fonts: { id: TitleFont; label: string; family: string }[] = [
     { id: 'Inter', label: 'Inter', family: "'Inter', sans-serif" },
@@ -127,20 +144,48 @@
 
   <div class="tab-content">
     {#if activeTab === 'font'}
-      <div class="font-grid">
-        {#each fonts as font}
-          <button
-            type="button"
-            class="font-btn"
-            class:selected={selectedFont === font.id}
-            onclick={() => onFontChange(font.id)}
-            aria-pressed={selectedFont === font.id}
-            aria-label={font.id}
-            style="font-family: {font.family}; font-weight: {font.id === 'Inter' ? 700 : font.id === 'Bebas Neue' ? 400 : 400};"
-          >
-            {font.label}
-          </button>
-        {/each}
+      <!-- Font dropdown -->
+      <div class="font-dropdown-wrapper">
+        <button
+          type="button"
+          class="font-dropdown-trigger"
+          class:open={fontDropdownOpen}
+          onclick={() => fontDropdownOpen = !fontDropdownOpen}
+          aria-expanded={fontDropdownOpen}
+        >
+          <span class="font-dropdown-value" style="font-family: {selectedFont}">
+            {selectedFont}
+          </span>
+          <img
+            src={fontDropdownOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+            alt=""
+            class="font-dropdown-icon"
+          />
+        </button>
+        
+        {#if fontDropdownOpen}
+          <ul class="font-dropdown-menu">
+            {#each ['Inter', 'Lora', 'Roboto Slab', 'Saira', 'Playfair Display', 'Bebas Neue'] as fontName, i}
+              <li>
+                <button
+                  type="button"
+                  class="font-dropdown-option"
+                  class:selected={selectedFont === fontName}
+                  style="font-family: {fontName}; font-weight: {fontName === 'Inter' ? '600' : fontName === 'Roboto Slab' ? '900' : fontName === 'Saira' ? '600' : fontName === 'Playfair Display' ? '600' : '400'}; font-stretch: {fontName === 'Saira' ? 'condensed' : 'normal'}"
+                  onclick={() => {
+                    onFontChange(fontName as TitleFont);
+                    fontDropdownOpen = false;
+                  }}
+                >
+                  {fontName}
+                </button>
+              </li>
+              {#if i < 5}
+                <li class="font-dropdown-separator"></li>
+              {/if}
+            {/each}
+          </ul>
+        {/if}
       </div>
     {:else if activeTab === 'style'}
       <div class="style-content">
@@ -387,31 +432,6 @@
     /* No min-height - let content determine height for consistent bottom gap */
   }
 
-  /* Font Tab */
-  .font-grid {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: var(--spacing-sm);
-  }
-
-  .font-btn {
-    padding: var(--spacing-sm) var(--spacing-md);
-    background: var(--bg-white);
-    border: 1px solid #999999;
-    border-radius: var(--radius-md);
-    font-size: var(--font-size-base);
-    color: #999999;
-    cursor: pointer;
-    text-align: left;
-    transition: border-color var(--transition-fast);
-  }
-
-  .font-btn.selected {
-    border-color: var(--color-primary);
-    border-width: 2px;
-    color: var(--text-primary);
-  }
-
   /* Style Tab */
   .style-content,
   .label-content {
@@ -615,5 +635,102 @@
       #ff0000
     );
     border: none;
+  }
+
+  /* Font dropdown */
+  .font-dropdown-wrapper {
+    position: relative;
+    width: 100%;
+  }
+
+  .font-dropdown-trigger {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px var(--spacing-sm);
+    background: var(--bg-white);
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    transition: border-color var(--transition-normal);
+  }
+
+  .font-dropdown-trigger:hover {
+    border-color: var(--text-secondary);
+  }
+
+  .font-dropdown-trigger.open {
+    border-color: var(--color-primary);
+    border-bottom-left-radius: 0;
+    border-bottom-right-radius: 0;
+  }
+
+  .font-dropdown-value {
+    text-align: left;
+  }
+
+  .font-dropdown-icon {
+    width: 20px;
+    height: 20px;
+    flex-shrink: 0;
+  }
+
+  .font-dropdown-menu {
+    position: absolute;
+    top: 100%;
+    left: 0;
+    right: 0;
+    background: var(--bg-white);
+    border: 1px solid var(--color-primary);
+    border-top: none;
+    border-bottom-left-radius: var(--radius-md);
+    border-bottom-right-radius: var(--radius-md);
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    z-index: 100;
+    animation: slideDown var(--transition-normal);
+  }
+
+  .font-dropdown-option {
+    width: 100%;
+    display: block;
+    padding: 6px var(--spacing-sm);
+    background: none;
+    border: none;
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    cursor: pointer;
+    text-align: left;
+    transition: background-color var(--transition-normal);
+  }
+
+  .font-dropdown-option:hover {
+    background-color: var(--color-highlight);
+  }
+
+  .font-dropdown-option.selected {
+    color: var(--color-primary);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .font-dropdown-separator {
+    height: 1px;
+    background-color: var(--color-border);
+    margin: 0 var(--spacing-md);
+  }
+
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      transform: translateY(-4px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
   }
 </style>
