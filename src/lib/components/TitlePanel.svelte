@@ -428,10 +428,6 @@
     font-weight: var(--font-weight-bold);
   }
 
-  .tab-content {
-    /* No min-height - let content determine height for consistent bottom gap */
-  }
-
   /* Style Tab */
   .style-content,
   .label-content {
