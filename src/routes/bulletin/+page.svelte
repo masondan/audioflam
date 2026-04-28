@@ -51,6 +51,11 @@
   let drawerOpen = $state(false);
   let drawerStory = $state<BulletinStory | null>(null);  // null = new story mode
 
+  // ─── Clear modals ──────────────────────────────────────────────────────────
+
+  let clearStoriesModalOpen = $state(false);
+  let clearAllModalOpen = $state(false);
+
   function handleAddStory() {
     drawerStory = null;
     drawerOpen = true;
@@ -446,16 +451,26 @@
     }
   }
 
-  // ─── New bulletin actions ──────────────────────────────────────────────────────
+  // ─── Clear stories / Clear all handlers ────────────────────────────────────
 
-  function handleContinueWithTemplate() {
-    bulletinStore.clearStoriesOnly();
-    stopBulletinAudio();
+  function handleClearStoriesClick() {
+    clearStoriesModalOpen = true;
   }
 
-  function handleStartFresh() {
+  function handleClearAllClick() {
+    clearAllModalOpen = true;
+  }
+
+  function handleClearStoriesConfirm() {
+    bulletinStore.clearStoriesOnly();
+    stopBulletinAudio();
+    clearStoriesModalOpen = false;
+  }
+
+  function handleClearAllConfirm() {
     bulletinStore.reset();
     stopBulletinAudio();
+    clearAllModalOpen = false;
   }
 
   // ─── Cleanup ───────────────────────────────────────────────────────────────
@@ -566,7 +581,7 @@
     <section class="section story-list-section">
       {#if stories.length === 0}
         <div class="empty-state">
-          <p class="empty-text">No stories yet</p>
+          <p class="empty-text">Build your bulletin</p>
           <p class="empty-hint">Select a voice and tap Add Story to begin.</p>
         </div>
       {:else}
@@ -588,12 +603,12 @@
     </section>
 
     <!-- Intro & Outro card -->
-    <section class="section">
+    <section class="section" class:disabled={stories.length === 0}>
       <BulletinIntroOutroCard />
     </section>
 
     <!-- Sounds card -->
-    <section class="section">
+    <section class="section" class:disabled={stories.length === 0}>
       <BulletinSoundsCard />
     </section>
 
@@ -635,7 +650,9 @@
       </div>
 
       <!-- Adjust main voice card -->
-      <BulletinAdjustVoiceCard />
+      <div class:disabled={stories.length === 0}>
+        <BulletinAdjustVoiceCard />
+      </div>
 
       <!-- Download button — full width, purple when enabled -->
       <button
@@ -661,27 +678,82 @@
 
     </section>
 
-    <!-- New bulletin actions -->
-    <section class="section bottom-actions">
+    <!-- Clear stories / Clear all buttons -->
+    <section class="section clear-buttons">
       <button
         type="button"
-        class="new-bulletin-btn secondary"
-        onclick={handleContinueWithTemplate}
+        class="clear-btn"
+        class:disabled={stories.length === 0}
+        disabled={stories.length === 0}
+        onclick={handleClearStoriesClick}
       >
-        Continue with template
+        Clear stories
       </button>
-
       <button
         type="button"
-        class="new-bulletin-btn primary"
-        onclick={handleStartFresh}
+        class="clear-btn"
+        class:disabled={stories.length === 0}
+        disabled={stories.length === 0}
+        onclick={handleClearAllClick}
       >
-        Start fresh
+        Clear all
       </button>
     </section>
 
   </main>
 </div>
+
+<!-- ─── Clear Stories Modal ──────────────────────────────────────────────── -->
+{#if clearStoriesModalOpen}
+  <div class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="modal-title">Clear stories?</h3>
+      <p class="modal-message">All stories are deleted. Intro, outro and sounds stay</p>
+      <div class="modal-buttons">
+        <button
+          type="button"
+          class="modal-btn cancel"
+          onclick={() => { clearStoriesModalOpen = false; }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="modal-btn go"
+          onclick={handleClearStoriesConfirm}
+        >
+          Go
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
+
+<!-- ─── Clear All Modal ──────────────────────────────────────────────────── -->
+{#if clearAllModalOpen}
+  <div class="modal-overlay">
+    <div class="modal-content">
+      <h3 class="modal-title">Clear all?</h3>
+      <p class="modal-message">All stories plus intro, outro and sounds are deleted</p>
+      <div class="modal-buttons">
+        <button
+          type="button"
+          class="modal-btn cancel"
+          onclick={() => { clearAllModalOpen = false; }}
+        >
+          Cancel
+        </button>
+        <button
+          type="button"
+          class="modal-btn go"
+          onclick={handleClearAllConfirm}
+        >
+          Go
+        </button>
+      </div>
+    </div>
+  </div>
+{/if}
 
 <!-- ─── Story Drawer ────────────────────────────────────────────────────────── -->
 {#if drawerOpen}
@@ -794,6 +866,16 @@
 
   .section {
     margin-bottom: var(--spacing-md);
+  }
+
+  .section.disabled {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .disabled {
+    opacity: 0.5;
+    pointer-events: none;
   }
 
   /* Add Story button */
@@ -973,21 +1055,88 @@
     text-decoration: underline;
   }
 
-  /* New bulletin action buttons */
-  .bottom-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-    margin-top: var(--spacing-lg);
-    padding-top: var(--spacing-lg);
-    border-top: 1px solid var(--color-border);
+  /* Clear buttons — two columns, 50% each */
+  .clear-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--spacing-md);
   }
 
-  .new-bulletin-btn {
+  .clear-btn {
     display: block;
-    width: 100%;
     padding: var(--spacing-md);
-    border: 1px solid var(--color-border);
+    border: 1px solid var(--color-primary);
+    border-radius: var(--radius-md);
+    background: var(--bg-white);
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-medium);
+    cursor: pointer;
+    transition: all var(--transition-normal);
+  }
+
+  .clear-btn:hover:not(:disabled) {
+    background: var(--color-primary);
+    color: var(--bg-white);
+  }
+
+  .clear-btn:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+    border-color: var(--color-border);
+    color: var(--text-secondary);
+  }
+
+  /* Modal overlay */
+  .modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+  }
+
+  /* Modal content */
+  .modal-content {
+    background: var(--bg-white);
+    border-radius: var(--radius-lg);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: var(--spacing-lg);
+    max-width: 320px;
+    width: 90%;
+    text-align: center;
+  }
+
+  .modal-title {
+    font-size: var(--font-size-lg);
+    font-weight: var(--font-weight-bold);
+    color: var(--color-primary);
+    margin: 0 0 var(--spacing-md) 0;
+  }
+
+  .modal-message {
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    line-height: var(--line-height-normal);
+    margin: 0 0 var(--spacing-lg) 0;
+  }
+
+  /* Modal buttons */
+  .modal-buttons {
+    display: flex;
+    gap: var(--spacing-md);
+    justify-content: flex-start;
+  }
+
+  .modal-btn {
+    flex: 1;
+    padding: var(--spacing-md);
+    border: none;
     border-radius: var(--radius-md);
     font-size: var(--font-size-base);
     font-weight: var(--font-weight-medium);
@@ -995,25 +1144,24 @@
     transition: all var(--transition-normal);
   }
 
-  .new-bulletin-btn.secondary {
+  .modal-btn.cancel {
     background: var(--bg-main);
     color: var(--text-primary);
-    border-color: var(--color-border);
+    border: 1px solid var(--color-border);
   }
 
-  .new-bulletin-btn.secondary:hover {
+  .modal-btn.cancel:hover {
     background: #e0e0e0;
     border-color: #999999;
   }
 
-  .new-bulletin-btn.primary {
+  .modal-btn.go {
     background: var(--color-primary);
     color: var(--bg-white);
-    border-color: var(--color-primary);
+    border: none;
   }
 
-  .new-bulletin-btn.primary:hover {
+  .modal-btn.go:hover {
     background: #4a1d9e;
-    border-color: #4a1d9e;
   }
 </style>
