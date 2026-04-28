@@ -25,6 +25,8 @@ export interface BulletinState {
 	outroScript: string;
 	introOutroVoice: string;
 	introOutroEnabled: boolean;
+	introOutroSpeed: number;  // 1.0 = default, 1.25 = lively, 1.5 = fast
+	introOutroSilence: 'default' | 'trim' | 'tight';
 	soundsEnabled: boolean;
 	selectedIntroOutroSound: string | null;  // filename or null
 	selectedTransitionSound: string | null;  // filename or null
@@ -48,6 +50,8 @@ const DEFAULT_STATE: BulletinState = {
 	outroScript: '',
 	introOutroVoice: '',
 	introOutroEnabled: false,
+	introOutroSpeed: 1.0,
+	introOutroSilence: 'default',
 	soundsEnabled: false,
 	selectedIntroOutroSound: null,
 	selectedTransitionSound: null,

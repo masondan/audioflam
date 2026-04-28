@@ -2,23 +2,21 @@
   import { bulletinStore } from '$lib/stores/bulletin';
   import { ALL_VOICES } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
-  import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
-
-  type SpeedLevel = 'default' | 'lively' | 'fast';
-  type SilenceLevel = 'default' | 'trim' | 'tight';
+  import SpeedSlider from '$lib/components/SpeedSlider.svelte';
+  import SilenceSlider from '$lib/components/SilenceSlider.svelte';
+  import { concatenateAudioSegments } from '$lib/audioProcessing';
 
   // Local UI state
   let isOpen = $state(false);
+  let adjustAudioOpen = $state(false);
 
   // Derived from store
   let introOutroEnabled = $derived($bulletinStore.introOutroEnabled);
   let introScript = $derived($bulletinStore.introScript);
   let outroScript = $derived($bulletinStore.outroScript);
   let introOutroVoice = $derived($bulletinStore.introOutroVoice);
-
-  // Local speed/silence state (static for Checkpoint 2 — wired in Checkpoint 5)
-  let speedLevel = $state<SpeedLevel>('default');
-  let silenceLevel = $state<SilenceLevel>('default');
+  let introOutroSpeed = $derived($bulletinStore.introOutroSpeed);
+  let introOutroSilence = $derived($bulletinStore.introOutroSilence);
 
   // Selected voice object derived from store voice name
   const selectedVoiceObj = $derived(
@@ -32,6 +30,12 @@
   // Voice preview state
   let playingVoice = $state<string | null>(null);
   let previewAudio: HTMLAudioElement | null = null;
+
+  // Preview audio state
+  let isGeneratingPreview = $state(false);
+  let isPlayingPreview = $state(false);
+  let previewAudioElement = $state<HTMLAudioElement | null>(null);
+  let previewError = $state('');
 
   function handleToggle() {
     const newEnabled = !introOutroEnabled;
@@ -129,6 +133,106 @@
 
   function estimatedDuration(text: string): number {
     return Math.round(wordCount(text) / 2.5);
+  }
+
+  function handleSpeedChange(speed: number) {
+    bulletinStore.update(s => ({ ...s, introOutroSpeed: speed }));
+  }
+
+  function handleSilenceChange(level: 'default' | 'trim' | 'tight') {
+    bulletinStore.update(s => ({ ...s, introOutroSilence: level }));
+  }
+
+  function base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteChars = atob(base64);
+    const byteNumbers = Array.from(byteChars, c => c.charCodeAt(0));
+    return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
+  }
+
+  async function generatePreview() {
+    if (!introScript.trim() && !outroScript.trim()) return;
+    if (!introOutroVoice) return;
+
+    isGeneratingPreview = true;
+    previewError = '';
+
+    try {
+      const audioSegments: string[] = [];
+
+      // Generate intro TTS if present
+      if (introScript.trim()) {
+        const introResponse = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: introScript,
+            voiceName: introOutroVoice,
+            provider: 'azure'
+          })
+        });
+
+        if (!introResponse.ok) throw new Error('Intro TTS failed');
+        const introData = await introResponse.json();
+        audioSegments.push(introData.audioContent);
+        bulletinStore.update(s => ({ ...s, introTtsAudio: introData.audioContent }));
+      }
+
+      // Generate outro TTS if present
+      if (outroScript.trim()) {
+        const outroResponse = await fetch('/api/tts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            text: outroScript,
+            voiceName: introOutroVoice,
+            provider: 'azure'
+          })
+        });
+
+        if (!outroResponse.ok) throw new Error('Outro TTS failed');
+        const outroData = await outroResponse.json();
+        audioSegments.push(outroData.audioContent);
+        bulletinStore.update(s => ({ ...s, outroTtsAudio: outroData.audioContent }));
+      }
+
+      // Concatenate segments
+      if (audioSegments.length > 0) {
+        const concatenatedBlob = await concatenateAudioSegments(audioSegments);
+        const url = URL.createObjectURL(concatenatedBlob);
+        
+        // Stop any existing preview
+        if (previewAudioElement) {
+          previewAudioElement.pause();
+        }
+
+        previewAudioElement = new Audio(url);
+        previewAudioElement.onended = () => { isPlayingPreview = false; };
+        previewAudioElement.onerror = () => {
+          isPlayingPreview = false;
+          previewError = 'Could not play preview audio';
+        };
+        
+        // Auto-play
+        previewAudioElement.play();
+        isPlayingPreview = true;
+      }
+    } catch (e) {
+      previewError = 'Could not generate preview. Please try again.';
+      console.error('[BulletinIntroOutro]', e);
+    } finally {
+      isGeneratingPreview = false;
+    }
+  }
+
+  function togglePreviewPlayPause() {
+    if (!previewAudioElement) return;
+    if (isPlayingPreview) {
+      previewAudioElement.pause();
+      isPlayingPreview = false;
+    } else {
+      previewAudioElement.play();
+      isPlayingPreview = true;
+    }
   }
 </script>
 
@@ -233,17 +337,6 @@
         </div>
       </div>
 
-      <!-- Speed & Silence controls -->
-      <div class="field-group">
-        <SpeedSilenceControls
-          {speedLevel}
-          {silenceLevel}
-          isActive={true}
-          onSpeedChange={(l) => { speedLevel = l; }}
-          onSilenceChange={(l) => { silenceLevel = l; }}
-        />
-      </div>
-
       <!-- Intro textarea -->
       <div class="field-group">
         <label class="field-label" for="intro-text">Intro</label>
@@ -276,14 +369,76 @@
         {/if}
       </div>
 
-      <!-- Preview button (static — wired in Checkpoint 5) -->
+      <!-- Preview button -->
       <button
         type="button"
         class="preview-btn"
-        disabled={!introScript.trim() && !outroScript.trim()}
+        onclick={generatePreview}
+        disabled={(!introScript.trim() && !outroScript.trim()) || !introOutroVoice || isGeneratingPreview}
       >
-        PREVIEW
+        {#if isGeneratingPreview}
+          GENERATING <span class="spinner" />
+        {:else if previewAudioElement && isPlayingPreview}
+          PAUSE
+        {:else if previewAudioElement}
+          PLAY
+        {:else}
+          PREVIEW
+        {/if}
       </button>
+
+      {#if previewError}
+        <p class="error-text">{previewError}</p>
+      {/if}
+
+      <!-- Adjust audio section -->
+      <div class="adjust-audio-section" class:inactive={!previewAudioElement}>
+        <button
+          type="button"
+          class="adjust-audio-header"
+          class:inactive={!previewAudioElement}
+          onclick={() => { if (previewAudioElement) adjustAudioOpen = !adjustAudioOpen; }}
+          aria-expanded={adjustAudioOpen && previewAudioElement !== null}
+          disabled={!previewAudioElement}
+        >
+          <span class="adjust-audio-label">Adjust audio</span>
+          <img
+            src={adjustAudioOpen && previewAudioElement ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+            alt=""
+            class="adjust-audio-chevron"
+          />
+        </button>
+
+        {#if adjustAudioOpen && previewAudioElement}
+          <div class="adjust-audio-content">
+            <div class="adjust-audio-row">
+              <div class="adjust-audio-slider">
+                <div class="slider-header">
+                  <span class="slider-label-text">Speed</span>
+                </div>
+                <SpeedSlider
+                  speed={introOutroSpeed}
+                  isActive={!isPlayingPreview}
+                  onSpeedChange={handleSpeedChange}
+                  size="small"
+                />
+              </div>
+
+              <div class="adjust-audio-slider">
+                <div class="slider-header">
+                  <span class="slider-label-text">Silence</span>
+                </div>
+                <SilenceSlider
+                  level={introOutroSilence}
+                  isActive={!isPlayingPreview}
+                  onLevelChange={handleSilenceChange}
+                  size="small"
+                />
+              </div>
+            </div>
+          </div>
+        {/if}
+      </div>
 
     </div>
   {/if}
@@ -574,6 +729,10 @@
     letter-spacing: 0.04em;
     cursor: pointer;
     transition: background var(--transition-normal);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
   }
 
   .preview-btn:hover:not(:disabled) {
@@ -584,5 +743,103 @@
     background: var(--color-border);
     color: var(--text-secondary);
     cursor: not-allowed;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: white;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .error-text {
+    font-size: var(--font-size-sm);
+    color: #d32f2f;
+    margin: 0;
+  }
+
+  /* Adjust audio section */
+  .adjust-audio-section {
+    border-top: 1px solid var(--color-border);
+    padding-top: var(--spacing-md);
+  }
+
+  .adjust-audio-section.inactive {
+    opacity: 0.5;
+    pointer-events: none;
+  }
+
+  .adjust-audio-header {
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0;
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    font-weight: var(--font-weight-medium);
+    transition: color var(--transition-normal);
+  }
+
+  .adjust-audio-header:disabled {
+    cursor: not-allowed;
+  }
+
+  .adjust-audio-header.inactive {
+    color: var(--text-secondary);
+    cursor: not-allowed;
+  }
+
+  .adjust-audio-label {
+    flex: 1;
+    text-align: left;
+  }
+
+  .adjust-audio-chevron {
+    width: 18px;
+    height: 18px;
+    filter: invert(0.4);
+    flex-shrink: 0;
+  }
+
+  .adjust-audio-content {
+    padding-top: var(--spacing-md);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-md);
+  }
+
+  .adjust-audio-row {
+    display: flex;
+    gap: var(--spacing-md);
+  }
+
+  .adjust-audio-slider {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .slider-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+  }
+
+  .slider-label-text {
+    font-size: var(--font-size-sm);
+    font-weight: var(--font-weight-medium);
+    color: var(--text-primary);
   }
 </style>

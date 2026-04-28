@@ -18,6 +18,7 @@ FORMAT
 - Open with the hook: lead with the single most important, attention-grabbing fact.
 - Cover the five Ws: who, what, why, where, when.
 - Keep sentences short. One idea per sentence.
+- End each sentence with a line break. Add a blank line between paragraphs (groups of 2–3 related sentences).
 - No intro. No outro. No filler. Just the script.
 
 TONE & STYLE
@@ -50,6 +51,7 @@ FORMAT
 - Answer the question immediately and directly.
 - Cover the five Ws: who, what, why, where, when.
 - Keep sentences short. One idea per sentence.
+- End each sentence with a line break. Add a blank line between paragraphs (groups of 2–3 related sentences).
 - No intro. No outro. No banter. Question, then answer — nothing else.
 
 TONE & STYLE

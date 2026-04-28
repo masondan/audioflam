@@ -1,13 +1,17 @@
 <script lang="ts">
-  import { onMount } from 'svelte';
-  import { bulletinStore } from '$lib/stores/bulletin';
-  import { ALL_VOICES } from '$lib/stores';
+  import { onMount, onDestroy } from 'svelte';
+  import { goto } from '$app/navigation';
+  import { bulletinStore, getStorySource } from '$lib/stores/bulletin';
+  import type { BulletinStory } from '$lib/stores/bulletin';
+  import { ALL_VOICES, preloadedTTSAudio } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
+  import { concatenateAudioSegments } from '$lib/audioProcessing';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import BulletinStoryCard from '$lib/components/bulletin/BulletinStoryCard.svelte';
   import BulletinIntroOutroCard from '$lib/components/bulletin/BulletinIntroOutroCard.svelte';
   import BulletinSoundsCard from '$lib/components/bulletin/BulletinSoundsCard.svelte';
+  import BulletinStoryDrawer from '$lib/components/bulletin/BulletinStoryDrawer.svelte';
 
   // Trigger localStorage initialisation on mount
   onMount(() => {
@@ -15,7 +19,8 @@
     unsub();
   });
 
-  // Derived state from store
+  // ─── Derived state from store ──────────────────────────────────────────────
+
   let stories = $derived($bulletinStore.stories);
   let selectedVoiceName = $derived($bulletinStore.selectedVoice);
   let bulletinAudio = $derived($bulletinStore.bulletinAudio);
@@ -25,68 +30,369 @@
     ALL_VOICES.find(v => v.name === selectedVoiceName) ?? null
   );
 
-  // Bulletin playback state (static for Checkpoint 2 — wired in Checkpoint 6)
-  let isPlaying = $state(false);
+  // ─── Bulletin playback state ───────────────────────────────────────────────
+
   let isGenerating = $state(false);
+  let isPlaying = $state(false);
+  let generateError = $state('');
+  let bulletinAudioElement = $state<HTMLAudioElement | null>(null);
 
   // Derived PlayButton state — matches TTS tab pattern
   const playButtonState = $derived(
     isGenerating ? 'loading'
     : isPlaying   ? 'playing'
-    : stories.length > 0 ? 'active'
+    : (bulletinAudio || stories.length > 0) ? 'active'
     : 'inactive'
   );
 
-  function handleVoiceChange(voice: VoiceOption) {
-    bulletinStore.update(s => ({ ...s, selectedVoice: voice.name }));
+  // ─── Drawer state ──────────────────────────────────────────────────────────
+
+  let drawerOpen = $state(false);
+  let drawerStory = $state<BulletinStory | null>(null);  // null = new story mode
+
+  function handleAddStory() {
+    drawerStory = null;
+    drawerOpen = true;
   }
 
-  // Story reorder handlers
+  function handleEditStory(story: BulletinStory) {
+    drawerStory = story;
+    drawerOpen = true;
+  }
+
+  function handleDrawerClose() {
+    drawerOpen = false;
+    drawerStory = null;
+    // Editing a story invalidates any assembled bulletin audio
+    bulletinStore.clearBulletinAudio();
+    stopBulletinAudio();
+  }
+
+  // ─── Voice change ──────────────────────────────────────────────────────────
+
+  function handleVoiceChange(voice: VoiceOption) {
+    bulletinStore.update(s => ({ ...s, selectedVoice: voice.name }));
+    // Changing voice invalidates assembled audio
+    bulletinStore.clearBulletinAudio();
+    stopBulletinAudio();
+  }
+
+  // ─── Story reorder ─────────────────────────────────────────────────────────
+
   function handleMoveUp(index: number) {
     if (index === 0) return;
     bulletinStore.reorderStories(index, index - 1);
+    bulletinStore.clearBulletinAudio();
+    stopBulletinAudio();
   }
 
   function handleMoveDown(index: number) {
     if (index === stories.length - 1) return;
     bulletinStore.reorderStories(index, index + 1);
+    bulletinStore.clearBulletinAudio();
+    stopBulletinAudio();
   }
 
-  // Edit handler — placeholder until Checkpoint 3 drawer exists
-  function handleEditStory(story: import('$lib/stores/bulletin').BulletinStory) {
-    console.log('[Bulletin] Edit story:', story.id);
+  // ─── Audio helpers ─────────────────────────────────────────────────────────
+
+  function base64ToBlob(base64: string, mimeType: string): Blob {
+    const byteChars = atob(base64);
+    const byteNumbers = Array.from(byteChars, c => c.charCodeAt(0));
+    return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
   }
 
-  // Add Story — placeholder until Checkpoint 3 drawer exists
-  function handleAddStory() {
-    console.log('[Bulletin] Add story');
+  /** Fetch an MP3 from /sounds/ and return its base64 string */
+  async function loadSoundAsBase64(filename: string): Promise<string> {
+    const response = await fetch(`/sounds/${filename}`);
+    if (!response.ok) throw new Error(`Failed to load sound: ${filename}`);
+    const arrayBuffer = await response.arrayBuffer();
+    const bytes = new Uint8Array(arrayBuffer);
+    let binary = '';
+    for (let i = 0; i < bytes.byteLength; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
   }
 
-  // Play button: generates if no audio, plays/pauses if audio exists (wired in Checkpoint 6)
-  function handlePlayButton() {
-    if (!bulletinAudio && !isGenerating) {
-      console.log('[Bulletin] Generate bulletin');
-    } else if (bulletinAudio) {
-      isPlaying = !isPlaying;
-      console.log('[Bulletin] Play/pause');
+  /** Generate TTS for a single story via /api/tts */
+  async function generateStoryTTS(story: BulletinStory): Promise<string> {
+    const text = getStorySource(story);
+    if (!text.trim()) throw new Error(`Story ${story.id} has no text`);
+
+    const response = await fetch('/api/tts', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        text,
+        voiceName: selectedVoiceName,
+        provider: 'azure',
+      }),
+    });
+
+    if (!response.ok) throw new Error(`TTS failed for story ${story.id}`);
+    const { audioContent } = await response.json();
+    return audioContent as string;
+  }
+
+  function stopBulletinAudio() {
+    if (bulletinAudioElement) {
+      bulletinAudioElement.pause();
+      bulletinAudioElement = null;
+    }
+    isPlaying = false;
+  }
+
+  // ─── Generate bulletin ─────────────────────────────────────────────────────
+
+  /**
+   * Assembly order (per plan):
+   * [intro sound] → [intro TTS] → [transition] → [story1] → [transition] →
+   * [story2] → ... → [storyN] → [transition] → [outro TTS] → [outro sound]
+   */
+  async function generateBulletin() {
+    if (stories.length === 0) return;
+    if (!selectedVoiceName) return;
+
+    isGenerating = true;
+    generateError = '';
+    stopBulletinAudio();
+
+    try {
+      const state = $bulletinStore;
+      const segments: string[] = [];
+
+      // ── 1. Intro sound ────────────────────────────────────────────────────
+      if (state.soundsEnabled && state.selectedIntroOutroSound) {
+        console.log('[Bulletin] Loading intro sound:', state.selectedIntroOutroSound);
+        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound);
+        segments.push(soundBase64);
+      }
+
+      // ── 2. Intro TTS ──────────────────────────────────────────────────────
+      if (state.introOutroEnabled && state.introScript.trim()) {
+        let introAudio = state.introTtsAudio;
+        if (!introAudio) {
+          console.log('[Bulletin] Generating intro TTS');
+          const response = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: state.introScript,
+              voiceName: state.introOutroVoice || selectedVoiceName,
+              provider: 'azure',
+            }),
+          });
+          if (!response.ok) throw new Error('Intro TTS failed');
+          const data = await response.json();
+          introAudio = data.audioContent as string;
+          bulletinStore.update(s => ({ ...s, introTtsAudio: introAudio }));
+        }
+        segments.push(introAudio);
+      }
+
+      // ── 3–N. Stories with transition sounds between them ──────────────────
+      const updatedStories: BulletinStory[] = [...state.stories];
+
+      for (let i = 0; i < updatedStories.length; i++) {
+        // Transition sound before each story (including before story 1 if intro exists)
+        if (state.soundsEnabled && state.selectedTransitionSound) {
+          console.log('[Bulletin] Loading transition sound for story', i + 1);
+          const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound);
+          segments.push(transBase64);
+        }
+
+        // Story TTS — generate if missing
+        let storyAudio = updatedStories[i].ttsAudio;
+        if (!storyAudio) {
+          console.log('[Bulletin] Generating TTS for story', i + 1);
+          storyAudio = await generateStoryTTS(updatedStories[i]);
+          updatedStories[i] = { ...updatedStories[i], ttsAudio: storyAudio };
+          // Persist generated audio back to store
+          bulletinStore.updateStory(updatedStories[i]);
+        }
+        segments.push(storyAudio);
+      }
+
+      // ── Transition after last story ───────────────────────────────────────
+      if (state.soundsEnabled && state.selectedTransitionSound) {
+        const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound);
+        segments.push(transBase64);
+      }
+
+      // ── Outro TTS ─────────────────────────────────────────────────────────
+      if (state.introOutroEnabled && state.outroScript.trim()) {
+        let outroAudio = state.outroTtsAudio;
+        if (!outroAudio) {
+          console.log('[Bulletin] Generating outro TTS');
+          const response = await fetch('/api/tts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              text: state.outroScript,
+              voiceName: state.introOutroVoice || selectedVoiceName,
+              provider: 'azure',
+            }),
+          });
+          if (!response.ok) throw new Error('Outro TTS failed');
+          const data = await response.json();
+          outroAudio = data.audioContent as string;
+          bulletinStore.update(s => ({ ...s, outroTtsAudio: outroAudio }));
+        }
+        segments.push(outroAudio);
+      }
+
+      // ── Outro sound ───────────────────────────────────────────────────────
+      if (state.soundsEnabled && state.selectedIntroOutroSound) {
+        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound);
+        segments.push(soundBase64);
+      }
+
+      if (segments.length === 0) {
+        throw new Error('No audio segments to assemble');
+      }
+
+      // ── Concatenate all segments ──────────────────────────────────────────
+      console.log('[Bulletin] Concatenating', segments.length, 'segments');
+      const concatenatedBlob = await concatenateAudioSegments(segments);
+
+      // ── Normalise via /api/normalize ──────────────────────────────────────
+      // Convert blob to base64 for the normalize endpoint
+      const blobArrayBuffer = await concatenatedBlob.arrayBuffer();
+      const blobBytes = new Uint8Array(blobArrayBuffer);
+      let blobBinary = '';
+      for (let i = 0; i < blobBytes.byteLength; i++) {
+        blobBinary += String.fromCharCode(blobBytes[i]);
+      }
+      const concatenatedBase64 = btoa(blobBinary);
+
+      console.log('[Bulletin] Normalising final audio');
+      const normalizeResponse = await fetch('/api/normalize', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          audios: [{ base64Audio: concatenatedBase64, label: 'bulletin' }],
+        }),
+      });
+
+      let finalBase64: string;
+      if (normalizeResponse.ok) {
+        const normalizeData = await normalizeResponse.json();
+        finalBase64 = normalizeData.normalizedAudios?.[0]?.base64Audio ?? concatenatedBase64;
+      } else {
+        // Normalisation failed — use un-normalised audio (non-fatal)
+        console.warn('[Bulletin] Normalisation failed, using raw concatenated audio');
+        finalBase64 = concatenatedBase64;
+      }
+
+      // ── Store result ──────────────────────────────────────────────────────
+      bulletinStore.update(s => ({ ...s, bulletinAudio: finalBase64 }));
+
+      // ── Auto-play ─────────────────────────────────────────────────────────
+      const finalBlob = base64ToBlob(finalBase64, 'audio/wav');
+      const url = URL.createObjectURL(finalBlob);
+      bulletinAudioElement = new Audio(url);
+      bulletinAudioElement.onended = () => { isPlaying = false; };
+      bulletinAudioElement.onerror = () => { isPlaying = false; };
+      bulletinAudioElement.play();
+      isPlaying = true;
+
+      console.log('[Bulletin] Assembly complete');
+    } catch (e) {
+      generateError = 'Could not generate bulletin. Please try again.';
+      console.error('[Bulletin] Assembly error:', e);
+    } finally {
+      isGenerating = false;
     }
   }
 
+  // ─── Play button handler ───────────────────────────────────────────────────
+
+  async function handlePlayButton() {
+    if (isGenerating) return;
+
+    // No audio yet — generate
+    if (!bulletinAudio) {
+      await generateBulletin();
+      return;
+    }
+
+    // Audio exists — reconstruct element if needed, then toggle play/pause
+    if (!bulletinAudioElement) {
+      const blob = base64ToBlob(bulletinAudio, 'audio/wav');
+      const url = URL.createObjectURL(blob);
+      bulletinAudioElement = new Audio(url);
+      bulletinAudioElement.onended = () => { isPlaying = false; };
+      bulletinAudioElement.onerror = () => { isPlaying = false; };
+    }
+
+    if (isPlaying) {
+      bulletinAudioElement.pause();
+      isPlaying = false;
+    } else {
+      bulletinAudioElement.play();
+      isPlaying = true;
+    }
+  }
+
+  // ─── Skip controls ─────────────────────────────────────────────────────────
+
   function skipBackward() {
-    console.log('[Bulletin] Skip back');
+    if (!bulletinAudioElement) return;
+    bulletinAudioElement.currentTime = Math.max(0, bulletinAudioElement.currentTime - 5);
   }
 
   function skipForward() {
-    console.log('[Bulletin] Skip forward');
+    if (!bulletinAudioElement) return;
+    bulletinAudioElement.currentTime = Math.min(
+      bulletinAudioElement.duration,
+      bulletinAudioElement.currentTime + 5
+    );
   }
+
+  // ─── Download ──────────────────────────────────────────────────────────────
 
   function handleDownload() {
-    console.log('[Bulletin] Download bulletin');
+    if (!bulletinAudio) return;
+    const blob = base64ToBlob(bulletinAudio, 'audio/wav');
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'bulletin.mp3';
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
-  function handleAddToAudiogram() {
-    console.log('[Bulletin] Add to audiogram');
+  // ─── Add to Audiogram ──────────────────────────────────────────────────────
+
+  async function handleAddToAudiogram() {
+    if (!bulletinAudio) return;
+
+    try {
+      // Decode the WAV blob into an AudioBuffer
+      const blob = base64ToBlob(bulletinAudio, 'audio/wav');
+      const arrayBuffer = await blob.arrayBuffer();
+      const audioContext = new AudioContext();
+      const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+      await audioContext.close();
+
+      // Write to the preloadedTTSAudio store (same pattern as TTS tab)
+      preloadedTTSAudio.set({
+        buffer: audioBuffer,
+        voiceName: selectedVoiceName || 'bulletin',
+      });
+
+      // Navigate to main app — AudiogramPage picks up the store on mount
+      await goto('/');
+    } catch (e) {
+      console.error('[Bulletin] Add to audiogram error:', e);
+    }
   }
+
+  // ─── Cleanup ───────────────────────────────────────────────────────────────
+
+  onDestroy(() => {
+    stopBulletinAudio();
+  });
 </script>
 
 <div class="bulletin-page">
@@ -158,13 +464,17 @@
     <!-- Controls cluster — matches TTS tab style exactly -->
     <section class="section controls-section">
 
+      {#if generateError}
+        <p class="generate-error">{generateError}</p>
+      {/if}
+
       <!-- Player row: back · play/pause · forward -->
       <div class="player-row">
         <button
           type="button"
           class="skip-btn"
           onclick={skipBackward}
-          disabled={!bulletinAudio}
+          disabled={!bulletinAudioElement}
           aria-label="Skip back 5 seconds"
         >
           <img src="/icons/icon-back-five.svg" alt="Back 5s" />
@@ -172,16 +482,16 @@
 
         <PlayButton
           state={playButtonState}
-          disabled={stories.length === 0}
+          disabled={stories.length === 0 || !selectedVoiceName}
           onclick={handlePlayButton}
-          ariaLabel={isPlaying ? 'Pause' : 'Play'}
+          ariaLabel={isPlaying ? 'Pause' : (bulletinAudio ? 'Play' : 'Generate bulletin')}
         />
 
         <button
           type="button"
           class="skip-btn"
           onclick={skipForward}
-          disabled={!bulletinAudio}
+          disabled={!bulletinAudioElement}
           aria-label="Skip forward 5 seconds"
         >
           <img src="/icons/icon-forward-five.svg" alt="Forward 5s" />
@@ -214,6 +524,14 @@
 
   </main>
 </div>
+
+<!-- ─── Story Drawer ────────────────────────────────────────────────────────── -->
+{#if drawerOpen}
+  <BulletinStoryDrawer
+    story={drawerStory}
+    onClose={handleDrawerClose}
+  />
+{/if}
 
 <style>
   .bulletin-page {
@@ -324,6 +642,17 @@
     flex-direction: column;
     gap: var(--spacing-md);
     margin-top: var(--spacing-sm);
+  }
+
+  /* Error message */
+  .generate-error {
+    font-size: var(--font-size-sm);
+    color: #c62828;
+    text-align: center;
+    margin: 0;
+    padding: var(--spacing-xs) var(--spacing-md);
+    background: #ffebee;
+    border-radius: var(--radius-sm);
   }
 
   /* Player row — back · PlayButton · forward */
