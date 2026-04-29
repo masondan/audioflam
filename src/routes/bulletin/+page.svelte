@@ -5,7 +5,7 @@
   import { bulletinStore, getStorySource } from '$lib/stores/bulletin';
   import type { BulletinStory } from '$lib/stores/bulletin';
   import { ALL_VOICES, preloadedTTSAudio } from '$lib/stores';
-  import type { VoiceOption } from '$lib/stores';
+  import type { VoiceOption, TTSProvider } from '$lib/stores';
   import { concatenateAudioSegments } from '$lib/audioProcessing';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
@@ -20,6 +20,12 @@
     const unsub = bulletinStore.subscribe(() => {});
     unsub();
   });
+
+  // ─── Helper: Get voice provider ────────────────────────────────────────────
+
+  function getVoiceProvider(voiceName: string | null): TTSProvider {
+    return ALL_VOICES.find(v => v.name === voiceName)?.provider ?? 'azure';
+  }
 
   // ─── Derived state from store ──────────────────────────────────────────────
 
@@ -115,7 +121,7 @@
         body: JSON.stringify({
           text,
           voiceName: selectedVoiceName,
-          provider: 'azure',
+          provider: getVoiceProvider(selectedVoiceName),
         }),
       });
 
@@ -183,7 +189,7 @@
       body: JSON.stringify({
         text,
         voiceName: selectedVoiceName,
-        provider: 'azure',
+        provider: getVoiceProvider(selectedVoiceName),
         speed,
         silence,
       }),
@@ -239,7 +245,7 @@
             body: JSON.stringify({
               text: state.introScript,
               voiceName: state.introOutroVoice || selectedVoiceName,
-              provider: 'azure',
+              provider: getVoiceProvider(state.introOutroVoice || selectedVoiceName),
             }),
           });
           if (!response.ok) throw new Error('Intro TTS failed');
@@ -294,7 +300,7 @@
             body: JSON.stringify({
               text: state.outroScript,
               voiceName: state.introOutroVoice || selectedVoiceName,
-              provider: 'azure',
+              provider: getVoiceProvider(state.introOutroVoice || selectedVoiceName),
             }),
           });
           if (!response.ok) throw new Error('Outro TTS failed');
