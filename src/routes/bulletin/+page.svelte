@@ -528,19 +528,9 @@
       >
         <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
       </button>
-      <button
-        type="button"
-        class="nav-tab-btn"
-        class:active={false}
-        onclick={() => {
-          localStorage.setItem('activeTab', 'subtitle-video');
-          goto('/');
-        }}
-        aria-label="Subtitle video"
-        aria-pressed={false}
-      >
-        <img src="/icons/icon-subtitles.svg" alt="" class="nav-tab-icon nav-tab-icon-subtitles" />
-      </button>
+      <a href="/" class="nav-tab-btn" aria-label="Bulletin">
+        <img src="/icons/icon-bulletin.svg" alt="" class="nav-tab-icon nav-tab-icon-bulletin" />
+      </a>
     </nav>
   </header>
 
@@ -852,7 +842,7 @@
     filter: brightness(0) invert(1);
   }
 
-  .nav-tab-icon-subtitles {
+  .nav-tab-icon-bulletin {
     width: 18px;
     height: 18px;
   }

@@ -10,19 +10,18 @@
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
   import TranscribePage from '$lib/components/TranscribePage.svelte';
-  import VideoSubtitlePage from '$lib/components/VideoSubtitlePage.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
 
   type SpeedLevel = 'default' | 'lively' | 'fast';
-  type ActiveTab = 'tts' | 'audiogram' | 'transcribe' | 'subtitle-video';
+  type ActiveTab = 'tts' | 'audiogram' | 'transcribe';
 
   // Navigation state - restore from localStorage on mount
   let activeTab = $state<ActiveTab>('tts');
 
   onMount(() => {
     const saved = localStorage.getItem('activeTab');
-    if (saved === 'tts' || saved === 'audiogram' || saved === 'transcribe' || saved === 'subtitle-video') {
+    if (saved === 'tts' || saved === 'audiogram' || saved === 'transcribe') {
       activeTab = saved as ActiveTab;
     }
   });
@@ -1231,16 +1230,9 @@
       >
         <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
       </button>
-      <button
-        type="button"
-        class="nav-tab-btn"
-        class:active={activeTab === 'subtitle-video'}
-        onclick={() => activeTab = 'subtitle-video'}
-        aria-label="Subtitle video"
-        aria-pressed={activeTab === 'subtitle-video'}
-      >
-        <img src="/icons/icon-subtitles.svg" alt="" class="nav-tab-icon nav-tab-icon-subtitles" />
-      </button>
+      <a href="/bulletin" class="nav-tab-btn" aria-label="Bulletin">
+        <img src="/icons/icon-bulletin.svg" alt="" class="nav-tab-icon nav-tab-icon-bulletin" />
+      </a>
     </nav>
   </header>
 
@@ -1611,9 +1603,6 @@
     <div class="tab-panel" class:hidden={activeTab !== 'transcribe'}>
       <TranscribePage />
     </div>
-    <div class="tab-panel" class:hidden={activeTab !== 'subtitle-video'}>
-      <VideoSubtitlePage />
-    </div>
   </main>
 </div>
 
@@ -1715,7 +1704,7 @@
     filter: brightness(0) invert(1);
   }
 
-  .nav-tab-icon-subtitles {
+  .nav-tab-icon-bulletin {
     width: 18px;
     height: 18px;
   }
