@@ -1,6 +1,7 @@
 <script lang="ts">
   import { onMount, onDestroy } from 'svelte';
   import { goto } from '$app/navigation';
+  import { page } from '$app/stores';
   import { bulletinStore, getStorySource } from '$lib/stores/bulletin';
   import type { BulletinStory } from '$lib/stores/bulletin';
   import { ALL_VOICES, preloadedTTSAudio } from '$lib/stores';
@@ -528,9 +529,16 @@
       >
         <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
       </button>
-      <a href="/" class="nav-tab-btn" aria-label="Bulletin">
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={$page.url.pathname === '/bulletin'}
+        onclick={() => goto('/bulletin')}
+        aria-label="Bulletin"
+        aria-pressed={$page.url.pathname === '/bulletin'}
+      >
         <img src="/icons/icon-bulletin.svg" alt="" class="nav-tab-icon nav-tab-icon-bulletin" />
-      </a>
+      </button>
     </nav>
   </header>
 
@@ -843,8 +851,8 @@
   }
 
   .nav-tab-icon-bulletin {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
   }
 
   .bulletin-main {

@@ -1,5 +1,7 @@
 <script lang="ts">
   import { onMount } from 'svelte';
+  import { page } from '$app/stores';
+  import { goto } from '$app/navigation';
   import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio } from '$lib/stores';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import type { VoiceOption } from '$lib/stores';
@@ -1230,9 +1232,16 @@
       >
         <img src="/icons/icon-transcribe.svg" alt="" class="nav-tab-icon" />
       </button>
-      <a href="/bulletin" class="nav-tab-btn" aria-label="Bulletin">
+      <button
+        type="button"
+        class="nav-tab-btn"
+        class:active={$page.url.pathname === '/bulletin'}
+        onclick={() => goto('/bulletin')}
+        aria-label="Bulletin"
+        aria-pressed={$page.url.pathname === '/bulletin'}
+      >
         <img src="/icons/icon-bulletin.svg" alt="" class="nav-tab-icon nav-tab-icon-bulletin" />
-      </a>
+      </button>
     </nav>
   </header>
 
@@ -1705,8 +1714,8 @@
   }
 
   .nav-tab-icon-bulletin {
-    width: 18px;
-    height: 18px;
+    width: 22px;
+    height: 22px;
   }
 
   .main-content {
