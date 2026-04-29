@@ -751,9 +751,13 @@
   }
 
   .panel-row.vertical {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-xs);
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
+  }
+
+  .panel-row.vertical .position-slider {
+    flex: 1;
   }
 
   .row-label {
@@ -1219,18 +1223,18 @@
 
   .shadow-opacity-row {
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: var(--spacing-xs);
+    flex-direction: row;
+    align-items: center;
+    gap: var(--spacing-sm);
     padding-top: var(--spacing-sm);
   }
 
   .shadow-opacity-row .row-label {
-    min-width: unset;
+    min-width: 72px;
   }
 
   .shadow-opacity-row .position-slider {
-    width: 100%;
+    flex: 1;
   }
 
   /* Style controls row */
