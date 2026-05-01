@@ -95,6 +95,17 @@
     draft.scriptType   !== _init.scriptType
   );
 
+  // ─── Effects ──────────────────────────────────────────────────────────────────
+
+  // Clear script when original text changes (invalidates generated script)
+  $effect(() => {
+    if (draft.originalText !== _init.originalText) {
+      draft.script = '';
+      draft.scriptActive = false;
+      scriptError = '';
+    }
+  });
+
   // ─── Toast helper ─────────────────────────────────────────────────────────────
 
   function showToast(msg: string, duration = 2200) {
@@ -972,8 +983,8 @@
     display: inline-block;
     width: 12px;
     height: 12px;
-    border: 2px solid rgba(255, 255, 255, 0.4);
-    border-top-color: var(--bg-white);
+    border: 2px solid rgba(84, 34, 176, 0.3);
+    border-top-color: var(--color-primary);
     border-radius: 50%;
     animation: spin 0.7s linear infinite;
     vertical-align: middle;
@@ -1003,8 +1014,8 @@
   }
 
   .btn-generate:disabled {
-    background: var(--color-border);
-    color: var(--text-secondary);
+    background: var(--color-highlight);
+    color: var(--color-primary);
     cursor: not-allowed;
   }
 
