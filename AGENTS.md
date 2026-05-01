@@ -1,14 +1,14 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam
-**Status:** Production (Transcription + Two-Speaker Mode + Video Subtitles + MiniMax Integration Complete)
-**Updated:** April 2026 (Latest: MiniMax + Video Subtitles implementation)
+**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + MiniMax Integration Complete)
+**Updated:** April 2026 (Latest: Bulletin Engine implementation)
 
 ---
 
 ## Quick Start
 
-**What is AudioFlam?** A mobile-first web app that converts text scripts to audio (TTS), creates audiograms (image + audio + waveform + effects → MP4), transcribes audio (Whisper), and adds subtitles to uploaded videos.
+**What is AudioFlam?** A mobile-first web app that converts text scripts to audio (TTS), creates audiograms (image + audio + waveform + effects + subtitles → MP4), transcribes audio (Whisper), and assembles news bulletins from multiple stories with intro/outro and transitions.
 
 **Tech Stack:**
 - SvelteKit 2 + Svelte 5 (TypeScript)
@@ -39,12 +39,13 @@ npm run check:watch  # Watch mode
 ```
 src/
 ├── routes/
-│   ├── +page.svelte              # Header + TTS/Audiogram/Transcribe/Subtitle Video tabs
+│   ├── +page.svelte              # Header + TTS/Audiogram/Transcribe tabs
+│   ├── bulletin/+page.svelte     # Bulletin engine page
 │   ├── +layout.svelte            # Root layout
 │   └── api/
 │       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT + MiniMax)
+│       ├── bulletin-script/+server.ts # Gemini script generation (summary/explainer)
 │       ├── minimax-refresh/+server.ts # MiniMax voice clone refresh (cron)
-│       ├── transcode/+server.ts  # Cloud video transcoding
 │       ├── audio/
 │       │   ├── silence-removal/+server.ts # Silence removal
 │       │   └── normalize/+server.ts       # Audio normalization
@@ -52,15 +53,18 @@ src/
 ├── lib/
 │   ├── audioProcessing.ts        # Audio processing utilities (silence, concatenation)
 │   ├── stores.ts                 # Voice definitions, app state, preloadedTTSAudio
+│   ├── stores/
+│   │   └── bulletin.ts           # Bulletin engine state + localStorage persistence
 │   ├── components/
 │   │   ├── VoiceDropdown.svelte  # Voice selector
-│   │   ├── AudiogramPage.svelte  # Main audiogram UI
+│   │   ├── AudiogramPage.svelte  # Main audiogram UI (with subtitles)
 │   │   ├── CompositionCanvas.svelte # Canvas preview/export
 │   │   ├── ImageCropDrawer.svelte # Image crop overlay
 │   │   ├── AudioImport.svelte    # Audio upload + waveform
 │   │   ├── Dropdown.svelte       # Reusable dropdown component
 │   │   ├── WaveformPanel.svelte  # Waveform settings
 │   │   ├── TitlePanel.svelte     # Title text/font/style
+│   │   ├── SubtitlePanel.svelte  # Subtitle transcription + styling (audiogram)
 │   │   ├── LightEffectPanel.svelte # Bokeh effect controls
 │   │   ├── ColorPicker.svelte    # HSB color picker
 │   │   ├── TogglePanel.svelte    # Collapsible panel (reusable)
@@ -69,10 +73,13 @@ src/
 │   │   ├── SilenceSlider.svelte  # Silence detection
 │   │   ├── SpeedBlockModal.svelte # Speed warning modal
 │   │   ├── TranscribePage.svelte # Transcription UI (Whisper)
-│   │   ├── VideoSubtitlePage.svelte # Video subtitle/composition UI (Stage 1-4 complete)
-│   │   ├── SubtitlePanel.svelte  # Subtitle transcription + styling controls
-│   │   ├── VoiceDropdown.svelte  # Voice selector (two-speaker mode)
-│   │   └── [other UI components]
+│   │   ├── PlayButton.svelte     # Reusable play/pause button
+│   │   └── bulletin/
+│   │       ├── BulletinStoryCard.svelte # Story preview card
+│   │       ├── BulletinStoryDrawer.svelte # Story editor (text + script generation + TTS)
+│   │       ├── BulletinIntroOutroCard.svelte # Intro/outro editor
+│   │       ├── BulletinSoundsCard.svelte # Sound selection (intro/outro + transitions)
+│   │       └── BulletinAdjustVoiceCard.svelte # Voice speed/silence controls
 │   ├── utils/
 │   │   ├── compositor.ts         # Canvas layer composition
 │   │   ├── recording.ts          # MediaRecorder wrapper
@@ -85,15 +92,17 @@ src/
 │   │   └── transcription.ts      # Transcription utilities (Hugging Face)
 │   └── server/                   # Server-side utilities
 │       ├── audioNormalize.ts     # Audio normalization
-│       └── silenceRemoval.ts     # Silence removal logic
+│       ├── silenceRemoval.ts     # Silence removal logic
+│       └── bulletinPrompts.ts    # Gemini prompt templates (summary/explainer)
 ├── app.css                       # Global styles + CSS variables
 └── app.html                      # HTML template
 
 static/
-  ├── icons/                        # SVG icons (22 for audiogram)
-  ├── fonts/                        # Self-hosted fonts (Inter, Lora, Playfair, Roboto Slab, Saira, Bebas)
+  ├── icons/                        # SVG icons (includes icon-bulletin.svg)
+  ├── fonts/                        # Self-hosted fonts (Inter, Lora, Playfair, Roboto Slab, Saira, Bebas, Oswald)
   ├── voices/                       # Sample voice files (for preview) + MiniMax samples
   ├── voice-samples/                # MiniMax voice clone training samples (Malawi + Zimbabwe)
+  ├── sounds/                       # Bulletin intro/outro/transition MP3s
   ├── robots.txt                    # Disallow: / (no indexing)
   └── manifest.json                 # PWA manifest
 ```
@@ -232,91 +241,92 @@ await releaseModel();
 
 ---
 
-## Video Subtitle Page
+## Bulletin Engine
 
 ### Overview
-- Upload device video (MP4, MOV, WebM)
-- Extract audio for transcription
-- Optionally trim video (in-point/out-point)
-- Add subtitles (via Whisper transcription) and title overlay
-- Export as MP4 (WebCodecs → MediaRecorder → cloud transcode fallback)
+- Assemble news bulletins from multiple stories with intro/outro
+- Per-story TTS generation with Gemini script generation (summary/explainer)
+- Sound selection for intro/outro and transitions between stories
+- Full bulletin assembly with audio normalization
+- Download as MP3 or add to Audiogram tab
 
 ### Implementation
-- **File:** `src/lib/components/VideoSubtitlePage.svelte` (1412 lines, complete Stages 1-4)
-- **State Management:**
-  - `videoBlob`, `videoDuration`, `canvasWidth`, `canvasHeight`
-  - `trimStart`, `trimEnd` (0–1 ratios for non-destructive trimming)
-  - `subtitleSegments`, `subtitleStyle`, `subtitlesEnabled` (from SubtitlePanel)
-  - `titleText`, `titleFont`, `titleColor`, `labelColor` (from TitlePanel)
-  - Playback: `isPlaying`, `currentTime`, `videoElement`
-  - Export: `isExporting`, `exportProgress`, `exportCancelled`
+- **Main page:** `src/routes/bulletin/+page.svelte` (1172 lines)
+- **Store:** `src/lib/stores/bulletin.ts` (localStorage persistence)
+- **API:** `src/routes/api/bulletin-script/+server.ts` (Gemini script generation)
+- **Components:**
+  - `BulletinStoryCard.svelte` - Story preview with reorder chevrons
+  - `BulletinStoryDrawer.svelte` - Story editor (text + script generation + TTS)
+  - `BulletinIntroOutroCard.svelte` - Intro/outro text + voice + speed/silence controls
+  - `BulletinSoundsCard.svelte` - Sound selection (intro/outro + transitions)
+  - `BulletinAdjustVoiceCard.svelte` - Global voice speed/silence controls
 
-### UI Components
-1. **Upload zone:** Drag-drop or file input (MP4/MOV/WebM)
-2. **Video preview:** HTML5 `<video>` element with playback controls
-3. **Trim control:** Dual-handle scrubber (in-point / out-point) with duration display
-4. **Canvas preview:** Real-time rendering of video frame + title + subtitles during playback
-5. **SubtitlePanel:** Extracts audio, generates subtitles, controls styling
-6. **TitlePanel:** Title text, font, alignment, label styling
-7. **Export button:** Triggers `smartExportVideo()` with trimmed duration
-
-### Canvas Rendering
+### Data Model
 ```typescript
-function renderFrame(currentTime: number): void {
-  // Seek to trimStart + currentTime
-  videoElement.currentTime = currentTime + trimStart;
-  
-  // Draw video frame
-  ctx.drawImage(videoElement, 0, 0, canvasWidth, canvasHeight);
-  
-  // Draw title layer
-  drawTitle(ctx, titleText, titleFont, ...);
-  
-  // Draw subtitle if enabled and active
-  if (subtitlesEnabled) {
-    const activeSegment = getActiveSegment(subtitleSegments, currentTime);
-    if (activeSegment) {
-      drawSubtitle(ctx, activeSegment, subtitleStyle, ...);
-    }
-  }
+interface BulletinStory {
+  id: string;
+  originalText: string;
+  script: string;
+  scriptActive: boolean;
+  scriptLength: 20 | 30 | 60 | 90;
+  scriptType: 'summary' | 'explainer';
+  ttsAudio: string | null;  // base64 MP3
+}
+
+interface BulletinState {
+  stories: BulletinStory[];
+  selectedVoice: string | null;
+  introScript: string;
+  outroScript: string;
+  introOutroVoice: string;
+  introOutroEnabled: boolean;
+  introOutroSpeed: number;
+  introOutroSilence: 'default' | 'trim' | 'tight';
+  soundsEnabled: boolean;
+  selectedIntroOutroSound: string | null;
+  selectedTransitionSound: string | null;
+  introTtsAudio: string | null;
+  outroTtsAudio: string | null;
+  bulletinAudio: string | null;
+  mainVoiceSpeed: number;
+  mainVoiceSilence: 'default' | 'trim' | 'tight';
 }
 ```
 
-### Audio Extraction from Video
-```typescript
-async function extractAudioFromVideo(videoBlob: Blob): Promise<Blob> {
-  const audioContext = new (window.AudioContext || window.webkitAudioContext)();
-  const source = audioContext.createMediaElementAudioSource(video);
-  const destination = audioContext.createMediaStreamDestination();
-  source.connect(destination);
-  
-  const mediaRecorder = new MediaRecorder(destination.stream);
-  // ... record audio during video playback ...
-  return audioBlob;
-}
+### Bulletin Assembly Order
+```
+[intro sound MP3 if selected]
+[intro TTS if enabled]
+[transition sound if selected]
+[story 1 TTS]
+[transition sound if selected]
+[story 2 TTS]
+[transition sound if selected]
+[story N TTS]
+[transition sound if selected]  ← after last story
+[outro TTS if enabled]
+[outro sound MP3 if selected]
 ```
 
-### Trim Control Pattern
-- Two drag handles at 0–1 ratios of total duration
-- Playback stops at `trimEnd * videoDuration`
-- Trim is applied at export time (non-destructive)
-- Pattern reused from waveform trimmer in AudiogramPage
-
-### Export Integration
-- Calls `smartExportVideo(canvas, audioBlob, width, height, trimmedDuration, renderCallback)`
-- Respects three-tier export strategy (WebCodecs → MediaRecorder → cloud transcode)
-- Audio passed to export is extracted audio (if subtitles enabled) or silence
+### Key Features
+- **Script generation:** Gemini API generates summary or explainer scripts (20/30/60/90 seconds)
+- **Per-story TTS:** Each story generates audio independently, stored in story object
+- **Sound library:** 3 intro/outro sounds + 3 transition sounds (MP3 files in `/sounds/`)
+- **Speed/silence controls:** Global controls for all story segments + separate controls for intro/outro
+- **Reordering:** Drag chevrons to reorder stories; changes invalidate assembled audio
+- **Download:** Save final bulletin as `bulletin.mp3`
+- **Add to Audiogram:** Pre-load bulletin audio into Audiogram tab via `preloadedTTSAudio` store
 
 ### Key Files
-- `src/lib/components/VideoSubtitlePage.svelte` - Main component
-- `src/lib/components/SubtitlePanel.svelte` - Transcription + subtitle styling (reused, unchanged)
-- `src/lib/components/TitlePanel.svelte` - Title controls (reused, unchanged)
-- `src/lib/utils/subtitles.ts` - `drawSubtitle()`, `getActiveSegment()`, subtitle rendering
-- `src/lib/utils/video-export.ts` - `smartExportVideo()` export orchestration
+- `src/routes/bulletin/+page.svelte` - Main page + assembly logic
+- `src/lib/stores/bulletin.ts` - State + localStorage persistence
+- `src/routes/api/bulletin-script/+server.ts` - Gemini script generation
+- `src/lib/server/bulletinPrompts.ts` - Prompt templates
+- `src/lib/components/bulletin/*` - UI components
 
 ### Status
 ✅ Fully implemented and working (April 2026)
-✅ All four stages complete: scaffold, canvas/trim, integration, testing
+✅ All checkpoints complete: routing, UI, drawer, script generation, intro/outro, sounds, assembly
 
 ---
 
@@ -521,15 +531,13 @@ All CSS variables defined in `src/app.css`.
 - **Language detection** - `language: 'auto'` works but may misidentify mixed-language audio
 - **Quantized vs full** - Quantized is faster but less accurate; full is slower but better quality
 
-### Video Subtitle Page Gotchas
+### Audiogram Subtitle Gotchas
 
-- **Canvas `drawImage()` with video element** - Works on most browsers but has edge cases on iOS Safari when rendering to canvas. If `ctx.drawImage(videoElement)` fails, video frame may not render; fallback to cloud transcode is automatic.
-- **Audio extraction timing** - Must wait for `loadedmetadata` before extracting audio from video element. Premature extraction yields silent audio.
-- **Trim boundaries in playback** - Playback must stop exactly at `trimEnd * videoDuration`, not video duration. Failing to enforce this causes export to include untrimmed section.
-- **Canvas context reset** - Must clear canvas before each frame render (`ctx.clearRect()`) to avoid ghosting/visual artifacts.
-- **SubtitlePanel/TitlePanel prop binding** - Both use callback-based props (`onStyleChange`, `onTextChange`), NOT two-way binding. Must update parent state via callbacks, not direct mutations.
-- **Video dimensions for export** - Canvas width/height must match source video dimensions to preserve quality. Auto-set from `videoElement.videoWidth`/`videoHeight` on upload.
-- **Audio blob for subtitles** - Must pass extracted audio blob to SubtitlePanel for transcription. If no subtitles enabled, audio is still required for export (can pass silence or original).
+- **SubtitlePanel integration** - SubtitlePanel is now part of AudiogramPage only. It transcribes uploaded audio and generates word-level subtitle segments.
+- **Subtitle rendering in canvas** - `drawSubtitle()` in `subtitles.ts` renders active subtitle segment based on current playback time.
+- **Word-level timing** - Whisper provides word-level timestamps; subtitle composition uses these for frame-accurate rendering.
+- **Subtitle styling** - SubtitlePanel controls font, size, color, background, and positioning; changes update canvas preview in real-time.
+- **Export with subtitles** - Subtitles are burned into the MP4 during export via canvas composition; no separate subtitle track.
 
 ---
 
@@ -545,8 +553,8 @@ All CSS variables defined in `src/app.css`.
 - **Transcription:** Whisper model (multilingual + quantized options)
 - **Audio processing:** Silence removal, normalization, time-stretching
 - **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls (all three providers)
-- **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export (April 2026)
-- **Video Subtitle Page:** Full implementation (1412 lines) with upload, trim, canvas preview, subtitle generation, title overlay, and export (April 2026) ✅ All stages complete
+- **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export
+- **Bulletin Engine:** Full implementation with story management, Gemini script generation, per-story TTS, intro/outro, sound selection, and assembly (April 2026) ✅ All checkpoints complete
 - **MiniMax voice cloning:** Malawi (Chisomo M, Mercy F) + Zimbabwe (Tawanda M, Precious F) voices cloned and integrated (April 2026) - **Note:** API integration complete but testing ongoing due to account/billing issue
 
 **Waveform Export Fix (Critical Implementation):**
@@ -679,15 +687,25 @@ All CSS variables defined in `src/app.css`.
 
 **Workaround:** Until resolved, route MiniMax requests to Azure/YarnGPT as fallback.
 
-### 12. Video Subtitle Trim Control Pattern Confusion
-**Reality:** Trim uses 0–1 ratios (like waveform trimmer in AudiogramPage), NOT absolute seconds. Must convert to seconds when seeking: `videoElement.currentTime = currentTime + (trimStart * videoDuration)`.
+### 12. Bulletin Story Audio Not Persisting
+**Reality:** Per-story TTS audio is stored as base64 in `BulletinStory.ttsAudio`. Must include in save logic when updating story. Forgetting this causes audio to be lost on reload.
 
-**File:** `src/lib/components/VideoSubtitlePage.svelte:renderFrame()` - Trim offset applied here
+**File:** `src/lib/components/bulletin/BulletinStoryDrawer.svelte:saveStory()` - Ensure `story.ttsAudio = draft.ttsAudio`
 
-### 13. Canvas drawImage() Failing on iOS Safari
-**Reality:** Some iOS Safari versions fail when rendering video element to canvas (`ctx.drawImage(videoElement)`). Fallback is automatic (MediaRecorder → cloud transcode), but user may not see preview.
+### 13. Bulletin Assembly Order Matters
+**Reality:** Intro/outro sounds and transitions must be loaded as ArrayBuffers from `/sounds/` and concatenated in exact order. Reordering stories invalidates assembled audio (must regenerate).
 
-**File:** `src/lib/components/VideoSubtitlePage.svelte` - No workaround needed; fallback automatic
+**File:** `src/routes/bulletin/+page.svelte:generateBulletin()` - Assembly order documented in code
+
+### 14. Gemini Script Generation Quota
+**Reality:** Gemini API has rate limits. If users spam "Generate Script", requests will fail. No throttling currently implemented.
+
+**File:** `src/routes/api/bulletin-script/+server.ts` - Consider adding request throttling (KNOWN ISSUE)
+
+### 15. Subtitle Styling Persistence in Audiogram
+**Reality:** SubtitlePanel state (font, color, background) is NOT persisted to localStorage. Changes are lost on page reload. Only subtitle segments (from transcription) are saved.
+
+**File:** `src/lib/components/SubtitlePanel.svelte` - Consider adding localStorage persistence if needed
 
 ---
 
@@ -736,19 +754,20 @@ All CSS variables defined in `src/app.css`.
 
 ### Implementing Audiogram Changes
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
-2. UI logic: Individual panel components (WaveformPanel, TitlePanel, etc.)
+2. UI logic: Individual panel components (WaveformPanel, TitlePanel, SubtitlePanel, etc.)
 3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
 4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
-5. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
+5. Subtitles: `src/lib/utils/subtitles.ts` (word-level rendering + composition)
+6. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
 
-### Implementing Video Subtitle Changes
-1. Start: `src/lib/components/VideoSubtitlePage.svelte` (main container, 1412 lines)
-2. Upload/trim logic: Built-in to VideoSubtitlePage (no external components)
-3. Subtitle rendering: `src/lib/utils/subtitles.ts` (`drawSubtitle()`, `getActiveSegment()`)
-4. Title rendering: Reuse `src/lib/utils/compositor.ts:drawTitle()` pattern
-5. Export: Call `smartExportVideo()` from `src/lib/utils/video-export.ts`
-6. Panel integration: `SubtitlePanel.svelte` + `TitlePanel.svelte` (reused unchanged)
-7. Consult: TROUBLESHOOTING.md → Video Subtitle Issues (if created)
+### Implementing Bulletin Engine Changes
+1. Start: `src/routes/bulletin/+page.svelte` (main page, 1172 lines)
+2. Store: `src/lib/stores/bulletin.ts` (state + localStorage persistence)
+3. Story drawer: `src/lib/components/bulletin/BulletinStoryDrawer.svelte` (text + script generation + TTS)
+4. Script generation: `src/routes/api/bulletin-script/+server.ts` (Gemini API)
+5. Prompts: `src/lib/server/bulletinPrompts.ts` (summary/explainer templates)
+6. Assembly logic: `src/routes/bulletin/+page.svelte:generateBulletin()` (audio concatenation + normalization)
+7. Consult: `docs/archive/bulletin-plan.md` for checkpoint reference
 
 ### Implementing Export Changes
 1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
@@ -834,12 +853,14 @@ All CSS variables defined in `src/app.css`.
 ### For Debugging & Problem-Solving
 - **`/docs/TROUBLESHOOTING.md`** - Searchable Q&A for common issues (TTS, export, mobile, performance, deployment)
 - **`/docs/CHALLENGES_AND_FIXES.md`** - Consolidated reference for known issues, root causes, and fixes applied
+- **`/docs/QUALITY_REPORT.md`** - Known issues and fixes
 
 ### For System Design & Architecture
 - **`/docs/ARCHITECTURE.md`** - Visual diagrams and data flows (TTS pipeline, export pipeline, canvas composition, browser compatibility)
 
 ### For Historical Context & Design Decisions
 - **`/docs/archive/MANIFEST.md`** - Index & status guide for archived documents
+- **`/docs/archive/bulletin-plan.md`** - Bulletin engine implementation checkpoints (6 stages, all complete)
 - **`/docs/archive/EXPORT_TECH_PLAN.md`** - Why WebCodecs + Mediabunny was chosen over FFmpeg/MediaRecorder
 - **`/docs/archive/ROADMAP.md`** - 14-step development timeline and completion status
 - **`/docs/archive/MOBILE_EXPORT_FIX.md`** - Black-screen issue diagnostic approach (learning resource)
@@ -975,5 +996,5 @@ Verify these exist:
 
 ---
 
-**Last Updated:** April 2026
+**Last Updated:** April 2026 (Bulletin Engine + Subtitle Clarification)
 **Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete. Update .clinerules whenever AGENTS.md changes significantly.

@@ -62,6 +62,14 @@
   // Delete-confirmation state
   let showDeleteConfirm = $state(false);
 
+  // ─── URL fetch state ──────────────────────────────────────────────────────────
+
+  let fetchUrl = $state('');
+  let fetchState: 'idle' | 'loading' | 'error' = $state('idle');
+  let fetchError = $state('');
+  let fetchSuccess = $state(false);
+  let fetchProgress = $state('');
+
   // ─── Script generation state ──────────────────────────────────────────────────
 
   let isGeneratingScript = $state(false);
@@ -178,6 +186,64 @@
     }
   }
 
+  // ─── URL fetch handler ────────────────────────────────────────────────────────
+
+  async function fetchFromUrl() {
+    if (!fetchUrl.trim()) return;
+    fetchState = 'loading';
+    fetchError = '';
+    fetchSuccess = false;
+    fetchProgress = 'Fetching the page…';
+
+    try {
+      const res = await fetch('/api/fetch-story', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: fetchUrl.trim() })
+      });
+
+      fetchProgress = 'Processing the article…';
+      const data = await res.json();
+
+      if (data.error === 'PAYWALL') {
+        fetchError = 'Sorry, the article may be blocked or paywalled. Try pasting instead.';
+        fetchState = 'error';
+        fetchProgress = '';
+      } else if (data.error === 'FETCH_FAILED') {
+        fetchError = 'Sorry, the article may be blocked or paywalled. Try pasting instead.';
+        fetchState = 'error';
+        fetchProgress = '';
+      } else if (data.error === 'NO_CONTENT') {
+        fetchError = 'Sorry, the article may be blocked or paywalled. Try pasting instead.';
+        fetchState = 'error';
+        fetchProgress = '';
+      } else if (data.error === 'GEMINI_FAILED') {
+        fetchError = 'Sorry, the article may be blocked or paywalled. Try pasting instead.';
+        fetchState = 'error';
+        fetchProgress = '';
+      } else if (data.text) {
+        draft.originalText = data.text;
+        fetchUrl = '';
+        fetchState = 'idle';
+        fetchSuccess = true;
+        fetchProgress = '';
+        originalTextExpanded = true;
+        setTimeout(() => { fetchSuccess = false; }, 2000);
+      }
+    } catch (e: any) {
+      fetchError = 'Sorry, the article may be blocked or paywalled. Try pasting instead.';
+      fetchState = 'error';
+      fetchProgress = '';
+    }
+  }
+
+  function clearFetchUrl() {
+    fetchUrl = '';
+    fetchState = 'idle';
+    fetchError = '';
+    fetchSuccess = false;
+  }
+
   // ─── Script generation ────────────────────────────────────────────────────────
 
   async function generateScript() {
@@ -284,6 +350,47 @@
     <!-- Scrollable body -->
     <div class="drawer-body">
 
+      <!-- ── URL Fetch ──────────────────────────────────────────────────────── -->
+      <div class="url-fetch">
+        <div class="url-fetch__row">
+          <input
+            type="url"
+            class="url-fetch__input"
+            placeholder="Add story URL"
+            bind:value={fetchUrl}
+            onkeydown={(e) => e.key === 'Enter' && fetchFromUrl()}
+            disabled={fetchState === 'loading'}
+          />
+
+          <button
+            class="url-fetch__btn"
+            class:url-fetch__btn--active={fetchUrl.trim().length > 0 && fetchState !== 'loading' && !fetchSuccess}
+            class:url-fetch__btn--loading={fetchState === 'loading'}
+            class:url-fetch__btn--success={fetchSuccess}
+            onclick={fetchFromUrl}
+            disabled={fetchState === 'loading' || fetchSuccess || !fetchUrl.trim()}
+            aria-label="Fetch story from URL"
+          >
+            {#if fetchState === 'loading'}
+              <span class="url-fetch__spinner"></span>
+            {:else if fetchSuccess}
+              <span class="url-fetch__icon url-fetch__icon--tick">✓</span>
+            {:else}
+              <span class="url-fetch__icon">›</span>
+            {/if}
+          </button>
+        </div>
+
+        {#if fetchState === 'loading' && fetchProgress}
+          <p class="url-fetch__progress">{fetchProgress}</p>
+        {:else if fetchState === 'error'}
+          <p class="url-fetch__error">{fetchError}</p>
+        {/if}
+      </div>
+
+      <!-- ── Divider ────────────────────────────────────────────────────────── -->
+      <div class="url-fetch__divider"><span>or paste story text</span></div>
+
       <!-- ── Original Text card ─────────────────────────────────────────────── -->
       <div class="text-card" class:expanded={originalTextExpanded}>
         <textarea
@@ -294,6 +401,9 @@
           oninput={(e) => {
             draft.originalText = (e.target as HTMLTextAreaElement).value;
             autoResize(e);
+            if (draft.originalText.trim()) {
+              originalTextExpanded = true;
+            }
           }}
         ></textarea>
 
@@ -1028,5 +1138,128 @@
   @keyframes toast-in {
     from { opacity: 0; transform: translateX(-50%) translateY(8px); }
     to   { opacity: 1; transform: translateX(-50%) translateY(0); }
+  }
+
+  /* ── URL Fetch ──────────────────────────────────────────────────────────── */
+  .url-fetch {
+    margin-bottom: 0;
+  }
+
+  .url-fetch__row {
+    display: flex;
+    gap: 0.5rem;
+    align-items: center;
+  }
+
+  .url-fetch__input {
+    flex: 1;
+    padding: 0.625rem 0.75rem;
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    font-size: var(--font-size-sm);
+    font-family: var(--font-family-base);
+    color: var(--text-primary);
+    background: var(--bg-white);
+    min-width: 0;
+  }
+
+  .url-fetch__input:focus {
+    outline: none;
+    border-color: var(--color-border-active);
+  }
+
+  .url-fetch__input:disabled {
+    opacity: 0.6;
+    background: #f5f5f5;
+  }
+
+  .url-fetch__btn {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 2.5rem;
+    height: 2.5rem;
+    padding: 0;
+    background: #e8e8e8;
+    color: #999;
+    border: none;
+    border-radius: var(--radius-sm);
+    font-size: 1.25rem;
+    cursor: not-allowed;
+    flex-shrink: 0;
+    transition: background-color 200ms ease, color 200ms ease;
+  }
+
+  .url-fetch__btn--active {
+    background: var(--accent-brand);
+    color: #fff;
+    cursor: pointer;
+  }
+
+  .url-fetch__btn--active:hover {
+    opacity: 0.9;
+  }
+
+  .url-fetch__btn--loading {
+    background: var(--accent-brand);
+    color: #fff;
+    cursor: wait;
+  }
+
+  .url-fetch__btn--success {
+    background: #2e7d32;
+    color: #fff;
+    cursor: default;
+  }
+
+  .url-fetch__spinner {
+    display: inline-block;
+    width: 1rem;
+    height: 1rem;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    border-top-color: #fff;
+    border-radius: 50%;
+    animation: url-fetch-spin 0.8s linear infinite;
+  }
+
+  @keyframes url-fetch-spin {
+    to {
+      transform: rotate(360deg);
+    }
+  }
+
+  .url-fetch__icon {
+    display: inline-block;
+  }
+
+  .url-fetch__progress {
+    margin: 0.5rem 0 0;
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    line-height: var(--line-height-normal);
+  }
+
+  .url-fetch__error {
+    margin: 0.5rem 0 0;
+    font-size: var(--font-size-sm);
+    color: #c0392b;
+    line-height: var(--line-height-normal);
+  }
+
+  .url-fetch__divider {
+    display: flex;
+    align-items: center;
+    gap: var(--spacing-sm);
+    font-size: var(--font-size-base);
+    color: var(--text-secondary);
+    margin: 0;
+  }
+
+  .url-fetch__divider::before,
+  .url-fetch__divider::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: var(--color-border);
   }
 </style>
