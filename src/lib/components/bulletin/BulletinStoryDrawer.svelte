@@ -97,11 +97,12 @@
 
   // ─── Effects ──────────────────────────────────────────────────────────────────
 
-  // Clear script when original text changes (invalidates generated script)
+  // Clear script and cached TTS when original text changes (invalidates generated script and audio)
   $effect(() => {
     if (draft.originalText !== _init.originalText) {
       draft.script = '';
       draft.scriptActive = false;
+      draft.ttsAudio = null;
       scriptError = '';
     }
   });
@@ -142,6 +143,11 @@
       return;
     }
 
+    // If text changed, invalidate cached TTS audio
+    const textChanged = draft.originalText !== _init.originalText;
+    const scriptChanged = draft.script !== _init.script;
+    const scriptActiveChanged = draft.scriptActive !== _init.scriptActive;
+
     const saved: BulletinStory = {
       id: _init.id ?? generateStoryId(),
       originalText: draft.originalText,
@@ -149,7 +155,8 @@
       scriptActive: draft.scriptActive,
       scriptLength: draft.scriptLength,
       scriptType: draft.scriptType,
-      ttsAudio: draft.ttsAudio,
+      // Clear cached TTS if any text-related field changed
+      ttsAudio: (textChanged || scriptChanged || scriptActiveChanged) ? null : draft.ttsAudio,
     };
 
     if (isEditMode) {

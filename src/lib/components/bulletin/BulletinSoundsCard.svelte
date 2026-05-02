@@ -1,6 +1,9 @@
 <script lang="ts">
   import { bulletinStore, bulletinPanelStore, INTRO_OUTRO_SOUNDS, TRANSITION_SOUNDS } from '$lib/stores/bulletin';
 
+  // Props
+  let { onSettingsChange }: { onSettingsChange?: () => void } = $props();
+
   // Local UI state
   let openPanel = $derived($bulletinPanelStore);
   let isOpen = $derived(openPanel === 'sounds');
@@ -17,6 +20,8 @@
   function handleToggle() {
     const newEnabled = !soundsEnabled;
     bulletinStore.update(s => ({ ...s, soundsEnabled: newEnabled }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
     if (newEnabled && !isOpen) bulletinPanelStore.setOpen('sounds');
     if (!newEnabled) bulletinPanelStore.close();
   }
@@ -32,10 +37,14 @@
 
   function selectIntroOutroSound(filename: string | null) {
     bulletinStore.update(s => ({ ...s, selectedIntroOutroSound: filename }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function selectTransitionSound(filename: string | null) {
     bulletinStore.update(s => ({ ...s, selectedTransitionSound: filename }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function previewSound(event: MouseEvent, filename: string) {

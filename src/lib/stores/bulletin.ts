@@ -134,9 +134,14 @@ function createBulletinStore() {
 			});
 		},
 
-		/** Clear the assembled bulletin audio (e.g. after editing stories) */
+		/** Clear the assembled bulletin audio + intro/outro TTS (e.g. after editing stories or changing settings) */
 		clearBulletinAudio() {
-			update((s) => ({ ...s, bulletinAudio: null }));
+			update((s) => ({
+				...s,
+				bulletinAudio: null,
+				introTtsAudio: null,
+				outroTtsAudio: null,
+			}));
 		},
 	
 		/** Clear stories only (keep intro/outro, sounds, voice, and adjustments) */

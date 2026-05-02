@@ -6,7 +6,9 @@
   import type { BulletinStory } from '$lib/stores/bulletin';
   import { ALL_VOICES, preloadedTTSAudio } from '$lib/stores';
   import type { VoiceOption, TTSProvider } from '$lib/stores';
-  import { concatenateAudioSegments } from '$lib/audioProcessing';
+  import { concatenateAudioSegments, removeSilence } from '$lib/audioProcessing';
+  import type { SilenceLevel } from '$lib/audioProcessing';
+  import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import BulletinStoryCard from '$lib/components/bulletin/BulletinStoryCard.svelte';
@@ -161,6 +163,66 @@
     return new Blob([new Uint8Array(byteNumbers)], { type: mimeType });
   }
 
+  function blobToBase64(blob: Blob): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const result = reader.result as string;
+        resolve(result.split(',')[1]);
+      };
+      reader.onerror = reject;
+      reader.readAsDataURL(blob);
+    });
+  }
+
+  async function decodeAudioBase64(base64Audio: string): Promise<AudioBuffer> {
+    const binaryString = atob(base64Audio);
+    const bytes = new Uint8Array(binaryString.length);
+    for (let i = 0; i < binaryString.length; i++) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+    const audioContext = new AudioContext();
+    try {
+      return await audioContext.decodeAudioData(bytes.buffer);
+    } finally {
+      await audioContext.close();
+    }
+  }
+
+  /**
+   * Apply speed and silence adjustments to a base64 audio segment.
+   * Mirrors the same logic in BulletinIntroOutroCard.processAudioSegment().
+   */
+  async function processAudioSegment(
+    base64Audio: string,
+    speed: number,
+    silenceLevel: SilenceLevel
+  ): Promise<string> {
+    let processed = base64Audio;
+
+    if (speed !== 1.0) {
+      try {
+        const buffer = await decodeAudioBase64(processed);
+        const stretched = await timeStretch(buffer, speed);
+        const blob = audioBufferToWav(stretched);
+        processed = await blobToBase64(blob);
+      } catch (e) {
+        console.error('[Bulletin] Speed adjustment failed:', e);
+      }
+    }
+
+    if (silenceLevel !== 'default') {
+      try {
+        const result = await removeSilence(processed, silenceLevel);
+        processed = await blobToBase64(result.blob);
+      } catch (e) {
+        console.error('[Bulletin] Silence removal failed:', e);
+      }
+    }
+
+    return processed;
+  }
+
   /** Fetch an MP3 from /sounds/ and return its base64 string */
   async function loadSoundAsBase64(filename: string): Promise<string> {
     const response = await fetch(`/sounds/${filename}`);
@@ -174,12 +236,8 @@
     return btoa(binary);
   }
 
-  /** Generate TTS for a single story via /api/tts with speed/silence adjustments */
-  async function generateStoryTTS(
-    story: BulletinStory,
-    speed: number = 1.0,
-    silence: 'default' | 'trim' | 'tight' = 'default'
-  ): Promise<string> {
+  /** Generate raw TTS for a single story via /api/tts (speed/silence applied separately at assembly time) */
+  async function generateStoryTTS(story: BulletinStory): Promise<string> {
     const text = getStorySource(story);
     if (!text.trim()) throw new Error(`Story ${story.id} has no text`);
 
@@ -190,8 +248,6 @@
         text,
         voiceName: selectedVoiceName,
         provider: getVoiceProvider(selectedVoiceName),
-        speed,
-        silence,
       }),
     });
 
@@ -251,9 +307,12 @@
           if (!response.ok) throw new Error('Intro TTS failed');
           const data = await response.json();
           introAudio = data.audioContent as string;
+          // Cache raw TTS (before speed/silence) so we can reuse it
           bulletinStore.update(s => ({ ...s, introTtsAudio: introAudio }));
         }
-        segments.push(introAudio);
+        // Apply speed/silence adjustments at assembly time
+        const processedIntro = await processAudioSegment(introAudio, state.introOutroSpeed, state.introOutroSilence);
+        segments.push(processedIntro);
       }
 
       // ── 3–N. Stories with transition sounds between them ──────────────────
@@ -267,20 +326,18 @@
           segments.push(transBase64);
         }
 
-        // Story TTS — generate if missing
+        // Story TTS — generate raw audio if missing, then apply speed/silence
         let storyAudio = updatedStories[i].ttsAudio;
         if (!storyAudio) {
           console.log('[Bulletin] Generating TTS for story', i + 1);
-          storyAudio = await generateStoryTTS(
-            updatedStories[i],
-            state.mainVoiceSpeed,
-            state.mainVoiceSilence
-          );
+          storyAudio = await generateStoryTTS(updatedStories[i]);
           updatedStories[i] = { ...updatedStories[i], ttsAudio: storyAudio };
-          // Persist generated audio back to store
+          // Persist raw TTS back to store (speed/silence applied at assembly time)
           bulletinStore.updateStory(updatedStories[i]);
         }
-        segments.push(storyAudio);
+        // Apply speed/silence adjustments at assembly time
+        const processedStory = await processAudioSegment(storyAudio, state.mainVoiceSpeed, state.mainVoiceSilence);
+        segments.push(processedStory);
       }
 
       // ── Transition after last story ───────────────────────────────────────
@@ -306,9 +363,12 @@
           if (!response.ok) throw new Error('Outro TTS failed');
           const data = await response.json();
           outroAudio = data.audioContent as string;
+          // Cache raw TTS (before speed/silence) so we can reuse it
           bulletinStore.update(s => ({ ...s, outroTtsAudio: outroAudio }));
         }
-        segments.push(outroAudio);
+        // Apply speed/silence adjustments at assembly time
+        const processedOutro = await processAudioSegment(outroAudio, state.introOutroSpeed, state.introOutroSilence);
+        segments.push(processedOutro);
       }
 
       // ── Outro sound ───────────────────────────────────────────────────────
@@ -561,6 +621,7 @@
     <!-- Voice selector -->
     <section class="section">
       <VoiceDropdown
+        label="Voice"
         voices={ALL_VOICES}
         value={selectedVoiceObj}
         onchange={handleVoiceChange}
@@ -608,12 +669,12 @@
 
     <!-- Intro & Outro card -->
     <section class="section" class:disabled={stories.length === 0}>
-      <BulletinIntroOutroCard />
+      <BulletinIntroOutroCard onSettingsChange={stopBulletinAudio} />
     </section>
 
     <!-- Sounds card -->
     <section class="section" class:disabled={stories.length === 0}>
-      <BulletinSoundsCard />
+      <BulletinSoundsCard onSettingsChange={stopBulletinAudio} />
     </section>
 
     <!-- Controls cluster — matches TTS tab style exactly -->

@@ -7,6 +7,9 @@
   import { concatenateAudioSegments, removeSilence, type SilenceLevel } from '$lib/audioProcessing';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
 
+  // Props
+  let { onSettingsChange }: { onSettingsChange?: () => void } = $props();
+
   // Local UI state
   let openPanel = $derived($bulletinPanelStore);
   let isOpen = $derived(openPanel === 'intro-outro');
@@ -42,6 +45,8 @@
   function handleToggle() {
     const newEnabled = !introOutroEnabled;
     bulletinStore.update(s => ({ ...s, introOutroEnabled: newEnabled }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
     if (newEnabled && !isOpen) bulletinPanelStore.setOpen('intro-outro');
     if (!newEnabled) bulletinPanelStore.close();
   }
@@ -58,15 +63,21 @@
   function handleIntroInput(e: Event) {
     const val = (e.target as HTMLTextAreaElement).value;
     bulletinStore.update(s => ({ ...s, introScript: val }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function handleOutroInput(e: Event) {
     const val = (e.target as HTMLTextAreaElement).value;
     bulletinStore.update(s => ({ ...s, outroScript: val }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function selectVoice(voice: VoiceOption) {
     bulletinStore.update(s => ({ ...s, introOutroVoice: voice.name }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
     voiceDropdownOpen = false;
     stopVoicePreview();
   }
@@ -143,10 +154,14 @@
 
   function handleSpeedChange(speed: number) {
     bulletinStore.update(s => ({ ...s, introOutroSpeed: speed }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function handleSilenceChange(level: 'default' | 'trim' | 'tight') {
     bulletinStore.update(s => ({ ...s, introOutroSilence: level }));
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function base64ToBlob(base64: string, mimeType: string): Blob {
