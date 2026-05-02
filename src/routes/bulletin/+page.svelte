@@ -570,6 +570,7 @@
       });
 
       // Navigate to main app — AudiogramPage picks up the store on mount
+      localStorage.setItem('activeTab', 'audiogram');
       await goto('/');
     } catch (e) {
       console.error('[Bulletin] Add to audiogram error:', e);
