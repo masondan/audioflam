@@ -4,6 +4,12 @@
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
   import SilenceSlider from '$lib/components/SilenceSlider.svelte';
 
+  interface Props {
+    onSettingsChange?: () => void;
+  }
+
+  let { onSettingsChange }: Props = $props();
+
   // Local UI state
   let openPanel = $derived($bulletinPanelStore);
   let isOpen = $derived(openPanel === 'adjust-voice');
@@ -24,12 +30,14 @@
     bulletinStore.update(s => ({ ...s, mainVoiceSpeed: speed }));
     // Invalidate assembled audio when controls change
     bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 
   function handleSilenceChange(silence: SilenceLevel) {
     bulletinStore.update(s => ({ ...s, mainVoiceSilence: silence }));
     // Invalidate assembled audio when controls change
     bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
   }
 </script>
 

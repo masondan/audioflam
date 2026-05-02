@@ -46,6 +46,9 @@
   let isPlaying = $state(false);
   let generateError = $state('');
   let bulletinAudioElement = $state<HTMLAudioElement | null>(null);
+  let currentTime = $state(0);
+  let duration = $state(0);
+  let isDraggingProgress = $state(false);
 
   // Derived PlayButton state — matches TTS tab pattern
   const playButtonState = $derived(
@@ -259,10 +262,21 @@
   function stopBulletinAudio() {
     if (bulletinAudioElement) {
       bulletinAudioElement.pause();
+      bulletinAudioElement.currentTime = 0;
       bulletinAudioElement = null;
     }
     isPlaying = false;
   }
+
+  // Reset playback position whenever the assembled audio is invalidated
+  $effect(() => {
+    if (!bulletinAudio && bulletinAudioElement) {
+      bulletinAudioElement.pause();
+      bulletinAudioElement.currentTime = 0;
+      bulletinAudioElement = null;
+      isPlaying = false;
+    }
+  });
 
   // ─── Generate bulletin ─────────────────────────────────────────────────────
 
@@ -423,6 +437,14 @@
       bulletinAudioElement = new Audio(url);
       bulletinAudioElement.onended = () => { isPlaying = false; };
       bulletinAudioElement.onerror = () => { isPlaying = false; };
+      bulletinAudioElement.ontimeupdate = () => {
+        if (!isDraggingProgress) {
+          currentTime = bulletinAudioElement?.currentTime ?? 0;
+        }
+      };
+      bulletinAudioElement.onloadedmetadata = () => {
+        duration = bulletinAudioElement?.duration ?? 0;
+      };
       bulletinAudioElement.play();
       isPlaying = true;
 
@@ -453,6 +475,14 @@
       bulletinAudioElement = new Audio(url);
       bulletinAudioElement.onended = () => { isPlaying = false; };
       bulletinAudioElement.onerror = () => { isPlaying = false; };
+      bulletinAudioElement.ontimeupdate = () => {
+        if (!isDraggingProgress) {
+          currentTime = bulletinAudioElement?.currentTime ?? 0;
+        }
+      };
+      bulletinAudioElement.onloadedmetadata = () => {
+        duration = bulletinAudioElement?.duration ?? 0;
+      };
     }
 
     if (isPlaying) {
@@ -477,6 +507,34 @@
       bulletinAudioElement.duration,
       bulletinAudioElement.currentTime + 5
     );
+  }
+
+  // ─── Time formatting ───────────────────────────────────────────────────────
+
+  function formatTime(seconds: number): string {
+    if (!isFinite(seconds)) return '0:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins}:${secs < 10 ? '0' : ''}${secs}`;
+  }
+
+  // ─── Progress slider handlers ──────────────────────────────────────────────
+
+  function handleProgressInput(e: Event) {
+    const target = e.target as HTMLInputElement;
+    const value = parseFloat(target.value);
+    currentTime = value;
+    if (bulletinAudioElement) {
+      bulletinAudioElement.currentTime = value;
+    }
+  }
+
+  function handleProgressMouseDown() {
+    isDraggingProgress = true;
+  }
+
+  function handleProgressMouseUp() {
+    isDraggingProgress = false;
   }
 
   // ─── Download ──────────────────────────────────────────────────────────────
@@ -546,6 +604,8 @@
     stopBulletinAudio();
   });
 </script>
+
+<svelte:window on:mouseup={handleProgressMouseUp} on:touchend={handleProgressMouseUp} />
 
 <div class="app-container">
 
@@ -684,6 +744,34 @@
         <p class="generate-error">{generateError}</p>
       {/if}
 
+      <!-- Progress slider and timestamp -->
+      {#if bulletinAudio && duration > 0}
+        <div class="progress-section">
+          <!-- svelte-ignore a11y_no_static_element_interactions -->
+          <div
+            class="progress-slider-container"
+            onmousedown={handleProgressMouseDown}
+            ontouchstart={handleProgressMouseDown}
+          >
+            <input
+              type="range"
+              min="0"
+              max={duration}
+              step="0.1"
+              value={currentTime}
+              oninput={handleProgressInput}
+              class="progress-slider"
+              aria-label="Bulletin progress"
+            />
+          </div>
+          <div class="progress-timestamp">
+            <span class="time-current">{formatTime(currentTime)}</span>
+            <span class="time-separator">/</span>
+            <span class="time-total">{formatTime(duration)}</span>
+          </div>
+        </div>
+      {/if}
+
       <!-- Player row: back · play/pause · forward -->
       <div class="player-row">
         <button
@@ -716,7 +804,7 @@
 
       <!-- Adjust main voice card -->
       <div class:disabled={stories.length === 0}>
-        <BulletinAdjustVoiceCard />
+        <BulletinAdjustVoiceCard onSettingsChange={stopBulletinAudio} />
       </div>
 
       <!-- Download button — full width, purple when enabled -->
@@ -1228,5 +1316,111 @@
 
   .modal-btn.go:hover {
     background: #4a1d9e;
+  }
+
+  /* Progress slider and timestamp */
+  .progress-section {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-sm);
+  }
+
+  .progress-slider-container {
+    position: relative;
+    --slider-height: 6px;
+    --thumb-size: 18px;
+  }
+
+  .progress-slider {
+    width: 100%;
+    height: var(--slider-height);
+    border-radius: var(--radius-round);
+    background: #dcdcdc;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    transition: background var(--transition-normal);
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+
+  /* Webkit browsers (Chrome, Safari) */
+  .progress-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: var(--thumb-size);
+    height: var(--thumb-size);
+    border-radius: var(--radius-round);
+    background: var(--color-primary);
+    cursor: pointer;
+    transition: background var(--transition-normal);
+    transform: translateY(calc((var(--slider-height) - var(--thumb-size)) / 2));
+    -webkit-tap-highlight-color: transparent;
+    border: none;
+  }
+
+  .progress-slider::-webkit-slider-thumb:hover {
+    background: var(--color-primary);
+  }
+
+  .progress-slider::-webkit-slider-thumb:active {
+    background: var(--color-primary);
+  }
+
+  /* Firefox */
+  .progress-slider::-moz-range-thumb {
+    width: var(--thumb-size);
+    height: var(--thumb-size);
+    border-radius: var(--radius-round);
+    background: var(--color-primary);
+    cursor: pointer;
+    border: none;
+    transition: background var(--transition-normal);
+    transform: translateY(calc((var(--slider-height) - var(--thumb-size)) / 2));
+  }
+
+  .progress-slider::-moz-range-thumb:hover {
+    background: var(--color-primary);
+  }
+
+  .progress-slider::-moz-range-thumb:active {
+    background: var(--color-primary);
+  }
+
+  /* Track styling */
+  .progress-slider::-webkit-slider-runnable-track {
+    background: #dcdcdc;
+    height: var(--slider-height);
+    border-radius: var(--radius-round);
+  }
+
+  .progress-slider::-moz-range-track {
+    background: transparent;
+    border: none;
+  }
+
+  /* Timestamp display */
+  .progress-timestamp {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-xs);
+    font-size: var(--font-size-sm);
+    color: var(--text-secondary);
+    font-weight: var(--font-weight-medium);
+  }
+
+  .time-current {
+    color: var(--text-primary);
+  }
+
+  .time-separator {
+    color: var(--text-secondary);
+  }
+
+  .time-total {
+    color: var(--text-secondary);
   }
 </style>

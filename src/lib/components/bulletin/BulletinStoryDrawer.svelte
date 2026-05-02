@@ -26,7 +26,7 @@
       originalText: s?.originalText ?? '',
       script:       s?.script       ?? '',
       scriptActive: s?.scriptActive ?? false,
-      scriptLength: (s?.scriptLength ?? 30) as ScriptLength,
+      scriptLength: (s?.scriptLength ?? 20) as ScriptLength,
       scriptType:   (s?.scriptType   ?? 'summary') as ScriptType,
       ttsAudio:     s?.ttsAudio     ?? null,
     };
