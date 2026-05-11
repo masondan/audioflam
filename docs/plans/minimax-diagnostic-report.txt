@@ -1,0 +1,120 @@
+MINIMAX TTS API - DIAGNOSTIC REPORT
+Date: 7 May 2026
+Account: danmasonmedia@gmail.com
+GroupID: 2047407150375903982
+============================================================
+
+
+TOOL & FRAMEWORK DETAILS
+─────────────────────────
+Application:      AudioFlam (audioflam.flamtools.com)
+Framework:        SvelteKit 2 / Node.js backend
+Hosting:          Cloudflare Pages (serverless)
+Language:         TypeScript
+API Integration:  Direct HTTP/2 POST requests (no SDK)
+
+
+API CONFIGURATION
+─────────────────────────
+Base URL:         https://api.minimax.io/v1/text_to_speech
+Query Parameter:  ?GroupId=2047407150375903982
+Authentication:   Bearer token in Authorization header
+Request Method:   POST
+Content-Type:     application/json
+Model:            speech-02
+
+Request body format:
+{
+  "model": "speech-02",
+  "text": "Hello, this is a test message.",
+  "voice_id": "<voice_id>",
+  "emotion": "neutral",
+  "response_format": "mp3"
+}
+
+
+TEST RESULTS (run 7 May 2026, 10:10 UTC)
+─────────────────────────────────────────
+Tests run via Node.js directly from developer machine (not via app).
+This isolates the issue from any app/framework/hosting variables.
+
+TEST 1: Built-in Voice
+  Voice ID:       Calm_Woman
+  HTTP Status:    200
+  Trace-ID:       064b9821b5f15c650711ad9a9cd4e491
+  Request-ID:     2ce9fe457570a2cb4dbba678cfa248f1
+  Response Time:  1248ms
+  Response Body:  {"base_resp":{"status_code":1002,"status_msg":"rate limit exceeded(RPM)"}}
+  RESULT:         ❌ FAILED
+
+TEST 2: Cloned Voice
+  Voice ID:       chisomom01 (Malawi English male, cloned via platform.minimax.io)
+  HTTP Status:    200
+  Trace-ID:       064b98236adc31fc2b5101fa6743b167
+  Request-ID:     a85090d630a460ded4b98b9e7b54dbb0
+  Response Time:  473ms
+  Response Body:  {"base_resp":{"status_code":1002,"status_msg":"rate limit exceeded(RPM)"}}
+  RESULT:         ❌ FAILED
+
+Earlier test (same day, 09:52 UTC) via raw curl:
+  Voice ID:       Calm_Woman
+  HTTP Status:    200
+  Trace-ID:       064b93c7ed26dc3893cacb81f400cf80
+  Request-ID:     0cb44f74caac1fdbe91237fb9336a0be
+  Response Body:  {"base_resp":{"status_code":1002,"status_msg":"rate limit exceeded(RPM)"}}
+  RESULT:         ❌ FAILED
+
+
+KEY OBSERVATIONS
+─────────────────────────
+1. Authentication succeeds — API key is accepted (no 1004 errors)
+2. Both built-in AND cloned voices fail with identical error
+3. Error is consistent across curl, Node.js, and app environments
+4. Error code 1002 = "rate limit exceeded(RPM)"
+5. No successful requests have ever been processed on this account
+6. Billing history shows zero usage / no purchase records
+7. This is NOT a code issue — same error from raw curl with no app involved
+
+
+ACCOUNT STATUS (as confirmed by MiniMax support, May 2026)
+─────────────────────────────────────────────────────────────
+Account Status:       Normal (not paused, frozen, or deleted)
+Cash Balance:         $25.00
+Subscription Credits: 100,000
+API Tokens:           5 active (including MINIMAX_SPEECH_KEY)
+Plan:                 Starter yearly, expires 2027-05-02
+Model Access:         Full (speech-2.8-hd/turbo, speech-2.6-hd/turbo, etc.)
+Rate Limit Records:   None (per MiniMax support)
+
+
+BACKGROUND: MULTIPLE ACCOUNTS ISSUE
+─────────────────────────────────────
+Three login methods were tried, each showing different account states:
+
+1. Gmail (danmasonmedia@gmail.com) — GroupID: 2047407150375903982
+   → Has Starter subscription, $25 credits, 5 API keys
+   → This is the account used for all API calls above
+
+2. GitHub (dan@danmason.co.uk) — GroupID: 2047969396655141126
+3. Email (dan@danmason.co.uk) — GroupID: 2047969396655141126
+   → Accounts 2 & 3 show no subscription, no credits, no APIs
+   → Attempts to delete these accounts return: "group has no owner (98002011)"
+
+Hypothesis: The API key may be routing requests to one of the unfunded accounts
+(GroupID 2047969396655141126) rather than the funded account (2047407150375903982),
+despite the GroupId parameter being explicitly set in the URL.
+
+
+QUESTIONS FOR MINIMAX TECHNICAL TEAM
+──────────────────────────────────────
+1. Can you confirm which GroupID the API key MINIMAX_SPEECH_KEY is associated with?
+2. Is GroupID 2047407150375903982 the account receiving these requests?
+   (Trace IDs above can be used to verify)
+3. Can you check the rate limit counter for GroupID 2047407150375903982?
+   It should show zero successful requests.
+4. Is there a known issue with accounts created via multiple OAuth providers
+   (Gmail + GitHub) sharing the same email address?
+5. Can the duplicate accounts (GroupID 2047969396655141126) be merged or deleted?
+
+============================================================
+END OF REPORT

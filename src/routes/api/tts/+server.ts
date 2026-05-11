@@ -18,6 +18,8 @@ export const POST: RequestHandler = async ({ request }) => {
 			return await handleAzure(text, voiceName);
 		} else if (provider === 'minimax') {
 			return await handleMiniMax(text, voiceName);
+		} else if (provider === 'qwen') {
+			return await handleQwen(text, voiceName);
 		} else {
 			return await handleYarnGPT(text, voiceName);
 		}
@@ -202,8 +204,121 @@ for (let i = 0; i < uint8Array.length; i += chunkSize) {
 	binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
 }
 const base64Audio = btoa(binaryString);
-
 console.log('[MiniMax] TTS generated successfully');
 return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 }
+
+async function handleQwen(text: string, voiceId: string) {
+	const QWEN_API_KEY = env.QWEN_SPEECH_KEY;
+	if (!QWEN_API_KEY) {
+		console.error('[Qwen] QWEN_SPEECH_KEY missing');
+		return json({ error: 'Qwen API key not configured' }, { status: 500 });
+	}
+
+	const trimmedText = text.slice(0, 4000);
+	const SYNTHESIS_ENDPOINT = 'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
+	const SYNTHESIS_MODEL = 'qwen3-tts-vc-2026-01-22';
+
+	console.log(`[Qwen] Generating TTS for voice: ${voiceId}, text length: ${trimmedText.length}`);
+
+	const requestBody = {
+		model: SYNTHESIS_MODEL,
+		input: {
+			text: trimmedText,
+			voice: voiceId,
+			language_type: 'English'
+		}
+	};
+
+	console.log('[Qwen] Request body:', JSON.stringify(requestBody));
+	console.log('[Qwen] Request body stringified:', JSON.stringify(requestBody, null, 2));
+
+	try {
+		const response = await fetch(SYNTHESIS_ENDPOINT, {
+			method: 'POST',
+			headers: {
+				'Authorization': `Bearer ${QWEN_API_KEY}`,
+				'Content-Type': 'application/json'
+			},
+			body: JSON.stringify(requestBody)
+		});
+
+		console.log(`[Qwen] Response status: ${response.status}`);
+
+		if (!response.ok) {
+			const errorText = await response.text();
+			console.error('[Qwen] API error:', response.status, errorText);
+			return json(
+				{ error: 'Qwen TTS generation failed', status: response.status, details: errorText },
+				{ status: response.status }
+			);
+		}
+
+		const contentType = response.headers.get('content-type') || '';
+		let audioUrl: string | null = null;
+		let audioData: ArrayBuffer | null = null;
+
+		if (contentType.includes('application/json')) {
+			const data = await response.json() as { code?: string; message?: string; output?: { audio?: { url?: string } } };
+
+			// Check for API error
+			if (data.code && data.code !== 'Success') {
+				console.error('[Qwen] API error code:', data.code, data.message);
+				return json(
+					{ error: 'Qwen TTS generation failed', details: data.message || data.code },
+					{ status: 500 }
+				);
+			}
+
+			// Extract audio URL
+			audioUrl = data.output?.audio?.url || null;
+		} else {
+			// Binary response (unlikely but handle it)
+			audioData = await response.arrayBuffer();
+		}
+
+		// If we got a URL, download the audio immediately
+		// CRITICAL: Qwen3-TTS returns a temporary URL that expires after 24 hours.
+		// Audio MUST be downloaded and stored immediately in this request cycle.
+		// Never store the URL itself — always store the audio bytes/file.
+		if (audioUrl) {
+			console.log(`[Qwen] Audio URL received, downloading...`);
+			const audioResponse = await fetch(audioUrl);
+
+			if (!audioResponse.ok) {
+				console.error('[Qwen] Failed to download audio from URL:', audioResponse.status);
+				return json(
+					{ error: 'Failed to download audio from Qwen', details: `HTTP ${audioResponse.status}` },
+					{ status: 500 }
+				);
+			}
+
+			audioData = await audioResponse.arrayBuffer();
+			console.log(`[Qwen] Audio downloaded: ${audioData.byteLength} bytes`);
+		}
+
+		if (!audioData) {
+			console.error('[Qwen] No audio data received');
+			return json({ error: 'No audio data from Qwen' }, { status: 500 });
+		}
+
+		// Convert to base64
+		const uint8Array = new Uint8Array(audioData);
+		let binaryString = '';
+		const chunkSize = 8192;
+		for (let i = 0; i < uint8Array.length; i += chunkSize) {
+			binaryString += String.fromCharCode(...uint8Array.slice(i, i + chunkSize));
+		}
+		const base64Audio = btoa(binaryString);
+
+		console.log('[Qwen] TTS generated successfully');
+		return json({ audioContent: base64Audio, format: 'wav' }, { status: 200 });
+
+	} catch (err) {
+		const message = err instanceof Error ? err.message : 'Unknown error';
+		console.error('[Qwen] Network error:', message);
+		return json({ error: 'Qwen TTS request failed', details: message }, { status: 500 });
+	}
+}
+
 

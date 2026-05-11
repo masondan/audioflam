@@ -21,6 +21,10 @@
       if (voice.description.includes('Malawi')) return '🇲🇼';
       if (voice.description.includes('Zimbabwe')) return '🇿🇼';
     }
+    if (voice.provider === 'qwen') {
+      if (voice.description.includes('Malawi')) return '🇲🇼';
+      if (voice.description.includes('Zimbabwe')) return '🇿🇼';
+    }
     return '';
   }
   

@@ -4,7 +4,7 @@ import { writable } from 'svelte/store';
 export const splashScreenVisible = writable(true);
 
 // TTS Provider Types
-export type TTSProvider = 'yarngpt' | 'azure' | 'minimax';
+export type TTSProvider = 'yarngpt' | 'azure' | 'minimax' | 'qwen';
 
 export interface VoiceOption {
 	name: string;
@@ -46,10 +46,24 @@ export const MINIMAX_VOICES: VoiceOption[] = [
 	{ name: 'preciousf1', ssmlGender: 'FEMALE', displayName: 'Precious', description: 'Zimbabwe English female', provider: 'minimax' }
 ];
 
-// Combined voices for the UI (Nigerian first, then MiniMax Malawi/Zim, then British)
+// Qwen3-TTS Voice Clones (Malawi + Zimbabwe English)
+// Enrolled via: node --env-file=.env scripts/enroll_voices.js (May 11, 2026)
+// Voice IDs stored in .env as VOICE_MALAWI_FEMALE, VOICE_MALAWI_MALE, VOICE_ZIM_FEMALE, VOICE_ZIM_MALE
+// Note: Synthesis with cloned voices requires paid subscription (enrollment was $0.04 total)
+export const QWEN_VOICES: VoiceOption[] = [
+	// Malawi English
+	{ name: 'qwen-tts-vc-malawi-voice-20260511195848208-4632', ssmlGender: 'FEMALE', displayName: 'Chisomo (Qwen)', description: 'Malawi English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-malawi-voice-20260511195853398-146d', ssmlGender: 'MALE', displayName: 'Mercy (Qwen)', description: 'Malawi English male', provider: 'qwen' },
+	// Zimbabwe English
+	{ name: 'qwen-tts-vc-zim-voice-20260511195858837-d2b5', ssmlGender: 'FEMALE', displayName: 'Tawanda (Qwen)', description: 'Zimbabwe English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-zim-voice-20260511195904106-121a', ssmlGender: 'MALE', displayName: 'Precious (Qwen)', description: 'Zimbabwe English male', provider: 'qwen' }
+];
+
+// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then MiniMax, then British)
 export const ALL_VOICES: VoiceOption[] = [
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-NG')),
 	...YARNGPT_VOICES,
+	...QWEN_VOICES,
 	...MINIMAX_VOICES,
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
 ];
