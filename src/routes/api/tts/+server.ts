@@ -40,6 +40,56 @@ function escapeXml(text: string): string {
 		.replace(/'/g, '&apos;');
 }
 
+function cleanForTTS(text: string): string {
+	let result = text;
+
+	// 1. Replace em-dashes (—) with commas for natural pacing, preserving spacing
+	result = result.replace(/\s*—\s*/g, ', ');
+
+	// 2. Ensure every sentence ends with . ? or !
+	// Process each line separately and add period if missing
+	const lines = result.split('\n');
+	result = lines
+		.map((line) => {
+			const trimmed = line.trim();
+			// Add period if line has content but no ending punctuation
+			if (trimmed && !/[.!?]$/.test(trimmed)) {
+				return trimmed + '.';
+			}
+			return trimmed;
+		})
+		.join('\n');
+
+	// Also ensure the entire text ends with punctuation
+	result = result.trim();
+	if (result && !/[.!?]$/.test(result)) {
+		result += '.';
+	}
+
+	// 3. Add comma after unpunctuated clauses 8+ words long
+	// Split on sentence-ending punctuation to identify clauses
+	// If a clause is long (8+ words) and unpunctuated, add comma for pacing
+	const clauses = result.split(/(?=[.!?])/);
+	result = clauses
+		.map((clause) => {
+			if (!clause || /^[.!?]/.test(clause)) {
+				return clause; // Keep punctuation marks as-is
+			}
+
+			const trimmedClause = clause.trim();
+			const wordCount = trimmedClause.split(/\s+/).filter((w) => w.length > 0).length;
+
+			// If 8+ words and currently unpunctuated, add comma for natural breath point
+			if (wordCount >= 8 && !/[,;:]$/.test(trimmedClause)) {
+				return trimmedClause + ',';
+			}
+			return trimmedClause;
+		})
+		.join('');
+
+	return result;
+}
+
 async function handleAzure(text: string, voiceName: string) {
 	const AZURE_SPEECH_KEY = env.AZURE_SPEECH_KEY?.trim();
 	const AZURE_SPEECH_REGION = env.AZURE_SPEECH_REGION?.trim() || 'eastus';
@@ -216,15 +266,16 @@ async function handleQwen(text: string, voiceId: string) {
 	}
 
 	const trimmedText = text.slice(0, 4000);
+	const cleanedText = cleanForTTS(trimmedText);
 	const SYNTHESIS_ENDPOINT = 'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
 	const SYNTHESIS_MODEL = 'qwen3-tts-vc-2026-01-22';
 
-	console.log(`[Qwen] Generating TTS for voice: ${voiceId}, text length: ${trimmedText.length}`);
+	console.log(`[Qwen] Generating TTS for voice: ${voiceId}, text length: ${cleanedText.length}`);
 
 	const requestBody = {
 		model: SYNTHESIS_MODEL,
 		input: {
-			text: trimmedText,
+			text: cleanedText,
 			voice: voiceId,
 			language_type: 'English'
 		}
