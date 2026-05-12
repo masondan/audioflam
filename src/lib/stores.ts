@@ -16,22 +16,22 @@ export interface VoiceOption {
 
 // YarnGPT Nigerian Voices (native, slower ~30s) - Adaora, Idera, Tayo, Femi
 export const YARNGPT_VOICES: VoiceOption[] = [
-	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora', description: 'Warm, engaging', provider: 'yarngpt' },
-	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera', description: 'Nigerian, melodic', provider: 'yarngpt' },
-	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo', description: 'Nigerian, upbeat', provider: 'yarngpt' },
-	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi', description: 'Nigerian, reassuring', provider: 'yarngpt' }
+	{ name: 'Adaora', ssmlGender: 'FEMALE', displayName: 'Adaora (Nigeria)', description: 'Warm, engaging', provider: 'yarngpt' },
+	{ name: 'Idera', ssmlGender: 'FEMALE', displayName: 'Idera (Nigeria)', description: 'Nigerian, melodic', provider: 'yarngpt' },
+	{ name: 'Tayo', ssmlGender: 'MALE', displayName: 'Tayo (Nigeria)', description: 'Nigerian, upbeat', provider: 'yarngpt' },
+	{ name: 'Femi', ssmlGender: 'MALE', displayName: 'Femi (Nigeria)', description: 'Nigerian, reassuring', provider: 'yarngpt' }
 ];
 
 // Azure TTS Voices (Nigerian + British English)
 export const AZURE_VOICES: VoiceOption[] = [
 	// Nigerian English
-	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo', description: 'Azure Nigerian male', provider: 'azure' },
-	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne', description: 'Azure Nigerian female', provider: 'azure' },
+	{ name: 'en-NG-AbeoNeural', ssmlGender: 'MALE', displayName: 'Abeo (Nigeria)', description: 'Azure Nigerian male', provider: 'azure' },
+	{ name: 'en-NG-EzinneNeural', ssmlGender: 'FEMALE', displayName: 'Ezinne (Nigeria)', description: 'Azure Nigerian female', provider: 'azure' },
 	// British English
-	{ name: 'en-GB-RyanNeural', ssmlGender: 'MALE', displayName: 'Ryan', description: 'British male', provider: 'azure' },
-	{ name: 'en-GB-BellaNeural', ssmlGender: 'FEMALE', displayName: 'Bella', description: 'British female', provider: 'azure' },
-	{ name: 'en-GB-HollieNeural', ssmlGender: 'FEMALE', displayName: 'Hollie', description: 'British female', provider: 'azure' },
-	{ name: 'en-GB-OliverNeural', ssmlGender: 'MALE', displayName: 'Oliver', description: 'British male', provider: 'azure' },
+	{ name: 'en-GB-RyanNeural', ssmlGender: 'MALE', displayName: 'Ryan (UK)', description: 'British male', provider: 'azure' },
+	{ name: 'en-GB-BellaNeural', ssmlGender: 'FEMALE', displayName: 'Bella (UK)', description: 'British female', provider: 'azure' },
+	{ name: 'en-GB-HollieNeural', ssmlGender: 'FEMALE', displayName: 'Hollie (UK)', description: 'British female', provider: 'azure' },
+	{ name: 'en-GB-OliverNeural', ssmlGender: 'MALE', displayName: 'Oliver (UK)', description: 'British male', provider: 'azure' },
 ];
 
 // MiniMax Voice Clones (Malawi + Zimbabwe English)
@@ -52,19 +52,19 @@ export const MINIMAX_VOICES: VoiceOption[] = [
 // Note: Synthesis with cloned voices requires paid subscription (enrollment was $0.04 total)
 export const QWEN_VOICES: VoiceOption[] = [
 	// Malawi English
-	{ name: 'qwen-tts-vc-malawi-voice-20260511195848208-4632', ssmlGender: 'FEMALE', displayName: 'Chisomo (Qwen)', description: 'Malawi English female', provider: 'qwen' },
-	{ name: 'qwen-tts-vc-malawi-voice-20260511195853398-146d', ssmlGender: 'MALE', displayName: 'Mercy (Qwen)', description: 'Malawi English male', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-malawi-voice-20260511195848208-4632', ssmlGender: 'FEMALE', displayName: 'Chisomo (Malawi)', description: 'Malawi English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-malawi-voice-20260511195853398-146d', ssmlGender: 'MALE', displayName: 'Mercy (Malawi)', description: 'Malawi English male', provider: 'qwen' },
 	// Zimbabwe English
-	{ name: 'qwen-tts-vc-zim-voice-20260511195858837-d2b5', ssmlGender: 'FEMALE', displayName: 'Tawanda (Qwen)', description: 'Zimbabwe English female', provider: 'qwen' },
-	{ name: 'qwen-tts-vc-zim-voice-20260511195904106-121a', ssmlGender: 'MALE', displayName: 'Precious (Qwen)', description: 'Zimbabwe English male', provider: 'qwen' }
+	{ name: 'qwen-tts-vc-zim-voice-20260511195858837-d2b5', ssmlGender: 'FEMALE', displayName: 'Tawanda (Zimbabwe)', description: 'Zimbabwe English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-zim-voice-20260511195904106-121a', ssmlGender: 'MALE', displayName: 'Precious (Zimbabwe)', description: 'Zimbabwe English male', provider: 'qwen' }
 ];
 
-// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then MiniMax, then British)
+// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then British)
+// Note: MINIMAX_VOICES hidden from dropdown (API currently non-functional)
 export const ALL_VOICES: VoiceOption[] = [
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-NG')),
 	...YARNGPT_VOICES,
 	...QWEN_VOICES,
-	...MINIMAX_VOICES,
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
 ];
 
