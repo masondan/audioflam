@@ -1,8 +1,8 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam
-**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + MiniMax Integration Complete)
-**Updated:** April 2026 (Latest: Bulletin Engine implementation)
+**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + Qwen Voice Cloning)
+**Updated:** May 2026 (Latest: Qwen3-TTS voice cloning + text cleaning for naturalness)
 
 ---
 
@@ -43,9 +43,8 @@ src/
 │   ├── bulletin/+page.svelte     # Bulletin engine page
 │   ├── +layout.svelte            # Root layout
 │   └── api/
-│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT + MiniMax)
+│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT + Qwen3-TTS voice cloning)
 │       ├── bulletin-script/+server.ts # Gemini script generation (summary/explainer)
-│       ├── minimax-refresh/+server.ts # MiniMax voice clone refresh (cron)
 │       ├── audio/
 │       │   ├── silence-removal/+server.ts # Silence removal
 │       │   └── normalize/+server.ts       # Audio normalization
@@ -100,8 +99,8 @@ src/
 static/
   ├── icons/                        # SVG icons (includes icon-bulletin.svg)
   ├── fonts/                        # Self-hosted fonts (Inter, Lora, Playfair, Roboto Slab, Saira, Bebas, Oswald)
-  ├── voices/                       # Sample voice files (for preview) + MiniMax samples
-  ├── voice-samples/                # MiniMax voice clone training samples (Malawi + Zimbabwe)
+  ├── voices/                       # Sample voice files (for preview)
+  ├── voice-samples/                # Qwen voice clone training samples (Malawi + Zimbabwe)
   ├── sounds/                       # Bulletin intro/outro/transition MP3s
   ├── robots.txt                    # Disallow: / (no indexing)
   └── manifest.json                 # PWA manifest
@@ -126,32 +125,45 @@ static/
 - **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
 
+### Qwen3-TTS Voice Cloning (Africa-First)
+- **Speed:** ~5-10 seconds
+- **Auth:** Bearer token via `QWEN_SPEECH_KEY`
+- **Model:** `qwen3-tts-vc-2026-01-22` (voice cloning synthesis)
+- **Voices:** Malawi (Chisomo F, Mercy M), Zimbabwe (Tawanda M, Precious F)
+- **Endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
+- **Format:** WAV
+- **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing)
+- **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `cleanForTTS()` utility
+
 ### API Endpoint: POST `/api/tts`
 
 ```json
 Request:
 {
   "text": "Hello world",
-  "voiceName": "en-NG-AbeoNeural",
-  "provider": "azure"
+  "voiceName": "qwen-tts-vc-malawi-voice-...",
+  "provider": "qwen"
 }
 
 Response:
 {
-  "audioContent": "<base64-encoded MP3>",
-  "format": "mp3"
+  "audioContent": "<base64-encoded WAV>",
+  "format": "wav"
 }
 ```
 
 ---
 
-## MiniMax Voice Clone Persistence
+## MiniMax Voice Cloning (⚠️ Not Recommended - Unresolved Issues)
 
-- **Voice clones auto-delete** after 7 days of inactivity
-- **Weekly cron refresh:** `/api/minimax-refresh` pings each voice with single character (cost ~$0.0000024/week)
-- **Clone IDs:** Stored in `src/lib/stores.ts:MINIMAX_VOICES` (format: min 10 chars, alphanumeric only)
-- **Voice samples:** Stored in `static/voices/` (chisomo.mp3, mercy.mp3, tawanda.mp3, precious.mp3)
-- **Training samples:** Original WAV files in `static/voice-samples/` (used for cloning, not shipped to browser)
+**Status:** Integration attempted but API returns no audio despite correct implementation. Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without active subscription). MiniMax support has not resolved this issue.
+
+- **Handler:** `src/routes/api/tts/+server.ts:handleMiniMax()` (implementation verified correct)
+- **Workaround:** Route MiniMax requests to Azure/YarnGPT until account issue is resolved
+- **Cron refresh:** `/api/minimax-refresh` (legacy, not actively used)
+- **Note:** Do NOT use MiniMax in production until billing account is properly linked and API returns audio
+
+**Recommendation:** Use Qwen3-TTS voice cloning instead (Africa-first, working, lower cost)
 
 ---
 
@@ -224,7 +236,7 @@ await releaseModel();
 - Compose TTS from two different voices
 - Per-speaker speed and silence controls
 - Audio merging pipeline
-- Works with all three TTS providers (Azure, YarnGPT, MiniMax)
+- Works with all three TTS providers (Azure, YarnGPT, Qwen3-TTS)
 
 ### Implementation
 - **File:** `src/routes/+page.svelte` (lines 88-90, 200+)
@@ -338,7 +350,9 @@ Set in Cloudflare Pages → Settings → Environment variables:
 AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
 YARNGPT_API_KEY=<API key>
-MINIMAX_API_KEY=<Bearer token for MiniMax API>
+QWEN_SPEECH_KEY=<Bearer token for Qwen3-TTS>
+MINIMAX_SPEECH_KEY=<Bearer token for MiniMax API (not recommended)>
+MINIMAX_GROUP_ID=<MiniMax Group ID (not recommended)>
 APIVIDEO_API_KEY=<API key for cloud transcoding>
 ```
 
@@ -502,9 +516,10 @@ All CSS variables defined in `src/app.css`.
 4. **Base64 encoding** - Use `btoa()` not `Buffer` (Cloudflare compatibility)
 5. **XML escaping** - Always escape user text before embedding in SSML (prevents injection)
 6. **Host header required** - Azure requests in Cloudflare Workers need explicit `Host` header
-7. **Audio format consistency** - All responses must include `format: 'mp3'` field
+7. **Audio format consistency** - All responses must include `format: 'mp3'` or `'wav'` field
 8. **Robots.txt noindex** - Must remain in `static/robots.txt` (educational use only)
 9. **Manifest.json display** - Currently set to `"display": "browser"` (not standalone)
+10. **Text cleaning for Qwen** - Always call `cleanForTTS()` before Qwen synthesis (improves naturalness, preserves author intent)
 
 ### Export-Specific Gotchas
 
@@ -520,7 +535,8 @@ All CSS variables defined in `src/app.css`.
 
 - **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
 - **Azure faster but slightly accented** - 3s generation but international accent
-- **MiniMax API returns no audio** - Despite proper handler implementation, API consistently returns empty response. Likely due to account mismatch (GitHub OAuth login created separate account without billing). DO NOT use in production until resolved. Workaround: Route requests to Azure/YarnGPT if MiniMax selected.
+- **Qwen3-TTS voice cloning** - Africa-first voices (Malawi/Zimbabwe), 5-10s generation. Text cleaning via `cleanForTTS()` improves naturalness (em-dashes → commas, ensures punctuation, adds pauses for long clauses)
+- **MiniMax API returns no audio** - Despite proper handler implementation, API consistently returns empty response. Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). DO NOT use in production. Workaround: Route requests to Azure/YarnGPT/Qwen if MiniMax selected.
 - **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE - see Quality Report)
 - **No request throttling** - Users can spam TTS API (KNOWN ISSUE - see Quality Report)
 
@@ -544,7 +560,7 @@ All CSS variables defined in `src/app.css`.
 ## Current Phase Focus
 
 ✅ **Completed:**
-- TTS with Azure + YarnGPT + MiniMax (single + two-speaker modes)
+- TTS with Azure + YarnGPT + Qwen3-TTS voice cloning (single + two-speaker modes)
 - Full Audiogram creation (image, audio, waveform, title, effects)
 - **Waveform visual parity:** Preview and export waveforms match exactly via pre-computed FFT frames
 - MP4 export via WebCodecs (Android)
@@ -555,16 +571,17 @@ All CSS variables defined in `src/app.css`.
 - **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls (all three providers)
 - **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export
 - **Bulletin Engine:** Full implementation with story management, Gemini script generation, per-story TTS, intro/outro, sound selection, and assembly (April 2026) ✅ All checkpoints complete
-- **MiniMax voice cloning:** Malawi (Chisomo M, Mercy F) + Zimbabwe (Tawanda M, Precious F) voices cloned and integrated (April 2026) - **Note:** API integration complete but testing ongoing due to account/billing issue
+- **Qwen3-TTS voice cloning:** Malawi (Chisomo F, Mercy M) + Zimbabwe (Tawanda M, Precious F) voices cloned and integrated (May 2026) ✅ Working with text cleaning for naturalness
 
-**Waveform Export Fix (Critical Implementation):**
-- `precomputeFrequencyFrames()` in `waveform.ts` performs offline FFT using Cooley-Tukey algorithm with Blackman windowing
-- Generates `Uint8Array[]` frames matching `AnalyserNode.getByteFrequencyData()` output format
-- Export pipeline passes pre-computed frames to `renderFrame(currentTime)` callback for frame-accurate rendering
-- Eliminates visual mismatch between live preview and exported MP4 (was caused by synthetic sine-wave generation)
+**Voice Naturalness Improvement (May 2026):**
+- `cleanForTTS()` function preprocesses text before Qwen synthesis
+- Replaces em-dashes with commas for natural pacing
+- Ensures sentence punctuation (`.` `?` `!`)
+- Adds commas after unpunctuated clauses ≥8 words for breath points
+- Preserves author intent: existing punctuation, CAPS emphasis, ellipsis
 
 **Known Issues (See QUALITY_REPORT.md):**
-- 🔴 **MiniMax API returns no audio** despite proper credentials (HIGH priority) - Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). Awaiting MiniMax support response. Implementation verified correct; workaround: Use Azure/YarnGPT until resolved.
+- 🔴 **MiniMax API returns no audio** despite proper credentials (HIGH priority) - Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). MiniMax support unresponsive. Implementation verified correct; workaround: Use Azure/YarnGPT/Qwen instead.
 - 🔴 Type assertion in `webcodecs-export.ts:445` without runtime guard (HIGH priority)
 - 🔴 TTS error handling gaps - generic "error" messages (HIGH priority)
 - 🟡 Audio encoding inconsistency between WebCodecs/MediaRecorder paths (MEDIUM)
@@ -572,7 +589,6 @@ All CSS variables defined in `src/app.css`.
 - 🟡 Canvas export validation gaps (MEDIUM)
 
 **Future Development:**
-- MiniMax billing issue resolution (once account is properly linked)
 - TTS→Audiogram one-click integration (store exists, UI not wired)
 - Enhanced iOS fallback with better error guidance
 - Performance optimization (OffscreenCanvas for preview)
@@ -681,11 +697,11 @@ All CSS variables defined in `src/app.css`.
 **File:** `src/lib/audioProcessing.ts` - Audio merging logic
 
 ### 11. MiniMax Account Billing Mismatch
-**Reality:** GitHub OAuth creates separate account from direct subscription. Both can have same GroupID but only one has billing/subscription. ALWAYS verify account that was charged matches the account you're using for API requests. Symptoms: API returns empty audio despite proper implementation.
+**Reality:** GitHub OAuth creates separate account from direct subscription. Both can have same GroupID but only one has billing/subscription. ALWAYS verify account that was charged matches the account you're using for API requests. Symptoms: API returns empty audio despite proper implementation. MiniMax support has not resolved this issue.
 
 **File:** `src/routes/api/tts/+server.ts:handleMiniMax()` - Check MINIMAX_API_KEY points to correct account
 
-**Workaround:** Until resolved, route MiniMax requests to Azure/YarnGPT as fallback.
+**Workaround:** Route MiniMax requests to Azure/YarnGPT/Qwen instead. **Recommendation:** Use Qwen3-TTS voice cloning (Africa-first, working, lower cost).
 
 ### 12. Bulletin Story Audio Not Persisting
 **Reality:** Per-story TTS audio is stored as base64 in `BulletinStory.ttsAudio`. Must include in save logic when updating story. Forgetting this causes audio to be lost on reload.
@@ -714,6 +730,8 @@ All CSS variables defined in `src/app.css`.
 ### TTS Pipeline
 - [ ] Azure Nigerian voice: fast (~3s), clear
 - [ ] YarnGPT voice: slow (~30s), natural
+- [ ] Qwen3-TTS voice: 5-10s, Africa-first voices (Malawi/Zimbabwe)
+- [ ] Text cleaning: em-dashes converted, punctuation added, long clauses get commas
 - [ ] Error handling: Invalid API key shows helpful message
 - [ ] Base64 decoding: Audio plays without skips/artifacts
 - [ ] 2000 char limit: Enforced UI-side, rejected server-side if exceeded
@@ -747,10 +765,11 @@ All CSS variables defined in `src/app.css`.
 
 ### Implementing TTS Changes
 1. Start: `src/routes/api/tts/+server.ts` (handler)
-2. Reference: `src/lib/stores.ts` (voice definitions, MINIMAX_VOICES)
+2. Reference: `src/lib/stores.ts` (voice definitions)
 3. UI: `src/routes/+page.svelte` (TTS panel, two-speaker mode)
-4. **MiniMax note:** Test thoroughly before production; current API issue requires workaround
-5. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
+4. **Qwen note:** Always call `cleanForTTS()` before synthesis to improve naturalness
+5. **MiniMax note:** Do NOT use in production; account billing issue unresolved. Route to Azure/YarnGPT/Qwen instead.
+6. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
 ### Implementing Audiogram Changes
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
