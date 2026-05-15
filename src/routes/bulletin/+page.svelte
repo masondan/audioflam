@@ -4,7 +4,7 @@
   import { page } from '$app/stores';
   import { bulletinStore, getStorySource } from '$lib/stores/bulletin';
   import type { BulletinStory } from '$lib/stores/bulletin';
-  import { ALL_VOICES, preloadedTTSAudio } from '$lib/stores';
+  import { ALL_VOICES, customVoices, customVoiceToVoiceOption, preloadedTTSAudio } from '$lib/stores';
   import type { VoiceOption, TTSProvider } from '$lib/stores';
   import { concatenateAudioSegments, removeSilence } from '$lib/audioProcessing';
   import type { SilenceLevel } from '$lib/audioProcessing';
@@ -23,10 +23,17 @@
     unsub();
   });
 
+  // ─── Merged voice list (custom + built-in) ─────────────────────────────────
+
+  const voicesForDropdown = $derived([
+    ...$customVoices.map(customVoiceToVoiceOption),
+    ...ALL_VOICES
+  ]);
+
   // ─── Helper: Get voice provider ────────────────────────────────────────────
 
   function getVoiceProvider(voiceName: string | null): TTSProvider {
-    return ALL_VOICES.find(v => v.name === voiceName)?.provider ?? 'azure';
+    return voicesForDropdown.find(v => v.name === voiceName)?.provider ?? 'azure';
   }
 
   // ─── Derived state from store ──────────────────────────────────────────────
@@ -37,7 +44,7 @@
 
   // Resolve voice name → VoiceOption object for VoiceDropdown
   const selectedVoiceObj = $derived(
-    ALL_VOICES.find(v => v.name === selectedVoiceName) ?? null
+    voicesForDropdown.find(v => v.name === selectedVoiceName) ?? null
   );
 
   // ─── Bulletin playback state ───────────────────────────────────────────────
@@ -683,7 +690,7 @@
     <section class="section">
       <VoiceDropdown
         label="Voice"
-        voices={ALL_VOICES}
+        voices={voicesForDropdown}
         value={selectedVoiceObj}
         onchange={handleVoiceChange}
       />

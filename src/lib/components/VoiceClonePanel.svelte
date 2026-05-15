@@ -25,6 +25,7 @@
   // ── Processing state ──────────────────────────────────────────────────────────
   let isProcessing = $state(false);
   let processingMessage = $state('');
+  let cloneComplete = $state(false);
 
   // ── Error / warning messages ──────────────────────────────────────────────────
   let errorMessage = $state('');
@@ -58,7 +59,8 @@
     voiceName.trim().length > 0 &&
     country.trim().length > 0 &&
     recordingState === 'done' &&
-    !isProcessing
+    !isProcessing &&
+    !cloneComplete
   );
 
   // Progress bar fill percentage (capped at 100)
@@ -365,6 +367,8 @@
       processingMessage = 'Building voice clone...';
     }, 3000);
 
+    let success = false;
+
     try {
       // Step 1: Register clone
       const cloneRes = await fetch('/api/tts/clone', {
@@ -397,12 +401,7 @@
       };
 
       customVoices.update(voices => [newVoice, ...voices]);
-
-      // Reset form
-      resetRecording();
-      voiceName = '';
-      country = '';
-      warningMessage = '';
+      success = true;
 
     } catch (err) {
       showError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
@@ -410,6 +409,16 @@
       clearTimeout(msgTimeout);
       isProcessing = false;
       processingMessage = '';
+    }
+
+    if (success) {
+      cloneComplete = true;
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      cloneComplete = false;
+      resetRecording();
+      voiceName = '';
+      country = '';
+      warningMessage = '';
     }
   }
 
@@ -601,7 +610,7 @@
           disabled={isProcessing || recordingState === 'recording' || recordingState === 'countdown'}
           title="Import clone ID from JSON"
         >
-          <img src="/icons/icon-download.svg" alt="" class="btn-icon" />
+          <img src="/icons/icon-upload.svg" alt="" class="btn-icon" />
           Import ID
         </button>
       </div>
@@ -666,14 +675,6 @@
         <p class="error-message">{errorMessage}</p>
       {/if}
 
-      <!-- Processing state -->
-      {#if isProcessing}
-        <div class="processing-row">
-          <span class="spinner"></span>
-          <span class="processing-text">{processingMessage}</span>
-        </div>
-      {/if}
-
       <!-- Delete voice button -->
       <button
         class="delete-voice-btn"
@@ -687,11 +688,19 @@
       <!-- Create button -->
       <button
         class="create-btn"
+        class:create-btn--active={isProcessing || cloneComplete}
         type="button"
         onclick={handleCreate}
-        disabled={!canCreate}
+        disabled={!canCreate && !isProcessing && !cloneComplete}
       >
-        Create voice clone
+        {#if cloneComplete}
+          Clone complete
+        {:else if isProcessing}
+          <span class="btn-spinner"></span>
+          {processingMessage}
+        {:else}
+          Create voice clone
+        {/if}
       </button>
 
       <!-- Completed voice rows -->
@@ -747,6 +756,7 @@
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <ul class="read-first-list">
         <li>Add a name and country, then record or upload 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
+        <li>Upload MP3, WAV, M4V or MP4 files with single clear voice</li>
         <li>Each Clone ID is stored on your device and may be lost if you delete your device cache. Export if you wish to save or import the clone to another device.</li>
         <li>Cloned voices appear with a ★ in the dropdown list of voices. Delete cloned voices or export IDs below.</li>
       </ul>
@@ -1104,19 +1114,42 @@
     font-weight: var(--font-weight-medium);
     cursor: pointer;
     transition: background var(--transition-normal), opacity var(--transition-normal);
-    background: var(--color-primary);
-    color: #ffffff;
-    margin-top: var(--spacing-xsm);
-  }
-
-  .create-btn:hover:not(:disabled) {
-    background: #4a1d9e;
-  }
-
-  .create-btn:disabled {
     background: var(--color-border);
     color: var(--text-secondary);
     cursor: not-allowed;
+    margin-top: var(--spacing-xsm);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--spacing-sm);
+    min-height: 40px;
+  }
+
+  .create-btn--active {
+    background: var(--color-primary) !important;
+    color: #ffffff !important;
+    cursor: default !important;
+  }
+
+  .create-btn:not(:disabled):not(.create-btn--active) {
+    background: var(--color-primary);
+    color: #ffffff;
+    cursor: pointer;
+  }
+
+  .create-btn:hover:not(:disabled):not(.create-btn--active) {
+    background: #4a1d9e;
+  }
+
+  .btn-spinner {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border: 2px solid rgba(255, 255, 255, 0.4);
+    border-top-color: #ffffff;
+    border-radius: var(--radius-round);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
   }
 
   /* ── Voice rows ──────────────────────────────────────────────────────────── */

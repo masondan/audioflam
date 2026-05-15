@@ -115,6 +115,12 @@
     ...$customVoices.map(customVoiceToVoiceOption),
     ...ALL_VOICES
   ]);
+
+  // Same list for two-speaker mode (both speakers can use custom voices)
+  const voicesForSpeakerDropdowns = $derived([
+    ...$customVoices.map(customVoiceToVoiceOption),
+    ...ALL_VOICES
+  ]);
   let speaker1 = $state<VoiceOption | null>(null);
   let speaker2 = $state<VoiceOption | null>(null);
   let speaker1Open = $state(false);
@@ -221,6 +227,10 @@
   }
 
   function getFlagForVoice(voice: VoiceOption): string {
+    // Custom cloned voices
+    if (voice.provider === 'qwen' && voice.description.includes('Custom')) {
+      return '★';
+    }
     if (voice.provider === 'azure') {
       if (voice.name.startsWith('en-NG')) return '🇳🇬';
       if (voice.name.startsWith('en-GB')) return '🇬🇧';
@@ -253,6 +263,36 @@
     stopSpeakerPreview();
     speakerPreviewPlaying = voice.name;
 
+    // Custom voice: decode base64 MP3 and play directly
+    if (voice.provider === 'qwen' && voice.description.includes('Custom')) {
+      const customVoice = $customVoices.find((v: CustomVoice) => v.id === voice.name);
+      if (customVoice?.previewAudio) {
+        try {
+          // Strip data URI prefix if present
+          let base64 = customVoice.previewAudio;
+          if (base64.startsWith('data:')) {
+            base64 = base64.split(',')[1];
+          }
+
+          const bytes = atob(base64);
+          const arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'audio/mp3' });
+          speakerPreviewAudio = new Audio(URL.createObjectURL(blob));
+          speakerPreviewAudio.onended = () => { speakerPreviewPlaying = null; };
+          speakerPreviewAudio.onerror = () => { speakerPreviewPlaying = null; };
+          speakerPreviewAudio.play();
+        } catch (err) {
+          console.error('Custom voice preview decode error:', err);
+          speakerPreviewPlaying = null;
+        }
+      } else {
+        speakerPreviewPlaying = null;
+      }
+      return;
+    }
+
+    // Built-in voice: load from static /voices/ files
     const previewUrl = getPreviewFilename(voice);
     speakerPreviewAudio = new Audio(previewUrl);
     
@@ -1336,7 +1376,7 @@
           </button>
           {#if speaker1Open}
             <div class="speaker-dropdown-menu">
-              {#each ALL_VOICES as voice}
+              {#each voicesForSpeakerDropdowns as voice}
                 <div class="speaker-option-row">
                   <button
                     type="button"
@@ -1344,7 +1384,7 @@
                     class:selected={speaker1?.name === voice.name}
                     onclick={() => handleSpeaker1Change(voice)}
                   >
-                    <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
+                    <span class="voice-name"><span class="flag" class:star={voice.provider === 'qwen' && voice.description.includes('Custom')}>{getFlagForVoice(voice)}</span>{voice.displayName}</span>
                     {#if voice.provider === 'azure'}
                       <span class="speed-badge">⚡</span>
                     {/if}
@@ -1383,7 +1423,7 @@
           </button>
           {#if speaker2Open}
             <div class="speaker-dropdown-menu">
-              {#each ALL_VOICES.filter(v => !speaker1 || v.provider === speaker1.provider) as voice}
+              {#each voicesForSpeakerDropdowns.filter(v => !speaker1 || v.provider === speaker1.provider) as voice}
                 <div class="speaker-option-row">
                   <button
                     type="button"
@@ -1391,7 +1431,7 @@
                     class:selected={speaker2?.name === voice.name}
                     onclick={() => handleSpeaker2Change(voice)}
                   >
-                    <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
+                    <span class="voice-name"><span class="flag" class:star={voice.provider === 'qwen' && voice.description.includes('Custom')}>{getFlagForVoice(voice)}</span>{voice.displayName}</span>
                     {#if voice.provider === 'azure'}
                       <span class="speed-badge">⚡</span>
                     {/if}
