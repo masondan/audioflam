@@ -1,5 +1,37 @@
 import { writable } from 'svelte/store';
 
+// Voice Cloning
+export interface CustomVoice {
+	id: string;           // Qwen clone ID from DashScope (e.g. "qwen-vc-xxxx")
+	name: string;         // Max 15 chars, e.g. "Amara"
+	country: string;      // Free text, e.g. "Ghana"
+	previewAudio: string; // Base64 MP3 (NOT WAV) — generated once at clone time
+	createdAt: number;    // Date.now() timestamp
+}
+
+export const MAX_CUSTOM_VOICES = 4;
+
+export const CLONE_PREVIEW_SCRIPT = "They say change begins at the end of your comfort zone. So are you ready to change your story?";
+
+function loadCustomVoices(): CustomVoice[] {
+	// SSR guard: localStorage only exists in browser
+	if (typeof window === 'undefined') return [];
+	try {
+		return JSON.parse(localStorage.getItem('audioflam_custom_voices') ?? '[]');
+	} catch {
+		return [];
+	}
+}
+
+export const customVoices = writable<CustomVoice[]>(loadCustomVoices());
+
+customVoices.subscribe(val => {
+	// SSR guard: only save in browser
+	if (typeof window !== 'undefined') {
+		localStorage.setItem('audioflam_custom_voices', JSON.stringify(val));
+	}
+});
+
 // App State
 export const splashScreenVisible = writable(true);
 
@@ -89,3 +121,14 @@ export const transcriptionSettingsStore = writable({
 	selectedLanguage: 'auto',
 	showTimestamps: false,
 });
+
+// Helper: convert CustomVoice to VoiceOption for dropdown integration
+export function customVoiceToVoiceOption(voice: CustomVoice): VoiceOption {
+	return {
+		name: voice.id,           // Use clone ID as the voice name for TTS API
+		ssmlGender: 'FEMALE',     // Placeholder; not used for Qwen clones
+		displayName: voice.name,  // User-friendly name for dropdown
+		description: `Custom (${voice.country})`,
+		provider: 'qwen'
+	};
+}

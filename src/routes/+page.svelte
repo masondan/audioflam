@@ -11,6 +11,7 @@
   import SpeedBlockModal from '$lib/components/SpeedBlockModal.svelte';
   import SpeedSilenceControls from '$lib/components/SpeedSilenceControls.svelte';
   import AudiogramPage from '$lib/components/AudiogramPage.svelte';
+  import VoiceClonePanel from '$lib/components/VoiceClonePanel.svelte';
   import TranscribePage from '$lib/components/TranscribePage.svelte';
   import PlayButton from '$lib/components/PlayButton.svelte';
   import { removeSilence, concatenateAudioSegments, type SilenceLevel } from '$lib/audioProcessing';
@@ -1592,6 +1593,8 @@
           </div>
         {/if}
       </div>
+
+      <VoiceClonePanel />
 
       <button
         type="button"
