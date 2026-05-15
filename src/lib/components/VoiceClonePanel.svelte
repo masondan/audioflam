@@ -545,11 +545,11 @@
   {#if clonePanelOpen}
     <div class="panel-content">
 
-      <!-- Read first button -->
+      <!-- Quick start button -->
       <div class="read-first-row">
         <button class="read-first-btn" type="button" onclick={() => showReadFirst = true}>
-          <span class="info-circle">ℹ</span>
-          Read first
+          <span>Quick start</span>
+          <span class="chevron-right">›</span>
         </button>
       </div>
 
@@ -747,9 +747,9 @@
   <div class="modal-backdrop" onclick={() => showReadFirst = false} role="presentation">
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <ul class="read-first-list">
-        <li>Record 10–20 seconds of clean, fluent audio, with no background noise or echo.</li>
+        <li>Record 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
         <li>Each Clone ID is stored on your device and may be lost if you delete your device cache. Export if you wish to save or import the clone to another device.</li>
-        <li>Cloned voices appear with a ★ in the dropdown list.</li>
+        <li>Cloned voices appear with a ★ in the dropdown list of voices. Delete cloned voices or export IDs below.</li>
       </ul>
       <button class="modal-btn modal-btn-primary" type="button" onclick={() => showReadFirst = false}>Got it</button>
     </div>
@@ -865,19 +865,11 @@
     color: var(--text-primary);
   }
 
-  .info-circle {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    width: 24px;
-    height: 24px;
-    border-radius: var(--radius-round);
-    background: #444444;
-    color: #ffffff;
-    font-size: 13px;
-    font-style: normal;
-    flex-shrink: 0;
-    line-height: 1;
+  .chevron-right {
+    color: var(--color-primary);
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-bold);
+    margin-left: 2px;
   }
 
   /* ── Form fields ─────────────────────────────────────────────────────────── */
