@@ -539,7 +539,7 @@
       alt=""
       class="chevron-icon"
     />
-    <span>Clone your voice</span>
+    <span>Voice clone</span>
   </button>
 
   {#if clonePanelOpen}
@@ -674,26 +674,25 @@
         </div>
       {/if}
 
-      <!-- Delete audio + Create buttons -->
-      <div class="bottom-actions">
-        <button
-          class="delete-audio-btn"
-          type="button"
-          onclick={handleDeleteAudio}
-          disabled={recordingState !== 'done' || isProcessing}
-        >
-          Delete audio
-        </button>
+      <!-- Delete voice button -->
+      <button
+        class="delete-voice-btn"
+        type="button"
+        onclick={handleDeleteAudio}
+        disabled={recordingState !== 'done' || isProcessing}
+      >
+        Delete voice
+      </button>
 
-        <button
-          class="create-btn"
-          type="button"
-          onclick={handleCreate}
-          disabled={!canCreate}
-        >
-          Create voice clone
-        </button>
-      </div>
+      <!-- Create button -->
+      <button
+        class="create-btn"
+        type="button"
+        onclick={handleCreate}
+        disabled={!canCreate}
+      >
+        Create voice clone
+      </button>
 
       <!-- Completed voice rows -->
       {#if sortedVoices.length > 0}
@@ -747,7 +746,7 @@
   <div class="modal-backdrop" onclick={() => showReadFirst = false} role="presentation">
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <ul class="read-first-list">
-        <li>Record 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
+        <li>Add a name and country, then record or upload 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
         <li>Each Clone ID is stored on your device and may be lost if you delete your device cache. Export if you wish to save or import the clone to another device.</li>
         <li>Cloned voices appear with a ★ in the dropdown list of voices. Delete cloned voices or export IDs below.</li>
       </ul>
@@ -856,13 +855,13 @@
     background: none;
     border: none;
     cursor: pointer;
-    font-size: var(--font-size-sm);
-    color: var(--text-secondary);
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
     padding: 0;
   }
 
   .read-first-btn:hover {
-    color: var(--text-primary);
+    color: var(--color-primary);
   }
 
   .chevron-right {
@@ -917,7 +916,7 @@
     border: 1px solid var(--color-border);
     border-radius: var(--radius-md);
     background: var(--bg-white);
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--text-primary);
     cursor: pointer;
     transition: border-color var(--transition-normal), background var(--transition-normal);
@@ -1008,7 +1007,7 @@
   }
 
   .progress-placeholder {
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-base);
     color: var(--text-secondary);
     padding-left: var(--spacing-sm);
     white-space: nowrap;
@@ -1073,29 +1072,24 @@
     to { transform: rotate(360deg); }
   }
 
-  /* ── Bottom actions ──────────────────────────────────────────────────────── */
-  .bottom-actions {
-    display: flex;
-    flex-direction: column;
-    gap: var(--spacing-sm);
-  }
-
-  .delete-audio-btn {
+  /* ── Delete voice button ──────────────────────────────────────────────────── */
+  .delete-voice-btn {
+    align-self: flex-end;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: var(--font-size-sm);
+    font-size: var(--font-size-md);
     color: var(--text-secondary);
     padding: 0;
-    text-align: left;
+    margin-bottom: var(--spacing-xsm);
     transition: color var(--transition-normal);
   }
 
-  .delete-audio-btn:hover:not(:disabled) {
+  .delete-voice-btn:hover:not(:disabled) {
     color: #cc0000;
   }
 
-  .delete-audio-btn:disabled {
+  .delete-voice-btn:disabled {
     opacity: 0.4;
     cursor: not-allowed;
     pointer-events: none;
@@ -1112,6 +1106,7 @@
     transition: background var(--transition-normal), opacity var(--transition-normal);
     background: var(--color-primary);
     color: #ffffff;
+    margin-top: var(--spacing-xsm);
   }
 
   .create-btn:hover:not(:disabled) {

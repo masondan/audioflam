@@ -545,7 +545,7 @@
   function handleAudioUploadClick() {
     const input = document.createElement('input');
     input.type = 'file';
-    input.accept = 'audio/*';
+    input.accept = 'audio/*,video/mp4,.m4v,.mov';
     input.onchange = (e) => {
       const file = (e.target as HTMLInputElement).files?.[0];
       if (file) {
@@ -583,8 +583,16 @@
       subtitleSegments = [];
       subtitleActive = false;
     } catch (err) {
-      audioUploadError = err instanceof Error ? err.message : 'Failed to load audio file. Please try a different file.';
-      console.error('Failed to decode audio:', err);
+      const isVideoFile = file.type.startsWith('video/') || file.name.endsWith('.m4v') || file.name.endsWith('.mp4') || file.name.endsWith('.mov');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load audio file. Please try a different file.';
+      
+      if (isVideoFile && errorMessage.includes('browser')) {
+        audioUploadError = `Could not extract audio from video. ${errorMessage}`;
+      } else {
+        audioUploadError = errorMessage;
+      }
+      
+      console.error('[AudiogramPage] Failed to decode audio:', err);
     } finally {
       audioLoading = false;
     }

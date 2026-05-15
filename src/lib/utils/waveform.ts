@@ -36,9 +36,76 @@ export async function extractWaveformData(
 export async function decodeAudioFile(file: File): Promise<AudioBuffer> {
   const arrayBuffer = await file.arrayBuffer();
   const audioContext = new AudioContext();
-  const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
-  await audioContext.close();
-  return audioBuffer;
+  
+  try {
+    // Try native browser decoding first (works for MP3, WAV, and MP4 on most modern browsers)
+    const audioBuffer = await audioContext.decodeAudioData(arrayBuffer);
+    await audioContext.close();
+    return audioBuffer;
+  } catch (browserDecodeError) {
+    // If native decoding fails and this is a video file, try server-side extraction
+    const isVideoFile = file.type.startsWith('video/') ||
+                        file.name.endsWith('.m4v') ||
+                        file.name.endsWith('.mp4') ||
+                        file.name.endsWith('.mov');
+    
+    if (isVideoFile) {
+      try {
+        // Convert arrayBuffer to base64 for server transmission
+        const bytes = new Uint8Array(arrayBuffer);
+        let binary = '';
+        for (let i = 0; i < bytes.byteLength; i++) {
+          binary += String.fromCharCode(bytes[i]);
+        }
+        const videoBase64 = btoa(binary);
+        
+        // Call server endpoint to extract audio
+        const extractRes = await fetch('/api/audio/extract', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ videoBase64, mimeType: file.type })
+        });
+        
+        if (!extractRes.ok) {
+          // Server-side extraction not available or failed
+          // This is expected for Cloudflare Workers (no FFmpeg)
+          throw new Error(
+            `Your browser couldn't decode this video file natively. ` +
+            `Please convert to MP3 or WAV, or try a different browser (Chrome, Safari, or Edge support MP4 audio extraction).`
+          );
+        }
+        
+        const extractedData = await extractRes.json() as { audioBase64?: string; error?: string };
+        if (extractedData.error) {
+          throw new Error(extractedData.error);
+        }
+        
+        if (!extractedData.audioBase64) {
+          throw new Error('Server returned no audio data');
+        }
+        
+        // Decode extracted audio
+        const binaryString = atob(extractedData.audioBase64);
+        const extractedBytes = new Uint8Array(binaryString.length);
+        for (let i = 0; i < binaryString.length; i++) {
+          extractedBytes[i] = binaryString.charCodeAt(i);
+        }
+        
+        const audioBuffer = await audioContext.decodeAudioData(extractedBytes.buffer);
+        await audioContext.close();
+        return audioBuffer;
+      } catch (serverError) {
+        await audioContext.close();
+        throw serverError;
+      }
+    } else {
+      // Non-video file that failed to decode
+      await audioContext.close();
+      throw new Error(
+        `Unsupported audio format. Please use MP3, WAV, or a video file with audio (MP4, M4V).`
+      );
+    }
+  }
 }
 
 export interface DrawWaveformOptions {
