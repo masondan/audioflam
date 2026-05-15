@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio } from '$lib/stores';
+  import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio, customVoices, customVoiceToVoiceOption } from '$lib/stores';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
@@ -109,6 +109,12 @@
   let generationAbortController = $state<AbortController | null>(null);
   
   let twoSpeakerMode = $state(false);
+
+  // Merge custom cloned voices (top of list) with built-in voices
+  const voicesForDropdown = $derived([
+    ...$customVoices.map(customVoiceToVoiceOption),
+    ...ALL_VOICES
+  ]);
   let speaker1 = $state<VoiceOption | null>(null);
   let speaker2 = $state<VoiceOption | null>(null);
   let speaker1Open = $state(false);
@@ -1304,7 +1310,7 @@
       <div class="dropdowns-section">
         <VoiceDropdown
           label=""
-          voices={ALL_VOICES}
+          voices={voicesForDropdown}
           value={$selectedVoice}
           onchange={handleVoiceChange}
           onopen={handleVoiceDropdownOpen}

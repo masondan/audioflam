@@ -1,5 +1,6 @@
 <script lang="ts">
-  import type { VoiceOption } from '$lib/stores';
+  import type { VoiceOption, CustomVoice } from '$lib/stores';
+  import { customVoices } from '$lib/stores';
 
   interface Props {
     label: string;
@@ -12,6 +13,9 @@
   let { label, voices, value, onchange, onopen }: Props = $props();
 
   function getFlagForVoice(voice: VoiceOption): string {
+    if (voice.provider === 'qwen' && voice.description.includes('Custom')) {
+      return '★';
+    }
     if (voice.provider === 'azure') {
       if (voice.name.startsWith('en-NG')) return '🇳🇬';
       if (voice.name.startsWith('en-GB')) return '🇬🇧';
@@ -26,6 +30,10 @@
       if (voice.description.includes('Zimbabwe')) return '🇿🇼';
     }
     return '';
+  }
+
+  function isCustomVoice(voice: VoiceOption): boolean {
+    return voice.provider === 'qwen' && voice.description.includes('Custom');
   }
   
   let isOpen = $state(false);
@@ -61,6 +69,36 @@
     stopPreview();
     playingVoice = voice.name;
 
+    // Custom voice: decode base64 MP3 and play directly
+    if (isCustomVoice(voice)) {
+      const customVoice = $customVoices.find((v: CustomVoice) => v.id === voice.name);
+      if (customVoice?.previewAudio) {
+        try {
+          // Strip data URI prefix if present
+          let base64 = customVoice.previewAudio;
+          if (base64.startsWith('data:')) {
+            base64 = base64.split(',')[1];
+          }
+
+          const bytes = atob(base64);
+          const arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'audio/mp3' });
+          audioElement = new Audio(URL.createObjectURL(blob));
+          audioElement.onended = () => { playingVoice = null; };
+          audioElement.onerror = () => { console.error('Custom voice preview error'); playingVoice = null; };
+          audioElement.play();
+        } catch (err) {
+          console.error('Custom voice preview decode error:', err);
+          playingVoice = null;
+        }
+      } else {
+        playingVoice = null;
+      }
+      return;
+    }
+
+    // Built-in voice: load from static /voices/ files
     const previewUrl = getPreviewFilename(voice);
     audioElement = new Audio(previewUrl);
     
@@ -133,7 +171,7 @@
               role="option"
               aria-selected={voice.name === value?.name}
             >
-              <span class="voice-name"><span class="flag">{getFlagForVoice(voice)}</span>{voice.displayName}</span>
+              <span class="voice-name"><span class="flag" class:star={isCustomVoice(voice)}>{getFlagForVoice(voice)}</span>{voice.displayName}</span>
               {#if voice.provider === 'azure'}
                 <span class="speed-badge">⚡</span>
               {/if}
@@ -313,6 +351,10 @@
     display: inline-block;
     width: 20px;
     text-align: center;
+  }
+
+  .flag.star {
+    color: var(--color-primary);
   }
 
   .speed-badge {

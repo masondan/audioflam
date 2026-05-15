@@ -135,6 +135,27 @@ static/
 - **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing)
 - **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `cleanForTTS()` utility
 
+### User Voice Cloning
+
+- **Max clones:** 4 (enforced in UI and stored in localStorage)
+- **Storage:** `localStorage` key: `audioflam_custom_voices` (array of CustomVoice)
+- **Clone registration:** POST `/api/tts/clone` → DashScope `qwen-voice-enrollment` model
+- **Preview script:** `CLONE_PREVIEW_SCRIPT` constant in `src/lib/stores.ts`
+- **Preview audio:** Generated at clone time, transcoded to MP3, stored as base64 in localStorage
+- **Storage footprint:** ~240–480KB for 4 voices (MP3 format)
+- **Dropdown position:** Top of voice list, above all built-in voices
+- **Identifier:** Purple ★ (U+2605) in place of country flag
+- **Export format:** JSON: `{ voiceName, country, cloneId }`
+- **Filename:** `{voicename-lowercase}-voice-clone.json`
+- **Import:** File picker → parse JSON → generate preview → transcode to MP3 → add to store
+- **Recording duration:** 10–20s required. Auto-stops at 20s. Resets if under 10s.
+- **Upload validation:** Reject < 10s. Warn (allow) > 20s.
+- **Audio format:** MediaRecorder produces WebM/Opus (or MP4 on iOS), not WAV. Format field must reflect actual blob MIME type.
+- **Key files:**
+   - [`src/lib/components/VoiceClonePanel.svelte`](src/lib/components/VoiceClonePanel.svelte) — Clone UI
+   - [`src/routes/api/tts/clone/+server.ts`](src/routes/api/tts/clone/+server.ts) — Registration + deletion API
+   - [`src/lib/stores.ts`](src/lib/stores.ts) — CustomVoice type, customVoices store, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, customVoiceToVoiceOption()
+
 ### API Endpoint: POST `/api/tts`
 
 ```json

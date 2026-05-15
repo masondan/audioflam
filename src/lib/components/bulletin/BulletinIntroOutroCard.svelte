@@ -1,6 +1,6 @@
 <script lang="ts">
   import { bulletinStore, bulletinPanelStore } from '$lib/stores/bulletin';
-  import { ALL_VOICES } from '$lib/stores';
+  import { ALL_VOICES, customVoices, customVoiceToVoiceOption } from '$lib/stores';
   import type { VoiceOption } from '$lib/stores';
   import SpeedSlider from '$lib/components/SpeedSlider.svelte';
   import SilenceSlider from '$lib/components/SilenceSlider.svelte';
@@ -23,9 +23,15 @@
   let introOutroSpeed = $derived($bulletinStore.introOutroSpeed);
   let introOutroSilence = $derived($bulletinStore.introOutroSilence);
 
+  // Merge custom cloned voices (top of list) with built-in voices
+  const voicesForDropdown = $derived([
+    ...$customVoices.map(customVoiceToVoiceOption),
+    ...ALL_VOICES
+  ]);
+
   // Selected voice object derived from store voice name
   const selectedVoiceObj = $derived(
-    ALL_VOICES.find(v => v.name === introOutroVoice) ?? null
+    voicesForDropdown.find(v => v.name === introOutroVoice) ?? null
   );
 
   // Voice dropdown open state
@@ -116,6 +122,36 @@
     }
     stopVoicePreview();
     playingVoice = voice.name;
+
+    // Custom voice: decode base64 MP3 and play directly
+    if (voice.provider === 'qwen' && voice.description.includes('Custom')) {
+      const customVoice = $customVoices.find(v => v.id === voice.name);
+      if (customVoice?.previewAudio) {
+        try {
+          // Strip data URI prefix if present
+          let base64 = customVoice.previewAudio;
+          if (base64.startsWith('data:')) {
+            base64 = base64.split(',')[1];
+          }
+
+          const bytes = atob(base64);
+          const arr = new Uint8Array(bytes.length);
+          for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+          const blob = new Blob([arr], { type: 'audio/mp3' });
+          previewAudio = new Audio(URL.createObjectURL(blob));
+          previewAudio.onended = () => { playingVoice = null; };
+          previewAudio.onerror = () => { playingVoice = null; };
+          previewAudio.play();
+        } catch (err) {
+          console.error('Custom voice preview decode error:', err);
+          playingVoice = null;
+        }
+      } else {
+        playingVoice = null;
+      }
+      return;
+    }
+
     const url = getPreviewFilename(voice);
     previewAudio = new Audio(url);
     previewAudio.onended = () => { playingVoice = null; };
@@ -132,12 +168,17 @@
   }
 
   function getFlagForVoice(voice: VoiceOption): string {
+    if (voice.provider === 'qwen' && voice.description.includes('Custom')) return '★';
     if (voice.provider === 'azure') {
       if (voice.name.startsWith('en-NG')) return '🇳🇬';
       if (voice.name.startsWith('en-GB')) return '🇬🇧';
     }
     if (voice.provider === 'yarngpt') return '🇳🇬';
     if (voice.provider === 'minimax') {
+      if (voice.description.includes('Malawi')) return '🇲🇼';
+      if (voice.description.includes('Zimbabwe')) return '🇿🇼';
+    }
+    if (voice.provider === 'qwen') {
       if (voice.description.includes('Malawi')) return '🇲🇼';
       if (voice.description.includes('Zimbabwe')) return '🇿🇼';
     }
@@ -400,7 +441,7 @@
           </button>
           {#if voiceDropdownOpen}
             <ul class="dropdown-menu" role="listbox">
-              {#each ALL_VOICES as voice, i}
+              {#each voicesForDropdown as voice, i}
                 <li>
                   <div class="dropdown-option-row">
                     <button
@@ -434,7 +475,7 @@
                     </button>
                   </div>
                 </li>
-                {#if i < ALL_VOICES.length - 1}
+                {#if i < voicesForDropdown.length - 1}
                   <li class="dropdown-separator" role="separator"></li>
                 {/if}
               {/each}

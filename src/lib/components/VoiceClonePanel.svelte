@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { customVoices, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, type CustomVoice } from '$lib/stores';
+  import { customVoices, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, selectedVoice, ALL_VOICES, type CustomVoice } from '$lib/stores';
   import { requestMicrophonePermission, createMediaRecorder, stopStream } from '$lib/utils/recording';
 
   // ── Panel state ──────────────────────────────────────────────────────────────
@@ -326,6 +326,10 @@
 
     const ttsData = await ttsRes.json() as { audioContent: string; format: string };
 
+    if (!ttsData.audioContent) {
+      throw new Error('TTS returned empty audio');
+    }
+
     // Transcode WAV → MP3 via silence-removal endpoint (level: default)
     const transcodeRes = await fetch('/api/audio/silence-removal', {
       method: 'POST',
@@ -338,8 +342,13 @@
       return ttsData.audioContent;
     }
 
-    const transcodeData = await transcodeRes.json() as { audio: string };
-    return transcodeData.audio;
+    const transcodeData = await transcodeRes.json() as { audioContent: string };
+    
+    if (!transcodeData.audioContent) {
+      return ttsData.audioContent;
+    }
+    
+    return transcodeData.audioContent;
   }
 
   // ── Create voice clone ────────────────────────────────────────────────────────
@@ -406,6 +415,12 @@
 
   // ── Preview playback (completed rows) ────────────────────────────────────────
   function handlePlayPreview(voice: CustomVoice) {
+    // Guard: no preview audio stored
+    if (!voice.previewAudio) {
+      console.warn('No preview audio available for voice:', voice.name);
+      return;
+    }
+
     if (playingPreviewId === voice.id) {
       previewAudio?.pause();
       previewAudio = null;
@@ -417,15 +432,26 @@
     previewAudio = null;
     playingPreviewId = voice.id;
 
-    const bytes = atob(voice.previewAudio);
-    const arr = new Uint8Array(bytes.length);
-    for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-    const blob = new Blob([arr], { type: 'audio/mp3' });
-    const audio = new Audio(URL.createObjectURL(blob));
-    audio.onended = () => { playingPreviewId = null; previewAudio = null; };
-    audio.onerror = () => { playingPreviewId = null; previewAudio = null; };
-    audio.play();
-    previewAudio = audio;
+    try {
+      // Strip data URI prefix if present
+      let base64 = voice.previewAudio;
+      if (base64.startsWith('data:')) {
+        base64 = base64.split(',')[1];
+      }
+
+      const bytes = atob(base64);
+      const arr = new Uint8Array(bytes.length);
+      for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
+      const blob = new Blob([arr], { type: 'audio/mp3' });
+      const audio = new Audio(URL.createObjectURL(blob));
+      audio.onended = () => { playingPreviewId = null; previewAudio = null; };
+      audio.onerror = () => { playingPreviewId = null; previewAudio = null; };
+      audio.play();
+      previewAudio = audio;
+    } catch (err) {
+      console.error('Failed to play preview:', err, 'voice:', voice.name);
+      playingPreviewId = null;
+    }
   }
 
   // ── Export ────────────────────────────────────────────────────────────────────
@@ -471,6 +497,15 @@
     }).catch(() => { /* ignore */ });
 
     customVoices.update(voices => voices.filter(v => v.id !== voiceId));
+
+    // If the deleted voice was selected, reset to first built-in voice
+    selectedVoice.update(current => {
+      if (current?.name === voiceId) {
+        return ALL_VOICES[0] ?? null;
+      }
+      return current;
+    });
+
     modalTargetVoice = null;
   }
 
