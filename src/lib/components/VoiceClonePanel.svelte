@@ -88,10 +88,77 @@
     });
   }
 
+  /**
+   * Encode an AudioBuffer as a WAV file (PCM 16-bit, mono or stereo).
+   * Returns a Blob with type 'audio/wav'.
+   */
+  function audioBufferToWav(buffer: AudioBuffer): Blob {
+    const numChannels = Math.min(buffer.numberOfChannels, 2);
+    const sampleRate = buffer.sampleRate;
+    const numSamples = buffer.length;
+    const bytesPerSample = 2; // 16-bit PCM
+    const dataLength = numSamples * numChannels * bytesPerSample;
+    const wavBuffer = new ArrayBuffer(44 + dataLength);
+    const view = new DataView(wavBuffer);
+
+    function writeString(offset: number, str: string) {
+      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
+    }
+
+    writeString(0, 'RIFF');
+    view.setUint32(4, 36 + dataLength, true);
+    writeString(8, 'WAVE');
+    writeString(12, 'fmt ');
+    view.setUint32(16, 16, true);           // PCM chunk size
+    view.setUint16(20, 1, true);            // PCM format
+    view.setUint16(22, numChannels, true);
+    view.setUint32(24, sampleRate, true);
+    view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
+    view.setUint16(32, numChannels * bytesPerSample, true);
+    view.setUint16(34, 16, true);           // bits per sample
+    writeString(36, 'data');
+    view.setUint32(40, dataLength, true);
+
+    // Interleave channel data as 16-bit PCM
+    let offset = 44;
+    for (let i = 0; i < numSamples; i++) {
+      for (let ch = 0; ch < numChannels; ch++) {
+        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
+        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
+        offset += 2;
+      }
+    }
+
+    return new Blob([wavBuffer], { type: 'audio/wav' });
+  }
+
+  /**
+   * If the blob is WebM/Opus (not natively supported by DashScope),
+   * decode it via AudioContext and re-encode as WAV.
+   * Returns { blob, format } where format is the full MIME type.
+   */
+  async function normaliseAudioForCloning(blob: Blob): Promise<{ blob: Blob; format: string }> {
+    const mimeType = blob.type || 'audio/webm';
+    // Only transcode WebM — MP3, WAV, MP4/AAC are accepted natively by DashScope
+    if (!mimeType.includes('webm')) {
+      return { blob, format: mimeType };
+    }
+    try {
+      const arrayBuffer = await blob.arrayBuffer();
+      const ctx = new AudioContext();
+      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
+      await ctx.close();
+      const wavBlob = audioBufferToWav(audioBuffer);
+      console.log('[VoiceClone] Transcoded WebM→WAV, size:', wavBlob.size);
+      return { blob: wavBlob, format: 'audio/wav' };
+    } catch (err) {
+      console.warn('[VoiceClone] WebM→WAV transcode failed, sending raw:', err);
+      return { blob, format: mimeType };
+    }
+  }
+
   function getMimeBase(mimeType: string): string {
-    // 'audio/webm;codecs=opus' → 'audio/webm;codecs=opus' (full MIME type)
-    // 'audio/mp3' → 'audio/mp3'
-    // Return full MIME type so DashScope can properly decode the audio
+    // Store the full MIME type from the recorder
     return mimeType || 'audio/webm';
   }
 
@@ -371,13 +438,23 @@
     let success = false;
 
     try {
-      // Step 1: Register clone
+      // Step 1: Transcode WebM→WAV if needed (DashScope doesn't accept WebM)
+      let cloneBase64 = audioBase64;
+      let cloneFormat = audioFormat;
+      if (audioBlob) {
+        const normalised = await normaliseAudioForCloning(audioBlob);
+        cloneBase64 = await blobToBase64(normalised.blob);
+        cloneFormat = normalised.format;
+        console.log('[VoiceClone] Sending format:', cloneFormat, 'base64 length:', cloneBase64.length);
+      }
+
+      // Step 2: Register clone
       const cloneRes = await fetch('/api/tts/clone', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          audioBase64,
-          audioFormat,
+          audioBase64: cloneBase64,
+          audioFormat: cloneFormat,
           preferredName: voiceName.trim().toLowerCase().replace(/\s+/g, '_')
         })
       });

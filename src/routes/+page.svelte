@@ -2,7 +2,7 @@
   import { onMount } from 'svelte';
   import { page } from '$app/stores';
   import { goto } from '$app/navigation';
-  import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio, customVoices, customVoiceToVoiceOption } from '$lib/stores';
+  import { ALL_VOICES, selectedVoice, textInput, preloadedTTSAudio, customVoices, customVoiceToVoiceOption, type CustomVoice } from '$lib/stores';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import type { VoiceOption } from '$lib/stores';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
