@@ -89,9 +89,10 @@
   }
 
   function getMimeBase(mimeType: string): string {
-    // 'audio/webm;codecs=opus' → 'webm'
-    const base = mimeType.split(';')[0].split('/')[1];
-    return base || 'webm';
+    // 'audio/webm;codecs=opus' → 'audio/webm;codecs=opus' (full MIME type)
+    // 'audio/mp3' → 'audio/mp3'
+    // Return full MIME type so DashScope can properly decode the audio
+    return mimeType || 'audio/webm';
   }
 
   function resetRecording() {
