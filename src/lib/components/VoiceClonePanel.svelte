@@ -226,7 +226,7 @@
       const blob = new Blob(recordingChunks, { type: recorder.mimeType });
       if (recordingSeconds < 10) {
         resetRecording();
-        showError('Too short. Your recording must be over 10 seconds.');
+        showError('A little too short. Try again.');
         return;
       }
       audioBlob = blob;
@@ -310,7 +310,7 @@
     }
 
     if (duration < 10) {
-      showError('Too short. Your recording must be over 10 seconds.');
+      showError('A little too short. Try again.');
       return;
     }
 
