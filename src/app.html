@@ -51,6 +51,14 @@
 		}
 		</script>
 		
+		<!-- Suppress PWA install prompt for sub-app (part of flamtools.com suite) -->
+		<script>
+			window.addEventListener('beforeinstallprompt', (e) => {
+				e.preventDefault();
+				// Suppress install prompt — app behaves as PWA without install UI
+			});
+		</script>
+		
 		%sveltekit.head%
 	</head>
 	<body data-sveltekit-preload-data="hover">

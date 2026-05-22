@@ -4,7 +4,7 @@
   "description": "A mobile-first, AI text-to-voice and audiogram app for journalists and content creators. Convert scripts to audio and create stunning audiograms with waveforms and effects.",
   "start_url": "/",
   "scope": "/",
-  "display": "browser",
+  "display": "standalone",
   "orientation": "portrait-primary",
   "background_color": "#5422b0",
   "theme_color": "#5422b0",

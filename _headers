@@ -1,2 +1,10 @@
+/manifest.json
+  Content-Type: application/manifest+json
+  Cache-Control: no-cache, must-revalidate
+
+/service-worker.js
+  Content-Type: application/javascript
+  Cache-Control: no-cache, must-revalidate
+
 /flam-nav.js
   Cache-Control: no-cache, must-revalidate
