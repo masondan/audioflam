@@ -5,7 +5,7 @@ import type { RequestHandler } from './$types';
 // POST /api/tts/clone — Register a new voice clone with DashScope
 export const POST: RequestHandler = async ({ request }) => {
 	try {
-		const { audioBase64, audioFormat, preferredName } = await request.json();
+		const { audioBase64, audioFormat, preferredName, text } = await request.json();
 
 		if (!audioBase64) {
 			return json({ error: 'audioBase64 is required' }, { status: 400 });
@@ -22,12 +22,6 @@ export const POST: RequestHandler = async ({ request }) => {
 			return json({ error: 'Voice cloning is not configured' }, { status: 503 });
 		}
 
-		// Use full MIME type as-is (e.g. "audio/webm;codecs=opus" or "audio/mp3")
-		// DashScope needs complete codec info to properly decode WebM+Opus streams
-		const mimeType = audioFormat.startsWith('audio/')
-			? audioFormat
-			: `audio/${audioFormat}`;
-
 		const response = await fetch(
 			'https://dashscope-intl.aliyuncs.com/api/v1/services/audio/tts/customization',
 			{
@@ -42,8 +36,10 @@ export const POST: RequestHandler = async ({ request }) => {
 						action: 'create',
 						target_model: 'qwen3-tts-vc-2026-01-22',
 						preferred_name: preferredName,
+						language: 'en',
+						text: text,
 						audio: {
-							data: `data:${mimeType};base64,${audioBase64}`
+							data: `data:${audioFormat};base64,${audioBase64}`
 						}
 					}
 				})

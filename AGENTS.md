@@ -2,7 +2,7 @@
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam
 **Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + Qwen Voice Cloning)
-**Updated:** May 2026 (Latest: Qwen3-TTS voice cloning + text cleaning for naturalness)
+**Updated:** June 2026 (Latest: Qwen3-TTS voice cloning + text cleaning for naturalness)
 
 ---
 
@@ -47,8 +47,8 @@ src/
 │       ├── bulletin-script/+server.ts # Gemini script generation (summary/explainer)
 │       ├── audio/
 │       │   ├── silence-removal/+server.ts # Silence removal
-│       │   └── normalize/+server.ts       # Audio normalization
-│       └── normalize/+server.ts   # Audio normalization (legacy path)
+│       │   └── normalize/+server.ts       # Audio normalization (new path)
+│       └── normalize/+server.ts   # Audio normalization (legacy/deprecated path - do not use)
 ├── lib/
 │   ├── audioProcessing.ts        # Audio processing utilities (silence, concatenation)
 │   ├── stores.ts                 # Voice definitions, app state, preloadedTTSAudio
@@ -539,7 +539,7 @@ All CSS variables defined in `src/app.css`.
 6. **Host header required** - Azure requests in Cloudflare Workers need explicit `Host` header
 7. **Audio format consistency** - All responses must include `format: 'mp3'` or `'wav'` field
 8. **Robots.txt noindex** - Must remain in `static/robots.txt` (educational use only)
-9. **Manifest.json display** - Currently set to `"display": "browser"` (not standalone)
+9. **Manifest.json display** - Currently set to `"display": "standalone"`
 10. **Text cleaning for Qwen** - Always call `cleanForTTS()` before Qwen synthesis (improves naturalness, preserves author intent)
 
 ### Export-Specific Gotchas

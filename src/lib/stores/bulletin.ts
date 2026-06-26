@@ -134,13 +134,14 @@ function createBulletinStore() {
 			});
 		},
 
-		/** Clear the assembled bulletin audio + intro/outro TTS (e.g. after editing stories or changing settings) */
+		/** Clear the assembled bulletin audio + intro/outro TTS + per-story TTS cache (e.g. after editing stories or changing voice) */
 		clearBulletinAudio() {
 			update((s) => ({
 				...s,
 				bulletinAudio: null,
 				introTtsAudio: null,
 				outroTtsAudio: null,
+				stories: s.stories.map(story => ({ ...story, ttsAudio: null })),
 			}));
 		},
 	

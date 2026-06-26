@@ -1,6 +1,7 @@
 <script lang="ts">
   import { customVoices, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, selectedVoice, ALL_VOICES, type CustomVoice } from '$lib/stores';
   import { requestMicrophonePermission, createMediaRecorder, stopStream } from '$lib/utils/recording';
+  import { prepareAudioForCloning } from '$lib/utils/audioPrep';
 
   // ── Panel state ──────────────────────────────────────────────────────────────
   let clonePanelOpen = $state(false);
@@ -88,80 +89,6 @@
     });
   }
 
-  /**
-   * Encode an AudioBuffer as a WAV file (PCM 16-bit, mono or stereo).
-   * Returns a Blob with type 'audio/wav'.
-   */
-  function audioBufferToWav(buffer: AudioBuffer): Blob {
-    const numChannels = Math.min(buffer.numberOfChannels, 2);
-    const sampleRate = buffer.sampleRate;
-    const numSamples = buffer.length;
-    const bytesPerSample = 2; // 16-bit PCM
-    const dataLength = numSamples * numChannels * bytesPerSample;
-    const wavBuffer = new ArrayBuffer(44 + dataLength);
-    const view = new DataView(wavBuffer);
-
-    function writeString(offset: number, str: string) {
-      for (let i = 0; i < str.length; i++) view.setUint8(offset + i, str.charCodeAt(i));
-    }
-
-    writeString(0, 'RIFF');
-    view.setUint32(4, 36 + dataLength, true);
-    writeString(8, 'WAVE');
-    writeString(12, 'fmt ');
-    view.setUint32(16, 16, true);           // PCM chunk size
-    view.setUint16(20, 1, true);            // PCM format
-    view.setUint16(22, numChannels, true);
-    view.setUint32(24, sampleRate, true);
-    view.setUint32(28, sampleRate * numChannels * bytesPerSample, true);
-    view.setUint16(32, numChannels * bytesPerSample, true);
-    view.setUint16(34, 16, true);           // bits per sample
-    writeString(36, 'data');
-    view.setUint32(40, dataLength, true);
-
-    // Interleave channel data as 16-bit PCM
-    let offset = 44;
-    for (let i = 0; i < numSamples; i++) {
-      for (let ch = 0; ch < numChannels; ch++) {
-        const sample = Math.max(-1, Math.min(1, buffer.getChannelData(ch)[i]));
-        view.setInt16(offset, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
-        offset += 2;
-      }
-    }
-
-    return new Blob([wavBuffer], { type: 'audio/wav' });
-  }
-
-  /**
-   * If the blob is WebM/Opus (not natively supported by DashScope),
-   * decode it via AudioContext and re-encode as WAV.
-   * Returns { blob, format } where format is the full MIME type.
-   */
-  async function normaliseAudioForCloning(blob: Blob): Promise<{ blob: Blob; format: string }> {
-    const mimeType = blob.type || 'audio/webm';
-    // Only transcode WebM — MP3, WAV, MP4/AAC are accepted natively by DashScope
-    if (!mimeType.includes('webm')) {
-      return { blob, format: mimeType };
-    }
-    try {
-      const arrayBuffer = await blob.arrayBuffer();
-      const ctx = new AudioContext();
-      const audioBuffer = await ctx.decodeAudioData(arrayBuffer);
-      await ctx.close();
-      const wavBlob = audioBufferToWav(audioBuffer);
-      console.log('[VoiceClone] Transcoded WebM→WAV, size:', wavBlob.size);
-      return { blob: wavBlob, format: 'audio/wav' };
-    } catch (err) {
-      console.warn('[VoiceClone] WebM→WAV transcode failed, sending raw:', err);
-      return { blob, format: mimeType };
-    }
-  }
-
-  function getMimeBase(mimeType: string): string {
-    // Store the full MIME type from the recorder
-    return mimeType || 'audio/webm';
-  }
-
   function resetRecording() {
     if (recordingInterval) { clearInterval(recordingInterval); recordingInterval = null; }
     if (countdownTimeout) { clearTimeout(countdownTimeout); countdownTimeout = null; }
@@ -216,7 +143,7 @@
     recordingChunks = [];
     const recorder = createMediaRecorder(mediaStream);
     mediaRecorder = recorder;
-    audioFormat = getMimeBase(recorder.mimeType);
+    // audioFormat will be set to 'audio/wav' after prepareAudioForCloning() runs
 
     recorder.ondataavailable = (e) => {
       if (e.data.size > 0) recordingChunks.push(e.data);
@@ -226,11 +153,29 @@
       const blob = new Blob(recordingChunks, { type: recorder.mimeType });
       if (recordingSeconds < 10) {
         resetRecording();
-        showError('A little too short. Try again.');
+        showError('Recording is too short. Please record for at least 10 seconds.');
         return;
       }
-      audioBlob = blob;
-      audioBase64 = await blobToBase64(blob);
+
+      try {
+        processingMessage = 'Analyzing recording...';
+        isProcessing = true;
+        const processed = await prepareAudioForCloning(blob);
+        audioBlob = processed.blob;
+        audioBase64 = await blobToBase64(processed.blob);
+        audioFormat = 'audio/wav'; // Always WAV after processing
+        if (processed.warnings.length > 0) {
+          warningMessage = processed.warnings.join(' ');
+        }
+      } catch (err) {
+        resetRecording();
+        showError(err instanceof Error ? err.message : 'Audio processing failed.');
+        return;
+      } finally {
+        isProcessing = false;
+        processingMessage = '';
+      }
+      
       recordingState = 'done';
       stopStream(mediaStream);
       mediaStream = null;
@@ -296,33 +241,26 @@
     warningMessage = '';
     errorMessage = '';
 
-    // Decode to get duration
-    let duration: number;
     try {
-      const arrayBuffer = await file.arrayBuffer();
-      const ctx = new AudioContext();
-      const buffer = await ctx.decodeAudioData(arrayBuffer);
-      await ctx.close();
-      duration = buffer.duration;
-    } catch {
-      showError('Could not read audio file. Please try a different file.');
+      processingMessage = 'Analyzing uploaded audio...';
+      isProcessing = true;
+      const processed = await prepareAudioForCloning(file);
+      audioBlob = processed.blob;
+      audioBase64 = await blobToBase64(processed.blob);
+      audioFormat = 'audio/wav'; // Always WAV after processing
+      if (processed.warnings.length > 0) {
+        warningMessage = processed.warnings.join(' ');
+      }
+      // Estimate duration from WAV size: (bytes / 2 bytes/sample) / 24000 samples/sec
+      recordingSeconds = Math.round(processed.blob.size / (24000 * 2));
+      recordingState = 'done';
+    } catch (err) {
+      showError(err instanceof Error ? err.message : 'Audio processing failed.');
       return;
+    } finally {
+      isProcessing = false;
+      processingMessage = '';
     }
-
-    if (duration < 10) {
-      showError('A little too short. Try again.');
-      return;
-    }
-
-    if (duration > 20) {
-      warningMessage = 'Recording over 20s — only the first 20s will be used.';
-    }
-
-    audioBlob = file;
-    audioBase64 = await blobToBase64(file);
-    audioFormat = getMimeBase(file.type) || 'mp3';
-    recordingSeconds = Math.round(Math.min(duration, 20));
-    recordingState = 'done';
   }
 
   // ── Import ID ─────────────────────────────────────────────────────────────────
@@ -439,14 +377,10 @@
 
     try {
       // Step 1: Transcode WebM→WAV if needed (DashScope doesn't accept WebM)
-      let cloneBase64 = audioBase64;
-      let cloneFormat = audioFormat;
-      if (audioBlob) {
-        const normalised = await normaliseAudioForCloning(audioBlob);
-        cloneBase64 = await blobToBase64(normalised.blob);
-        cloneFormat = normalised.format;
-        console.log('[VoiceClone] Sending format:', cloneFormat, 'base64 length:', cloneBase64.length);
-      }
+      // Audio is already prepared and transcoded to WAV by prepareAudioForCloning
+      // in handleRecord() or handleFileSelected()
+      const cloneBase64 = audioBase64;
+      const cloneFormat = audioFormat; // Should always be 'audio/wav' now
 
       // Step 2: Register clone
       const cloneRes = await fetch('/api/tts/clone', {
@@ -529,7 +463,10 @@
       const bytes = atob(base64);
       const arr = new Uint8Array(bytes.length);
       for (let i = 0; i < bytes.length; i++) arr[i] = bytes.charCodeAt(i);
-      const blob = new Blob([arr], { type: 'audio/mp3' });
+      // Sniff MIME type: WAV starts with "RIFF" (0x52 0x49 0x46 0x46), MP3 otherwise
+      const isWav = arr[0] === 0x52 && arr[1] === 0x49 && arr[2] === 0x46 && arr[3] === 0x46;
+      const mimeType = isWav ? 'audio/wav' : 'audio/mp3';
+      const blob = new Blob([arr], { type: mimeType });
       const audio = new Audio(URL.createObjectURL(blob));
       audio.onended = () => { playingPreviewId = null; previewAudio = null; };
       audio.onerror = () => { playingPreviewId = null; previewAudio = null; };
@@ -726,11 +663,13 @@
           <div class="progress-track">
             {#if recordingState === 'idle' || recordingState === 'countdown'}
               <span class="progress-placeholder">Speak clearly for 10–20s</span>
-            {:else}
+            {:else if recordingState === 'recording'}
               <div
                 class="progress-fill"
                 style="width: {progressPercent}%; background: {progressColor};"
               ></div>
+            {:else if isProcessing}
+              <span class="progress-placeholder">{processingMessage}</span>
             {/if}
           </div>
 
@@ -835,6 +774,7 @@
       <ul class="read-first-list">
         <li>Add a name and country, then record or upload 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
         <li>Upload MP3, WAV, M4V or MP4 files with single clear voice</li>
+        <li>**Read the displayed script conversationally**, as if explaining something to a colleague — not as a script read.</li>
         <li>Each Clone ID is stored on your device and may be lost if you delete your device cache. Export if you wish to save or import the clone to another device.</li>
         <li>Cloned voices appear with a ★ in the dropdown list of voices. Delete cloned voices or export IDs below.</li>
       </ul>
@@ -1098,6 +1038,17 @@
     font-size: var(--font-size-base);
     color: var(--text-secondary);
     padding-left: var(--spacing-sm);
+    white-space: nowrap;
+  }
+
+  .recording-script {
+    font-size: var(--font-size-sm);
+    color: var(--text-primary);
+    margin: 0;
+    padding: 0 var(--spacing-sm);
+    line-height: var(--line-height-normal);
+    overflow: hidden;
+    text-overflow: ellipsis;
     white-space: nowrap;
   }
 

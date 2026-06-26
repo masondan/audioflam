@@ -27,6 +27,7 @@
 		"dotenv": "^17.2.3",
 		"lamejs": "^1.2.1",
 		"mediabunny": "^1.31.0",
-		"soundtouchjs": "^0.2.1"
+		"soundtouchjs": "^0.2.1",
+		"standardized-audio-context": "^25.3.77"
 	}
 }
