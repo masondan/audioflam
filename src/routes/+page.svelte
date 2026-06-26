@@ -2302,6 +2302,10 @@
     cursor: not-allowed;
   }
 
+  .adjust-audio-section {
+    margin-bottom: calc(var(--spacing-md) - var(--spacing-lg));
+  }
+
   .adjust-audio-section.inactive .adjust-audio-label {
     color: var(--text-secondary);
   }
@@ -2311,7 +2315,7 @@
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 12px var(--spacing-md);
+    padding: var(--spacing-md);
     background: none;
     border: none;
     cursor: pointer;

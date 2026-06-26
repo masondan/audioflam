@@ -13,7 +13,7 @@ export const MAX_CUSTOM_VOICES = 4;
 
 export const CLONE_PREVIEW_SCRIPT = "They say change begins at the end of your comfort zone. So are you ready to change your story?";
 
-export const CLONE_RECORDING_SCRIPT = "Good morning. Today we're looking at the latest developments across the region. There's been significant progress on the infrastructure project, and community leaders say they're cautiously optimistic about what comes next.";
+export const CLONE_RECORDING_SCRIPT = "Hello and welcome. Today we're bringing you good news from across the region. A new project that aims to make life better for people of all ages has started after a major community campaign. Leaders say the project will deliver exciting benefits for everyone.";
 
 function loadCustomVoices(): CustomVoice[] {
 	// SSR guard: localStorage only exists in browser

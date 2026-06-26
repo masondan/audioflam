@@ -1,10 +1,11 @@
 <script lang="ts">
-  import { customVoices, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, selectedVoice, ALL_VOICES, type CustomVoice } from '$lib/stores';
+  import { customVoices, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, CLONE_RECORDING_SCRIPT, selectedVoice, ALL_VOICES, type CustomVoice } from '$lib/stores';
   import { requestMicrophonePermission, createMediaRecorder, stopStream } from '$lib/utils/recording';
   import { prepareAudioForCloning } from '$lib/utils/audioPrep';
 
   // ── Panel state ──────────────────────────────────────────────────────────────
   let clonePanelOpen = $state(false);
+  let scriptOpen = $state(false);
 
   // ── Form fields ──────────────────────────────────────────────────────────────
   let voiceName = $state('');
@@ -563,23 +564,22 @@
 <div class="clone-panel">
   <!-- svelte-ignore a11y_no_static_element_interactions -->
   <!-- svelte-ignore a11y_click_events_have_key_events -->
-  <button class="panel-header" type="button" onclick={() => clonePanelOpen = !clonePanelOpen}>
+  <button class="panel-header" class:open={clonePanelOpen} type="button" onclick={() => clonePanelOpen = !clonePanelOpen}>
+    <span>Voice clone</span>
     <img
       src={clonePanelOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
       alt=""
       class="chevron-icon"
     />
-    <span>Voice clone</span>
   </button>
 
   {#if clonePanelOpen}
     <div class="panel-content">
 
-      <!-- Quick start button -->
+      <!-- Read First button -->
       <div class="read-first-row">
         <button class="read-first-btn" type="button" onclick={() => showReadFirst = true}>
-          <span>Quick start</span>
-          <span class="chevron-right">›</span>
+          Read First
         </button>
       </div>
 
@@ -600,6 +600,24 @@
           bind:value={country}
           disabled={isProcessing}
         />
+      </div>
+
+      <!-- Recording Script dropdown -->
+      <div class="script-dropdown">
+        <button class="script-header" class:script-open={scriptOpen} type="button" onclick={() => scriptOpen = !scriptOpen}>
+          <span>Recording Script</span>
+          <img
+            src={scriptOpen ? '/icons/icon-collapse.svg' : '/icons/icon-expand.svg'}
+            alt=""
+            class="script-chevron"
+          />
+        </button>
+        {#if scriptOpen}
+          <div class="script-body">
+            <p class="script-hint">Ready? Tap record and speak after the countdown ...</p>
+            <p class="script-text">{CLONE_RECORDING_SCRIPT}</p>
+          </div>
+        {/if}
       </div>
 
       <!-- Action buttons row -->
@@ -783,11 +801,10 @@
   <div class="modal-backdrop" onclick={() => showReadFirst = false} role="presentation">
     <div class="modal-content" onclick={(e) => e.stopPropagation()}>
       <ul class="read-first-list">
-        <li>Add a name and country, then record or upload 10–20 seconds of clean, fluent audio, with no background noise or echo. Recording stops automatically at 20 seconds. Longer uploads are trimmed.</li>
-        <li>Upload MP3, WAV, M4V or MP4 files with single clear voice</li>
-        <li>**Read the displayed script conversationally**, as if explaining something to a colleague — not as a script read.</li>
-        <li>Each Clone ID is stored on your device and may be lost if you delete your device cache. Export if you wish to save or import the clone to another device.</li>
-        <li>Cloned voices appear with a ★ in the dropdown list of voices. Delete cloned voices or export IDs below.</li>
+        <li><strong>To create a voice clone ...</strong></li>
+        <li>Add a name and country, then record or upload 10–20 seconds of clean audio with no background noise or echo. Read the script in a natural, relaxed voice. Recording stops automatically at 20 seconds.</li>
+        <li>After adding your voice, tap Create voice clone. Your cloned voice will appear below and with a ★ in the dropdown list of voices. You can have a maximum of four cloned voices.</li>
+        <li>Each clone has its own ID number, which lives on your device. Cloned voices may be lost if you delete your device cache. You can download a clone ID to save it or import to another device.</li>
       </ul>
       <button class="modal-btn modal-btn-primary" type="button" onclick={() => showReadFirst = false}>Got it</button>
     </div>
@@ -851,6 +868,7 @@
   .panel-header {
     display: flex;
     align-items: center;
+    justify-content: space-between;
     gap: var(--spacing-sm);
     width: 100%;
     padding: var(--spacing-md);
@@ -866,6 +884,15 @@
 
   .panel-header:hover {
     background: var(--color-highlight);
+  }
+
+  .panel-header:not(.open) span {
+    color: var(--text-secondary);
+  }
+
+  .panel-header.open span {
+    color: var(--text-primary);
+    font-weight: var(--font-weight-semibold);
   }
 
   .chevron-icon {
@@ -885,29 +912,20 @@
   /* ── Read first ──────────────────────────────────────────────────────────── */
   .read-first-row {
     display: flex;
+    justify-content: center;
   }
 
   .read-first-btn {
-    display: flex;
-    align-items: center;
-    gap: var(--spacing-xs);
     background: none;
     border: none;
     cursor: pointer;
     font-size: var(--font-size-base);
-    color: var(--text-primary);
+    color: var(--color-primary);
     padding: 0;
   }
 
   .read-first-btn:hover {
-    color: var(--color-primary);
-  }
-
-  .chevron-right {
-    color: var(--color-primary);
-    font-size: var(--font-size-base);
-    font-weight: var(--font-weight-bold);
-    margin-left: 2px;
+    opacity: 0.8;
   }
 
   /* ── Form fields ─────────────────────────────────────────────────────────── */
@@ -937,6 +955,66 @@
   .text-input:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* ── Recording Script dropdown ───────────────────────────────────────────── */
+  .script-dropdown {
+    border: 1px solid var(--color-border);
+    border-radius: var(--radius-sm);
+    overflow: hidden;
+  }
+
+  .script-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    padding: var(--spacing-sm) var(--spacing-md);
+    background: none;
+    border: none;
+    cursor: pointer;
+    font-size: var(--font-size-base);
+    font-weight: var(--font-weight-regular);
+    color: var(--text-secondary);
+    text-align: left;
+    transition: background var(--transition-normal);
+  }
+
+  .script-header.script-open {
+    font-weight: var(--font-weight-semibold);
+    color: var(--text-primary);
+  }
+
+  .script-header:hover {
+    background: var(--color-highlight);
+  }
+
+  .script-chevron {
+    width: 18px;
+    height: 18px;
+    flex-shrink: 0;
+  }
+
+  .script-body {
+    padding: var(--spacing-sm) var(--spacing-md) var(--spacing-md);
+    border-top: 1px solid var(--color-border);
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
+  .script-hint {
+    font-size: var(--font-size-sm);
+    color: #777777;
+    margin: 0;
+    line-height: var(--line-height-normal);
+  }
+
+  .script-text {
+    font-size: var(--font-size-base);
+    color: var(--text-primary);
+    margin: 0;
+    line-height: var(--line-height-relaxed);
   }
 
   /* ── Action buttons row ──────────────────────────────────────────────────── */
@@ -1254,9 +1332,10 @@
   .modal-backdrop {
     position: fixed;
     top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 480px;
+    height: 100vh;
     background: rgba(0, 0, 0, 0.2);
     display: flex;
     align-items: center;
