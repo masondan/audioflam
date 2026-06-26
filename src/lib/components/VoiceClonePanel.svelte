@@ -21,6 +21,8 @@
 
   // ── Playback state ────────────────────────────────────────────────────────────
   let isPlayingRecording = $state(false);
+  let playbackCurrentTime = $state(0);
+  let playbackDuration = $state(0);
   let playbackAudio: HTMLAudioElement | null = null;
 
   // ── Processing state ──────────────────────────────────────────────────────────
@@ -110,6 +112,8 @@
       playbackAudio = null;
     }
     isPlayingRecording = false;
+    playbackCurrentTime = 0;
+    playbackDuration = 0;
   }
 
   // ── Record ────────────────────────────────────────────────────────────────────
@@ -214,8 +218,10 @@
     }
     const url = URL.createObjectURL(audioBlob);
     playbackAudio = new Audio(url);
-    playbackAudio.onended = () => { isPlayingRecording = false; playbackAudio = null; };
-    playbackAudio.onerror = () => { isPlayingRecording = false; playbackAudio = null; };
+    playbackAudio.onloadedmetadata = () => { playbackDuration = playbackAudio?.duration ?? 0; };
+    playbackAudio.ontimeupdate = () => { playbackCurrentTime = playbackAudio?.currentTime ?? 0; };
+    playbackAudio.onended = () => { isPlayingRecording = false; playbackCurrentTime = 0; playbackDuration = 0; playbackAudio = null; };
+    playbackAudio.onerror = () => { isPlayingRecording = false; playbackCurrentTime = 0; playbackDuration = 0; playbackAudio = null; };
     playbackAudio.play();
     isPlayingRecording = true;
   }
@@ -667,6 +673,11 @@
               <div
                 class="progress-fill"
                 style="width: {progressPercent}%; background: {progressColor};"
+              ></div>
+            {:else if recordingState === 'done' && isPlayingRecording && playbackDuration > 0}
+              <div
+                class="progress-fill"
+                style="width: {Math.min((playbackCurrentTime / playbackDuration) * 100, 100)}%; background: #CCFFCC;"
               ></div>
             {:else if isProcessing}
               <span class="progress-placeholder">{processingMessage}</span>
