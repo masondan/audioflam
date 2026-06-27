@@ -25,6 +25,7 @@
   let playbackCurrentTime = $state(0);
   let playbackDuration = $state(0);
   let playbackAudio: HTMLAudioElement | null = null;
+  let playbackObjectUrl: string | null = null;
 
   // ── Processing state ──────────────────────────────────────────────────────────
   let isProcessing = $state(false);
@@ -125,6 +126,10 @@
     if (playbackAudio) {
       playbackAudio.pause();
       playbackAudio = null;
+    }
+    if (playbackObjectUrl) {
+      URL.revokeObjectURL(playbackObjectUrl);
+      playbackObjectUrl = null;
     }
     isPlayingRecording = false;
     playbackCurrentTime = 0;
@@ -231,7 +236,12 @@
       stopPlayback();
       return;
     }
+    // Revoke any previous object URL before creating a new one
+    if (playbackObjectUrl) {
+      URL.revokeObjectURL(playbackObjectUrl);
+    }
     const url = URL.createObjectURL(audioBlob);
+    playbackObjectUrl = url;
     playbackAudio = new Audio(url);
     playbackAudio.onloadedmetadata = () => { playbackDuration = playbackAudio?.duration ?? 0; };
     playbackAudio.ontimeupdate = () => { playbackCurrentTime = playbackAudio?.currentTime ?? 0; };
@@ -410,7 +420,8 @@
         body: JSON.stringify({
           audioBase64: cloneBase64,
           audioFormat: cloneFormat,
-          preferredName: voiceName.trim().toLowerCase().replace(/\s+/g, '_')
+          preferredName: voiceName.trim().toLowerCase().replace(/\s+/g, '_'),
+          text: CLONE_RECORDING_SCRIPT
         })
       });
 
@@ -1269,8 +1280,12 @@
     flex-shrink: 0;
   }
 
+  .delete-voice-btn:not(:disabled) {
+    color: var(--color-primary);
+  }
+
   .delete-voice-btn:hover:not(:disabled) {
-    color: #cc0000;
+    opacity: 0.8;
   }
 
   .delete-voice-btn:disabled {
