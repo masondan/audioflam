@@ -93,13 +93,23 @@ export const QWEN_VOICES: VoiceOption[] = [
 	{ name: 'qwen-tts-vc-zim-voice-20260511195904106-121a', ssmlGender: 'MALE', displayName: 'Precious (Zimbabwe)', description: 'Zimbabwe English male', provider: 'qwen' }
 ];
 
-// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then British)
+// Qwen3-TTS Voice Clones (Welsh English)
+// Enrolled via: node --env-file=.env scripts/enroll_welsh_voices.js (June 27, 2026)
+// Voice IDs stored in .env as VOICE_WALES_FEMALE, VOICE_WALES_MALE
+export const QWEN_WELSH_VOICES: VoiceOption[] = [
+	// Welsh English
+	{ name: 'qwen-tts-vc-ffion-voice-20260628021453526-424a', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-owain-voice-20260627234209804-bd83', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
+];
+
+// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then British, then Welsh)
 // Note: MINIMAX_VOICES hidden from dropdown (API currently non-functional)
 export const ALL_VOICES: VoiceOption[] = [
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-NG')),
 	...YARNGPT_VOICES,
 	...QWEN_VOICES,
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
+	...QWEN_WELSH_VOICES,
 ];
 
 export const selectedVoice = writable<VoiceOption | null>(null);
