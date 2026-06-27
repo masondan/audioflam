@@ -72,6 +72,20 @@
   // Colour: green if ≥10s, red if <10s
   let progressColor = $derived(recordingSeconds >= 10 ? '#CCFFCC' : '#FFCCCC');
 
+  // Static waveform SVG path (computed once, not reactive)
+  const staticWaveformPath = (() => {
+    const points = [];
+    const amplitude = 12;
+    const frequency = 0.08;
+    const numPoints = 100;
+    for (let i = 0; i <= numPoints; i++) {
+      const x = (i / numPoints) * 300;
+      const y = 20 + amplitude * Math.sin(frequency * x * Math.PI);
+      points.push(`${x},${y}`);
+    }
+    return `M${points.join('L')}`;
+  })();
+
   // ── Helpers ───────────────────────────────────────────────────────────────────
   function showError(msg: string, duration = 3000) {
     errorMessage = msg;
@@ -654,9 +668,10 @@
         </button>
       </div>
 
-      <!-- Progress bar -->
+      <!-- Progress bar + footer -->
+      <div class="progress-group">
       <div class="progress-container">
-        <div class="progress-bar-frame">
+        <div class="progress-bar-frame" class:has-audio={audioBlob !== null}>
           <!-- Left icon area -->
           <div class="progress-icon-area">
             {#if recordingState === 'countdown'}
@@ -665,7 +680,7 @@
               <button class="icon-btn stop-btn" type="button" onclick={handleStopButton} title="Stop recording">
                 <img src="/icons/icon-square-new.svg" alt="Stop" class="icon-img" />
               </button>
-            {:else if recordingState === 'done'}
+            {:else if audioBlob !== null}
               <button
                 class="icon-btn play-btn"
                 type="button"
@@ -685,18 +700,21 @@
 
           <!-- Progress fill -->
           <div class="progress-track">
-            {#if recordingState === 'idle' || recordingState === 'countdown'}
-              <span class="progress-placeholder">Speak clearly for 10–20s</span>
-            {:else if recordingState === 'recording'}
+            {#if recordingState === 'recording'}
               <div
                 class="progress-fill"
                 style="width: {progressPercent}%; background: {progressColor};"
               ></div>
-            {:else if recordingState === 'done' && isPlayingRecording && playbackDuration > 0}
-              <div
-                class="progress-fill"
-                style="width: {Math.min((playbackCurrentTime / playbackDuration) * 100, 100)}%; background: #CCFFCC;"
-              ></div>
+            {:else if audioBlob !== null && !isProcessing}
+              <svg class="static-waveform" viewBox="0 0 300 40" preserveAspectRatio="none">
+                <path d={staticWaveformPath} stroke="#D3D3D3" stroke-width="1" fill="none" />
+              </svg>
+              {#if isPlayingRecording && playbackDuration > 0}
+                <div
+                  class="progress-fill"
+                  style="width: {Math.min((playbackCurrentTime / playbackDuration) * 100, 100)}%; background: #CCFFCC;"
+                ></div>
+              {/if}
             {:else if isProcessing}
               <span class="progress-placeholder">{processingMessage}</span>
             {/if}
@@ -709,27 +727,30 @@
             {/if}
           </div>
         </div>
-      </div>
+      </div><!-- end progress-bar-frame -->
 
-      <!-- Warning message (upload >20s) -->
-      {#if warningMessage}
-        <p class="warning-message">{warningMessage}</p>
-      {/if}
+      <!-- Footer row: warning + start again button -->
+      <div class="progress-footer">
+        {#if warningMessage}
+          <span class="warning-message">{warningMessage}</span>
+        {:else}
+          <span></span>
+        {/if}
+        <button
+          class="delete-voice-btn"
+          type="button"
+          onclick={handleDeleteAudio}
+          disabled={recordingState !== 'done' || isProcessing}
+        >
+          Start again
+        </button>
+      </div><!-- end progress-footer -->
+      </div><!-- end progress-group -->
 
       <!-- Error message -->
       {#if errorMessage}
         <p class="error-message">{errorMessage}</p>
       {/if}
-
-      <!-- Delete voice button -->
-      <button
-        class="delete-voice-btn"
-        type="button"
-        onclick={handleDeleteAudio}
-        disabled={recordingState !== 'done' || isProcessing}
-      >
-        Delete voice
-      </button>
 
       <!-- Create button -->
       <button
@@ -1057,6 +1078,12 @@
   }
 
   /* ── Progress bar ────────────────────────────────────────────────────────── */
+  .progress-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-xs);
+  }
+
   .progress-container {
     width: 100%;
   }
@@ -1069,6 +1096,10 @@
     height: 40px;
     overflow: hidden;
     background: var(--bg-white);
+  }
+
+  .progress-bar-frame.has-audio {
+    border-color: var(--color-primary);
   }
 
   .progress-icon-area {
@@ -1103,6 +1134,11 @@
     height: 20px;
   }
 
+  /* recolor stop and play icons to purple */
+  .stop-btn .icon-img, .play-btn .icon-img {
+    filter: invert(15%) sepia(87%) saturate(3015%) hue-rotate(262deg) brightness(60%) contrast(105%); /* Adjust this filter to match var(--color-primary) */
+  }
+
   .mic-idle {
     opacity: 0.3;
   }
@@ -1130,6 +1166,15 @@
     white-space: nowrap;
   }
 
+  .static-waveform {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 1; /* Below the progress-fill */
+  }
+
   .recording-script {
     font-size: var(--font-size-sm);
     color: var(--text-primary);
@@ -1144,6 +1189,8 @@
   .progress-fill {
     height: 100%;
     transition: width 0.3s ease, background 0.3s ease;
+    position: relative;
+    z-index: 2; /* Above the static-waveform */
   }
 
   .progress-timer {
@@ -1168,7 +1215,7 @@
 
   .warning-message {
     font-size: var(--font-size-sm);
-    color: #996600;
+    color: var(--text-secondary);
     margin: 0;
     line-height: var(--line-height-normal);
   }
@@ -1200,17 +1247,26 @@
     to { transform: rotate(360deg); }
   }
 
-  /* ── Delete voice button ──────────────────────────────────────────────────── */
+  /* ── Progress footer (warning + start again on same line) ────────────────── */
+  .progress-footer {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    min-height: 1.25rem;
+  }
+
+  /* ── Start again button ───────────────────────────────────────────────────── */
   .delete-voice-btn {
-    align-self: flex-end;
     background: none;
     border: none;
     cursor: pointer;
-    font-size: var(--font-size-md);
+    font-size: var(--font-size-sm);
     color: var(--text-secondary);
     padding: 0;
-    margin-bottom: var(--spacing-xsm);
     transition: color var(--transition-normal);
+    white-space: nowrap;
+    flex-shrink: 0;
   }
 
   .delete-voice-btn:hover:not(:disabled) {
@@ -1268,6 +1324,10 @@
     border-radius: var(--radius-round);
     animation: spin 0.7s linear infinite;
     flex-shrink: 0;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
   }
 
   /* ── Voice rows ──────────────────────────────────────────────────────────── */

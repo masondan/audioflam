@@ -161,7 +161,7 @@ export async function prepareAudioForCloning(audioBlob: Blob): Promise<AudioPrep
     const trimmedBuffer = offlineCtx.createBuffer(1, trimLength, SAMPLE_RATE);
     trimmedBuffer.copyToChannel(finalBuffer.getChannelData(0).slice(0, trimLength), 0, 0);
     finalBuffer = trimmedBuffer;
-    warnings.push('Audio trimmed to 20 seconds.');
+    warnings.push('Audio trimmed');
   }
 
   // 5. Check duration
