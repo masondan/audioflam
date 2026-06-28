@@ -98,7 +98,7 @@ export const QWEN_VOICES: VoiceOption[] = [
 // Voice IDs stored in .env as VOICE_WALES_FEMALE, VOICE_WALES_MALE
 export const QWEN_WELSH_VOICES: VoiceOption[] = [
 	// Welsh English
-	{ name: 'qwen-tts-vc-ffion-voice-20260628021453526-424a', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
+	{ name: 'qwen-tts-vc-ffion-voice-20260628200429563-406e', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
 	{ name: 'qwen-tts-vc-owain-voice-20260627234209804-bd83', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
 ];
 
