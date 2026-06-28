@@ -501,10 +501,20 @@
       };
 
       transcriptionStage = 'Starting engine…';
-      await loadWhisperModel(options, (stage) => {
-        if (transcriptionCancelled) return;
-        transcriptionStage = stage === 'downloading' ? 'Downloading engine…' : 'Model ready';
-      });
+
+      // Model load timeout: 3 minutes (covers first-time download)
+      const modelTimeoutMs = 3 * 60 * 1000;
+      const modelTimeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error('MODEL_TIMEOUT')), modelTimeoutMs)
+      );
+
+      await Promise.race([
+        loadWhisperModel(options, (stage) => {
+          if (transcriptionCancelled) return;
+          transcriptionStage = stage === 'downloading' ? 'Downloading engine…' : 'Model ready';
+        }),
+        modelTimeoutPromise,
+      ]);
 
       if (transcriptionCancelled) {
         transcribeState = 'idle';
@@ -516,8 +526,8 @@
       // Get trimmed audio blob
       const trimmedBlob = await getTrimmedAudioBlob();
 
-      // Set up 5 minute timeout
-      const timeoutMs = 5 * 60 * 1000;
+      // Inference timeout: 3 minutes (separate from model load)
+      const timeoutMs = 3 * 60 * 1000;
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('TIMEOUT')), timeoutMs)
       );
@@ -548,8 +558,10 @@
         return;
       }
       console.error('Transcription failed:', err);
-      if (err instanceof Error && err.message === 'TIMEOUT') {
-        transcriptionError = 'Transcription timed out after 5 minutes. Try a shorter clip.';
+      if (err instanceof Error && err.message === 'MODEL_TIMEOUT') {
+        transcriptionError = 'Engine download timed out. Check your connection and try again.';
+      } else if (err instanceof Error && err.message === 'TIMEOUT') {
+        transcriptionError = 'Transcription timed out. Try a shorter clip or reload the page.';
       } else if (err instanceof Error && err.message.includes('memory')) {
         transcriptionError = 'Not enough memory. Try closing other tabs.';
       } else {
