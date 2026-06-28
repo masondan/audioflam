@@ -1308,7 +1308,7 @@
     <div class="helper-section">
       <h2 class="helper-headline">Text-to-Speech</h2>
       <p class="helper-text">
-        Select a speaker voice (or two), add text, download MP3 or create an audiogram
+        Choose preset voices or clone your own voice, add text, export as MP3 or MP4 audiogram
       </p>
     </div>
 
