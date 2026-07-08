@@ -1,8 +1,8 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam
-**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + Qwen Voice Cloning)
-**Updated:** June 2026 (Latest: Qwen3-TTS voice cloning + text cleaning for naturalness)
+**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + Qwen Voice Cloning + Welsh Voices)
+**Updated:** July 2026 (Latest: Welsh voice cloning + Deepgram subtitle transcription + story URL import)
 
 ---
 
@@ -125,15 +125,19 @@ static/
 - **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
 
-### Qwen3-TTS Voice Cloning (Africa-First)
+### Qwen3-TTS Voice Cloning (Africa-First + Welsh)
 - **Speed:** ~5-10 seconds
 - **Auth:** Bearer token via `QWEN_SPEECH_KEY`
 - **Model:** `qwen3-tts-vc-2026-01-22` (voice cloning synthesis)
-- **Voices:** Malawi (Chisomo F, Mercy M), Zimbabwe (Tawanda M, Precious F)
+- **Voices:**
+  - Malawi: Chisomo (F), Mercy (M) — enrolled May 11, 2026
+  - Zimbabwe: Tawanda (M), Precious (F) — enrolled May 11, 2026
+  - Wales: Ffion (F), Owain (M) — enrolled June 27, 2026
 - **Endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
 - **Format:** WAV
 - **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing)
 - **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `cleanForTTS()` utility
+- **Voice Preparation:** `src/lib/utils/audioPrep.ts` prepares recorded audio for cloning (resampling to 24kHz mono, validation, WAV encoding)
 
 ### User Voice Cloning
 
@@ -154,7 +158,8 @@ static/
 - **Key files:**
    - [`src/lib/components/VoiceClonePanel.svelte`](src/lib/components/VoiceClonePanel.svelte) — Clone UI
    - [`src/routes/api/tts/clone/+server.ts`](src/routes/api/tts/clone/+server.ts) — Registration + deletion API
-   - [`src/lib/stores.ts`](src/lib/stores.ts) — CustomVoice type, customVoices store, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, customVoiceToVoiceOption()
+   - [`src/lib/stores.ts`](src/lib/stores.ts) — CustomVoice type, customVoices store, MAX_CUSTOM_VOICES, CLONE_PREVIEW_SCRIPT, CLONE_RECORDING_SCRIPT, customVoiceToVoiceOption()
+   - [`src/lib/utils/audioPrep.ts`](src/lib/utils/audioPrep.ts) — Audio preparation (resampling, validation, WAV encoding for Qwen)
 
 ### API Endpoint: POST `/api/tts`
 
@@ -175,14 +180,24 @@ Response:
 
 ---
 
-## MiniMax Voice Cloning (⚠️ Not Recommended - Unresolved Issues)
+## MiniMax Voice Cloning (⚠️ Dead Code - To Be Removed)
 
-**Status:** Integration attempted but API returns no audio despite correct implementation. Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without active subscription). MiniMax support has not resolved this issue.
+**Status:** MiniMax voices are **deliberately excluded from the UI** (`src/lib/stores.ts:106` comment: "MINIMAX_VOICES hidden from dropdown (API currently non-functional)"). The integration remains as dead code in the codebase but is not exposed to users.
 
-- **Handler:** `src/routes/api/tts/+server.ts:handleMiniMax()` (implementation verified correct)
-- **Workaround:** Route MiniMax requests to Azure/YarnGPT until account issue is resolved
-- **Cron refresh:** `/api/minimax-refresh` (legacy, not actively used)
-- **Note:** Do NOT use MiniMax in production until billing account is properly linked and API returns audio
+**Dead Code Locations:**
+- `MINIMAX_VOICES` array in `src/lib/stores.ts:74-81` (excluded from `ALL_VOICES`)
+- `handleMiniMax()` handler in `src/routes/api/tts/+server.ts:19-20` (unreachable from UI)
+- `TTSProvider` type includes `'minimax'` in `src/lib/stores.ts:41` (unused)
+- Flag emoji logic for minimax in `src/routes/+page.svelte:239`, `VoiceDropdown.svelte:24`, `BulletinIntroOutroCard.svelte:177`
+- Scripts: `scripts/minimax-clone-voices.js`, `scripts/generate-minimax-samples.js`
+
+**Removal Plan:**
+1. Delete `MINIMAX_VOICES` from `src/lib/stores.ts`
+2. Remove `'minimax'` from `TTSProvider` type
+3. Delete `handleMiniMax()` function from `src/routes/api/tts/+server.ts`
+4. Remove all minimax flag emoji branches from `.svelte` files
+5. Delete `/scripts/minimax-*.js` files
+6. Remove `MINIMAX_SPEECH_KEY` and `MINIMAX_GROUP_ID` from env vars section
 
 **Recommendation:** Use Qwen3-TTS voice cloning instead (Africa-first, working, lower cost)
 
@@ -210,13 +225,14 @@ Response:
 
 ---
 
-## Transcription (Whisper)
+## Transcription
 
-### Overview
+### Whisper (Primary - Audiogram Subtitles)
 - **Model:** OpenAI Whisper (via @huggingface/transformers)
 - **Execution:** Web Worker (off-main-thread)
 - **Languages:** 99+ (multilingual mode) or English-only (quantized)
 - **Quantization:** Optional (smaller model, faster on mobile)
+- **Used in:** TranscribePage tab, AudiogramPage subtitle generation
 
 ### API
 ```typescript
@@ -248,6 +264,16 @@ await releaseModel();
 - **Quantized:** ~100MB, faster on mobile
 - **Full:** ~350MB, more accurate
 - **Transcription:** 30-120s per minute of audio (device-dependent)
+
+### Deepgram Nova-3 (Alternative - Subtitle Transcription)
+- **Speed:** Faster than Whisper for subtitle generation
+- **Auth:** API key via `DEEPGRAM_VTT_KEY` env var
+- **Endpoint:** POST `/api/transcribe-deepgram`
+- **Input:** Audio file (multipart/form-data)
+- **Output:** Word-level subtitle segments with timestamps
+- **Used in:** SubtitlePanel (audiogram subtitles) as faster alternative to Whisper
+- **Features:** Smart formatting, punctuation, sentence-case capitalization, pause detection
+- **File:** `src/routes/api/transcribe-deepgram/+server.ts`
 
 ---
 
@@ -343,6 +369,7 @@ interface BulletinState {
 
 ### Key Features
 - **Script generation:** Gemini API generates summary or explainer scripts (20/30/60/90 seconds)
+- **Story import:** Fetch story text from URL via `/api/fetch-story` (uses Gemini 2.5 Flash to extract article body from HTML)
 - **Per-story TTS:** Each story generates audio independently, stored in story object
 - **Sound library:** 3 intro/outro sounds + 3 transition sounds (MP3 files in `/sounds/`)
 - **Speed/silence controls:** Global controls for all story segments + separate controls for intro/outro
@@ -354,6 +381,7 @@ interface BulletinState {
 - `src/routes/bulletin/+page.svelte` - Main page + assembly logic
 - `src/lib/stores/bulletin.ts` - State + localStorage persistence
 - `src/routes/api/bulletin-script/+server.ts` - Gemini script generation
+- `src/routes/api/fetch-story/+server.ts` - URL story import (HTML extraction + Gemini parsing)
 - `src/lib/server/bulletinPrompts.ts` - Prompt templates
 - `src/lib/components/bulletin/*` - UI components
 
@@ -372,8 +400,8 @@ AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
 YARNGPT_API_KEY=<API key>
 QWEN_SPEECH_KEY=<Bearer token for Qwen3-TTS>
-MINIMAX_SPEECH_KEY=<Bearer token for MiniMax API (not recommended)>
-MINIMAX_GROUP_ID=<MiniMax Group ID (not recommended)>
+DEEPGRAM_VTT_KEY=<API key for Deepgram Nova-3 transcription>
+GEMINI_API_KEY=<API key for Gemini 2.5 Flash (bulletin story import + script generation)>
 APIVIDEO_API_KEY=<API key for cloud transcoding>
 ```
 
@@ -556,8 +584,7 @@ All CSS variables defined in `src/app.css`.
 
 - **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
 - **Azure faster but slightly accented** - 3s generation but international accent
-- **Qwen3-TTS voice cloning** - Africa-first voices (Malawi/Zimbabwe), 5-10s generation. Text cleaning via `cleanForTTS()` improves naturalness (em-dashes → commas, ensures punctuation, adds pauses for long clauses)
-- **MiniMax API returns no audio** - Despite proper handler implementation, API consistently returns empty response. Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). DO NOT use in production. Workaround: Route requests to Azure/YarnGPT/Qwen if MiniMax selected.
+- **Qwen3-TTS voice cloning** - Africa-first + Welsh voices, 5-10s generation. Text cleaning via `cleanForTTS()` improves naturalness (em-dashes → commas, ensures punctuation, adds pauses for long clauses)
 - **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE - see Quality Report)
 - **No request throttling** - Users can spam TTS API (KNOWN ISSUE - see Quality Report)
 
@@ -729,17 +756,17 @@ All CSS variables defined in `src/app.css`.
 
 **File:** `src/lib/components/bulletin/BulletinStoryDrawer.svelte:saveStory()` - Ensure `story.ttsAudio = draft.ttsAudio`
 
-### 13. Bulletin Assembly Order Matters
+### 12. Bulletin Assembly Order Matters
 **Reality:** Intro/outro sounds and transitions must be loaded as ArrayBuffers from `/sounds/` and concatenated in exact order. Reordering stories invalidates assembled audio (must regenerate).
 
 **File:** `src/routes/bulletin/+page.svelte:generateBulletin()` - Assembly order documented in code
 
-### 14. Gemini Script Generation Quota
+### 13. Gemini Script Generation Quota
 **Reality:** Gemini API has rate limits. If users spam "Generate Script", requests will fail. No throttling currently implemented.
 
 **File:** `src/routes/api/bulletin-script/+server.ts` - Consider adding request throttling (KNOWN ISSUE)
 
-### 15. Subtitle Styling Persistence in Audiogram
+### 14. Subtitle Styling Persistence in Audiogram
 **Reality:** SubtitlePanel state (font, color, background) is NOT persisted to localStorage. Changes are lost on page reload. Only subtitle segments (from transcription) are saved.
 
 **File:** `src/lib/components/SubtitlePanel.svelte` - Consider adding localStorage persistence if needed
@@ -751,7 +778,7 @@ All CSS variables defined in `src/app.css`.
 ### TTS Pipeline
 - [ ] Azure Nigerian voice: fast (~3s), clear
 - [ ] YarnGPT voice: slow (~30s), natural
-- [ ] Qwen3-TTS voice: 5-10s, Africa-first voices (Malawi/Zimbabwe)
+- [ ] Qwen3-TTS voice: 5-10s, Africa-first voices (Malawi/Zimbabwe/Wales)
 - [ ] Text cleaning: em-dashes converted, punctuation added, long clauses get commas
 - [ ] Error handling: Invalid API key shows helpful message
 - [ ] Base64 decoding: Audio plays without skips/artifacts
@@ -789,8 +816,7 @@ All CSS variables defined in `src/app.css`.
 2. Reference: `src/lib/stores.ts` (voice definitions)
 3. UI: `src/routes/+page.svelte` (TTS panel, two-speaker mode)
 4. **Qwen note:** Always call `cleanForTTS()` before synthesis to improve naturalness
-5. **MiniMax note:** Do NOT use in production; account billing issue unresolved. Route to Azure/YarnGPT/Qwen instead.
-6. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
+5. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
 
 ### Implementing Audiogram Changes
 1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
@@ -877,14 +903,6 @@ All CSS variables defined in `src/app.css`.
 5. If subtitle not appearing: check `subtitleSegments` populated and `subtitlesEnabled === true`
 6. If trim not working: verify trim handles dragging updates `trimStart`/`trimEnd` ratios
 7. If export black screen: check if iOS Safari—fallback to MediaRecorder/cloud transcode automatic
-
-### MiniMax Integration Issues
-1. **No audio returned from API** - Check `MINIMAX_API_KEY` is set and valid
-2. Verify account has billing/subscription active (GitHub OAuth creates separate account; ensure subscription applies to correct account)
-3. Check voice ID format: min 10 chars, alphanumeric only (no underscores)
-4. Verify voice clone ID exists in `src/lib/stores.ts:MINIMAX_VOICES`
-5. Test with single character "a" first (verify API connectivity before full text)
-6. Current workaround: Route MiniMax requests to Azure if testing (temporary until account resolved)
 
 ---
 
@@ -1036,5 +1054,21 @@ Verify these exist:
 
 ---
 
-**Last Updated:** April 2026 (Bulletin Engine + Subtitle Clarification)
+**Last Updated:** July 2026 (MiniMax removal plan + Welsh voices + Deepgram + Story import)
 **Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete. Update .clinerules whenever AGENTS.md changes significantly.
+
+---
+
+## Orphaned Components (Not Used in AudioFlam)
+
+### VideoSubtitlePage.svelte
+- **Status:** 1420-line component for video subtitle overlay + export
+- **Location:** `src/lib/components/VideoSubtitlePage.svelte`
+- **Usage:** Not imported anywhere in AudioFlam routing
+- **Context:** Built for VideoFlam (separate app), left in AudioFlam codebase
+- **Action:** Flag for removal or migration to VideoFlam repo
+
+### Unused API Endpoints
+- **`/api/audio/extract`** — Server-side video audio extraction (returns 501 "not implemented"). Recommends client-side MP4 extraction or MP3/WAV upload instead.
+- **`/api/gemini-test`** — Development/test endpoint, not used in production
+
