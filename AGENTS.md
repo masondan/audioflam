@@ -1,8 +1,8 @@
 # AudioFlam - AI Agent Reference
 
 **Purpose:** Single-source-of-truth for AI agents working on AudioFlam
-**Status:** Production (Transcription + Two-Speaker Mode + Audiogram Subtitles + Bulletin Engine + Qwen Voice Cloning + Welsh Voices)
-**Updated:** July 2026 (Latest: Welsh voice cloning + Deepgram subtitle transcription + story URL import)
+**Status:** Production (TTS + Audiogram + Bulletin + Transcription + Voice Cloning)
+**Updated:** August 2026
 
 ---
 
@@ -131,7 +131,7 @@ static/
 - **Model:** `qwen3-tts-vc-2026-01-22` (voice cloning synthesis)
 - **Voices:**
   - Malawi: Chisomo (F), Mercy (M) — enrolled May 11, 2026
-  - Zimbabwe: Tawanda (M), Precious (F) — enrolled May 11, 2026
+  - Zimbabwe: Precious (F), Tawanda (M) — enrolled May 11, 2026
   - Wales: Ffion (F), Owain (M) — enrolled June 27, 2026
 - **Endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
 - **Format:** WAV
@@ -180,26 +180,9 @@ Response:
 
 ---
 
-## MiniMax Voice Cloning (⚠️ Dead Code - To Be Removed)
+## MiniMax Voice Cloning (⚠️ Dead Code - Removal Pending)
 
-**Status:** MiniMax voices are **deliberately excluded from the UI** (`src/lib/stores.ts:106` comment: "MINIMAX_VOICES hidden from dropdown (API currently non-functional)"). The integration remains as dead code in the codebase but is not exposed to users.
-
-**Dead Code Locations:**
-- `MINIMAX_VOICES` array in `src/lib/stores.ts:74-81` (excluded from `ALL_VOICES`)
-- `handleMiniMax()` handler in `src/routes/api/tts/+server.ts:19-20` (unreachable from UI)
-- `TTSProvider` type includes `'minimax'` in `src/lib/stores.ts:41` (unused)
-- Flag emoji logic for minimax in `src/routes/+page.svelte:239`, `VoiceDropdown.svelte:24`, `BulletinIntroOutroCard.svelte:177`
-- Scripts: `scripts/minimax-clone-voices.js`, `scripts/generate-minimax-samples.js`
-
-**Removal Plan:**
-1. Delete `MINIMAX_VOICES` from `src/lib/stores.ts`
-2. Remove `'minimax'` from `TTSProvider` type
-3. Delete `handleMiniMax()` function from `src/routes/api/tts/+server.ts`
-4. Remove all minimax flag emoji branches from `.svelte` files
-5. Delete `/scripts/minimax-*.js` files
-6. Remove `MINIMAX_SPEECH_KEY` and `MINIMAX_GROUP_ID` from env vars section
-
-**Recommendation:** Use Qwen3-TTS voice cloning instead (Africa-first, working, lower cost)
+**Status:** Non-functional, hidden from UI. Awaiting removal in next development cycle. Location: `src/lib/stores.ts:74-81`, `src/routes/api/tts/+server.ts:20`, `scripts/minimax-*.js`. **Use Qwen3-TTS instead** (working, Africa-first, lower cost).
 
 ---
 
@@ -585,8 +568,8 @@ All CSS variables defined in `src/app.css`.
 - **YarnGPT slower but native** - Nigerian voices sound more natural but take ~30s (user education needed)
 - **Azure faster but slightly accented** - 3s generation but international accent
 - **Qwen3-TTS voice cloning** - Africa-first + Welsh voices, 5-10s generation. Text cleaning via `cleanForTTS()` improves naturalness (em-dashes → commas, ensures punctuation, adds pauses for long clauses)
-- **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE - see Quality Report)
-- **No request throttling** - Users can spam TTS API (KNOWN ISSUE - see Quality Report)
+- **Error handling loose** - If API fails, user gets generic "error" message (KNOWN ISSUE)
+- **No request throttling** - Users can spam TTS API (KNOWN ISSUE)
 
 ### Transcription Gotchas
 
@@ -628,8 +611,7 @@ All CSS variables defined in `src/app.css`.
 - Adds commas after unpunctuated clauses ≥8 words for breath points
 - Preserves author intent: existing punctuation, CAPS emphasis, ellipsis
 
-**Known Issues (See QUALITY_REPORT.md):**
-- 🔴 **MiniMax API returns no audio** despite proper credentials (HIGH priority) - Root cause: account billing/subscription mismatch (GitHub OAuth login created separate account without subscription). MiniMax support unresponsive. Implementation verified correct; workaround: Use Azure/YarnGPT/Qwen instead.
+**Known Issues:**
 - 🔴 Type assertion in `webcodecs-export.ts:445` without runtime guard (HIGH priority)
 - 🔴 TTS error handling gaps - generic "error" messages (HIGH priority)
 - 🟡 Audio encoding inconsistency between WebCodecs/MediaRecorder paths (MEDIUM)
@@ -694,183 +676,112 @@ All CSS variables defined in `src/app.css`.
 
 ## Common Pitfalls for Agents
 
-### 1. Assuming MediaRecorder H.264 Works on All Android
-**Reality:** It claims support but fails in practice. Always check WebCodecs first.
+1. **MediaRecorder H.264 on Android** - Claims support but fails. Always check WebCodecs first.
 
-### 2. Forgetting Audio MIME Type Field
-**Reality:** All TTS providers must return `{ audioContent, format: 'mp3' }`. YarnGPT + MiniMax were fixed to match Azure response format.
+2. **Audio MIME type field** - All TTS responses must include `format: 'mp3'` or `'wav'`. (`src/routes/api/tts/+server.ts`)
 
-**File:** `src/routes/api/tts/+server.ts`
+3. **Mono audio in WebCodecs** - AAC rejects mono; code auto-converts to stereo. (`webcodecs-export.ts:277-294`)
 
-### 3. Not Handling Mono Audio in WebCodecs
-**Reality:** AAC encoder on mobile browsers rejects mono. Code auto-converts mono→stereo.
+4. **Type assertions without guards** - `webcodecs-export.ts:445` has unchecked assertion. (KNOWN ISSUE)
 
-**File:** `src/lib/utils/webcodecs-export.ts:277-294`
+5. **Azure Host header** - Cloudflare Workers need explicit `Host` header. (`src/routes/api/tts/+server.ts`)
 
-### 4. Type Assertions Without Guards
-**Reality:** `webcodecs-export.ts:445` does unchecked type assertion on Mediabunny target. Could fail silently if target changes.
+6. **XML escaping in SSML** - User text must be escaped to prevent injection. Check `escapeXml()` function.
 
-**Fix:** Add runtime check before assertion. (KNOWN ISSUE)
+7. **Blocking main thread** - Transcription must run in Web Worker. Use `getWorker()` + `workerRequest<T>()`. (`src/lib/utils/transcription.ts`)
 
-### 5. Forgetting Cloudflare Workers Host Header
-**Reality:** Azure Speech API requires explicit `Host` header in Cloudflare environment.
+8. **Forgetting to release model** - Call `releaseModel()` when done to free 100-350MB RAM.
 
-**File:** `src/routes/api/tts/+server.ts` - Header correctly set.
+9. **Waveform animation sync** - WebCodecs (no playback) and MediaRecorder (with playback) need different timing. Use `currentTime` parameter in `renderFrame()`. (`src/lib/utils/compositor.ts`)
 
-### 6. Breaking XML Escaping in SSML
-**Reality:** User text embedded in SSML XML without escaping = potential injection. Function exists to fix this.
+10. **Two-speaker audio merge** - Must explicitly call `concatenateAudioSegments()` after generating both voices. (`src/lib/audioProcessing.ts`)
 
-**File:** `src/routes/api/tts/+server.ts` - Check for `escapeXml()` or equivalent.
+11. **Bulletin story audio** - TTS audio stored as base64 in `BulletinStory.ttsAudio`. Must include in save logic. (`BulletinStoryDrawer.svelte:saveStory()`)
 
-### 7. Blocking Main Thread During Transcription
-**Reality:** Whisper model loading is slow (~30-60s). Must run in Web Worker to keep UI responsive.
+12. **Bulletin assembly order** - Intro/outro/transition sounds must concatenate in exact order. Reordering stories invalidates audio. (`src/routes/bulletin/+page.svelte:generateBulletin()`)
 
-**File:** `src/lib/utils/transcription.ts` - Worker management via `getWorker()`
+13. **Gemini rate limits** - Script generation has no throttling. Users spamming requests will fail. (`src/routes/api/bulletin-script/+server.ts`)
 
-**Pattern:** Use `workerRequest<T>()` to send messages and wait for responses.
-
-### 8. Forgetting to Release Transcription Model
-**Reality:** Whisper model consumes 100-350MB RAM. Call `releaseModel()` when done.
-
-**File:** `src/lib/utils/transcription.ts:releaseModel()`
-
-### 9. Not Syncing Waveform Animation Between Export Paths
-**Reality:** WebCodecs (no audio playback) and MediaRecorder (with playback) need different timing logic.
-
-**File:** `src/lib/utils/compositor.ts:renderFrame()` - Must use `currentTime` parameter, not live audio data.
-
-### 10. Assuming Two-Speaker Audio Merges Automatically
-**Reality:** Must explicitly call `concatenateAudioSegments()` after generating both voices. Works with all three providers (Azure, YarnGPT, MiniMax).
-
-**File:** `src/lib/audioProcessing.ts` - Audio merging logic
-
-### 11. MiniMax Account Billing Mismatch
-**Reality:** GitHub OAuth creates separate account from direct subscription. Both can have same GroupID but only one has billing/subscription. ALWAYS verify account that was charged matches the account you're using for API requests. Symptoms: API returns empty audio despite proper implementation. MiniMax support has not resolved this issue.
-
-**File:** `src/routes/api/tts/+server.ts:handleMiniMax()` - Check MINIMAX_API_KEY points to correct account
-
-**Workaround:** Route MiniMax requests to Azure/YarnGPT/Qwen instead. **Recommendation:** Use Qwen3-TTS voice cloning (Africa-first, working, lower cost).
-
-### 12. Bulletin Story Audio Not Persisting
-**Reality:** Per-story TTS audio is stored as base64 in `BulletinStory.ttsAudio`. Must include in save logic when updating story. Forgetting this causes audio to be lost on reload.
-
-**File:** `src/lib/components/bulletin/BulletinStoryDrawer.svelte:saveStory()` - Ensure `story.ttsAudio = draft.ttsAudio`
-
-### 12. Bulletin Assembly Order Matters
-**Reality:** Intro/outro sounds and transitions must be loaded as ArrayBuffers from `/sounds/` and concatenated in exact order. Reordering stories invalidates assembled audio (must regenerate).
-
-**File:** `src/routes/bulletin/+page.svelte:generateBulletin()` - Assembly order documented in code
-
-### 13. Gemini Script Generation Quota
-**Reality:** Gemini API has rate limits. If users spam "Generate Script", requests will fail. No throttling currently implemented.
-
-**File:** `src/routes/api/bulletin-script/+server.ts` - Consider adding request throttling (KNOWN ISSUE)
-
-### 14. Subtitle Styling Persistence in Audiogram
-**Reality:** SubtitlePanel state (font, color, background) is NOT persisted to localStorage. Changes are lost on page reload. Only subtitle segments (from transcription) are saved.
-
-**File:** `src/lib/components/SubtitlePanel.svelte` - Consider adding localStorage persistence if needed
+14. **Subtitle styling not persisted** - SubtitlePanel styling lost on reload (only segments saved). (`src/lib/components/SubtitlePanel.svelte`)
 
 ---
 
 ## Testing Checklist
 
-### TTS Pipeline
-- [ ] Azure Nigerian voice: fast (~3s), clear
-- [ ] YarnGPT voice: slow (~30s), natural
-- [ ] Qwen3-TTS voice: 5-10s, Africa-first voices (Malawi/Zimbabwe/Wales)
-- [ ] Text cleaning: em-dashes converted, punctuation added, long clauses get commas
-- [ ] Error handling: Invalid API key shows helpful message
-- [ ] Base64 decoding: Audio plays without skips/artifacts
-- [ ] 2000 char limit: Enforced UI-side, rejected server-side if exceeded
+**TTS Pipeline**
+- Azure voice: ~3s, clear
+- YarnGPT voice: ~30s, natural Nigerian
+- Qwen3-TTS voice: 5-10s, Malawi/Zimbabwe/Wales
+- Text cleaning: em-dashes→commas, punctuation, long clause breaks
+- Error handling: Helpful message on invalid API key
+- Base64 decoding: No skips/artifacts
+- 2000 char limit: UI + server enforced
 
-### Audiogram Export
-- [ ] Image upload: Accepts JPG, PNG; auto-resizes
-- [ ] Audio import: Accepts MP3, WAV; waveform renders
-- [ ] Composition: Image + audio + waveform sync visually
-- [ ] Export Android: MP4 downloads via WebCodecs (no cloud needed)
-- [ ] Export iOS: WebM downloads locally (acceptable fallback)
-- [ ] Export desktop Chrome: MP4 via WebCodecs
-- [ ] Export desktop Firefox: WebM locally
+**Audiogram Export**
+- Image upload: JPG/PNG, auto-resize
+- Audio import: MP3/WAV, waveform renders
+- Image + audio + waveform: Visual sync in preview
+- Android: MP4 via WebCodecs
+- iOS: WebM locally
+- Desktop Chrome: MP4 via WebCodecs
+- Desktop Firefox: WebM
 
-### Edge Cases
-- [ ] Very long audio (5+ min): Export doesn't timeout
-- [ ] Very large image (10MB+): Upload handles gracefully
-- [ ] Slow network: Cloud transcode retries on 404 (api.video timing)
-- [ ] Rapid successive exports: No race conditions
-- [ ] Browser back button: State preserved (or gracefully cleared)
+**Edge Cases**
+- Long audio (5+ min): Export doesn't timeout
+- Large image (10MB+): Handles gracefully
+- Slow network: Cloud transcode retries
+- Rapid exports: No race conditions
 
 ---
 
 ## Navigating the Codebase by Task
 
-### Getting Started with AudioFlam
-1. **Read this file (AGENTS.md)** - 5 minutes for complete overview
-2. **Check "Critical Rules & Gotchas"** - Avoid breaking patterns
-3. **Check "Common Pitfalls for Agents"** - Learn from past mistakes
-4. **Bookmark `/docs/TROUBLESHOOTING.md`** - For debugging later
-5. **Check `/docs/QUALITY_REPORT.md`** - Known issues and fixes
+### Getting Started
+1. Read AGENTS.md for complete overview
+2. Review "Critical Rules & Gotchas"
+3. Review "Common Pitfalls for Agents"
+4. Check "Known Issues" under "Current Phase Focus"
 
-### Implementing TTS Changes
-1. Start: `src/routes/api/tts/+server.ts` (handler)
-2. Reference: `src/lib/stores.ts` (voice definitions)
-3. UI: `src/routes/+page.svelte` (TTS panel, two-speaker mode)
-4. **Qwen note:** Always call `cleanForTTS()` before synthesis to improve naturalness
-5. Consult: TROUBLESHOOTING.md → TTS Pipeline Issues
+### TTS Changes
+- Handler: `src/routes/api/tts/+server.ts`
+- Voice definitions: `src/lib/stores.ts`
+- UI: `src/routes/+page.svelte`
+- **Important:** Call `cleanForTTS()` before Qwen synthesis
 
-### Implementing Audiogram Changes
-1. Start: `src/lib/components/AudiogramPage.svelte` (main container)
-2. UI logic: Individual panel components (WaveformPanel, TitlePanel, SubtitlePanel, etc.)
-3. Rendering: `src/lib/components/CompositionCanvas.svelte` (canvas logic)
-4. Composition: `src/lib/utils/compositor.ts` (layer stacking)
-5. Subtitles: `src/lib/utils/subtitles.ts` (word-level rendering + composition)
-6. Consult: TROUBLESHOOTING.md → Audiogram Export Issues
+### Audiogram Changes
+- Main: `src/lib/components/AudiogramPage.svelte`
+- Canvas: `src/lib/components/CompositionCanvas.svelte`
+- Composition: `src/lib/utils/compositor.ts`
+- Subtitles: `src/lib/utils/subtitles.ts`
 
-### Implementing Bulletin Engine Changes
-1. Start: `src/routes/bulletin/+page.svelte` (main page, 1172 lines)
-2. Store: `src/lib/stores/bulletin.ts` (state + localStorage persistence)
-3. Story drawer: `src/lib/components/bulletin/BulletinStoryDrawer.svelte` (text + script generation + TTS)
-4. Script generation: `src/routes/api/bulletin-script/+server.ts` (Gemini API)
-5. Prompts: `src/lib/server/bulletinPrompts.ts` (summary/explainer templates)
-6. Assembly logic: `src/routes/bulletin/+page.svelte:generateBulletin()` (audio concatenation + normalization)
-7. Consult: `docs/archive/bulletin-plan.md` for checkpoint reference
+### Bulletin Engine
+- Page: `src/routes/bulletin/+page.svelte` (1172 lines)
+- Store: `src/lib/stores/bulletin.ts`
+- Story editor: `src/lib/components/bulletin/BulletinStoryDrawer.svelte`
+- Script API: `src/routes/api/bulletin-script/+server.ts`
 
-### Implementing Export Changes
-1. Entry point: `src/lib/utils/video-export.ts:smartExportVideo()`
-2. Branch A (WebCodecs): `src/lib/utils/webcodecs-export.ts`
-3. Branch B (MediaRecorder): `src/lib/utils/video-export.ts:exportCanvasVideoLegacy()`
-4. Branch C (Cloud): `src/routes/api/transcode/+server.ts`
-5. Consult: TROUBLESHOOTING.md → Export Issues + ARCHITECTURE.md
+### Export Pipeline
+- Entry: `src/lib/utils/video-export.ts:smartExportVideo()`
+- WebCodecs: `src/lib/utils/webcodecs-export.ts`
+- MediaRecorder: `src/lib/utils/video-export.ts:exportCanvasVideoLegacy()`
+- Cloud: `src/routes/api/transcode/+server.ts`
 
-### Implementing Transcription Changes
-1. Start: `src/lib/components/TranscribePage.svelte` (UI)
-2. API: `src/lib/utils/transcription.ts` (main interface)
-3. Worker: `src/lib/utils/transcription-worker.ts` (off-main-thread)
-4. Model: `@huggingface/transformers` (Whisper)
-5. Consult: TROUBLESHOOTING.md → Transcription Issues
+### Transcription
+- UI: `src/lib/components/TranscribePage.svelte`
+- API: `src/lib/utils/transcription.ts`
+- Worker: `src/lib/utils/transcription-worker.ts`
+- Model: `@huggingface/transformers` (Whisper)
 
-### Implementing Audio Processing Changes
-1. Silence removal: `src/lib/server/silenceRemoval.ts` + `/api/audio/silence-removal`
-2. Normalization: `src/lib/server/audioNormalize.ts` + `/api/normalize`
-3. Time-stretching: `src/lib/utils/timestretch.ts` (SoundTouchJS)
-4. Utilities: `src/lib/audioProcessing.ts` (silence, concatenation)
+### Audio Processing
+- Silence removal: `src/lib/server/silenceRemoval.ts`
+- Normalization: `src/lib/server/audioNormalize.ts`
+- Time-stretching: `src/lib/utils/timestretch.ts`
+- Utilities: `src/lib/audioProcessing.ts`
 
-### Implementing Design/CSS Changes
-1. Colors/spacing: `src/app.css` (CSS variables)
-2. Icons: `static/icons/` (SVG files)
-3. Fonts: `static/fonts/` (self-hosted)
-4. Components: Individual `.svelte` files (use design tokens)
-
-### Debugging Issues
-1. **Search TROUBLESHOOTING.md** for your symptom
-2. Check "Debug steps" section for your issue
-3. Check "Critical Rules & Gotchas" in this file
-4. Check console logs for prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`, `[Transcription]`
-5. Check QUALITY_REPORT.md for known issues
-
-### Understanding Design Decisions
-1. Check this file → "Architecture Decision Log" section
-2. For deep dives: see "Useful References" for archive docs
+### Design/CSS
+- Variables: `src/app.css`
+- Icons: `static/icons/`
+- Fonts: `static/fonts/`
 
 ---
 
@@ -908,25 +819,10 @@ All CSS variables defined in `src/app.css`.
 
 ## Reference Documents
 
-### For Debugging & Problem-Solving
-- **`/docs/TROUBLESHOOTING.md`** - Searchable Q&A for common issues (TTS, export, mobile, performance, deployment)
-- **`/docs/CHALLENGES_AND_FIXES.md`** - Consolidated reference for known issues, root causes, and fixes applied
-- **`/docs/QUALITY_REPORT.md`** - Known issues and fixes
-
-### For System Design & Architecture
-- **`/docs/ARCHITECTURE.md`** - Visual diagrams and data flows (TTS pipeline, export pipeline, canvas composition, browser compatibility)
-
 ### For Historical Context & Design Decisions
-- **`/docs/archive/MANIFEST.md`** - Index & status guide for archived documents
-- **`/docs/archive/bulletin-plan.md`** - Bulletin engine implementation checkpoints (6 stages, all complete)
-- **`/docs/archive/EXPORT_TECH_PLAN.md`** - Why WebCodecs + Mediabunny was chosen over FFmpeg/MediaRecorder
-- **`/docs/archive/ROADMAP.md`** - 14-step development timeline and completion status
-- **`/docs/archive/MOBILE_EXPORT_FIX.md`** - Black-screen issue diagnostic approach (learning resource)
-- **`/docs/archive/EXPORT_FIX_IMPLEMENTATION.md`** - How RAF loop decoupling fixed export stuttering
-
-### For Design & UI Reference
-- **`/docs/archive/DESIGN_VISION.md`** - Original design specification (design tokens now in `src/app.css`)
-- **`/docs/archive/TTS_REDESIGN_SUMMARY.md`** - TTS page UI redesign history (completed February 2026)
+- **`/docs/archive/bulletin-plan.md`** - Bulletin engine implementation checkpoints
+- **`/docs/archive/EXPORT_TECH_PLAN.md`** - Why WebCodecs + Mediabunny architecture
+- **`/docs/archive/EXPORT_FIX_IMPLEMENTATION.md`** - RAF loop decoupling for export stuttering fix
 
 ---
 
@@ -935,12 +831,11 @@ All CSS variables defined in `src/app.css`.
 **This file (AGENTS.md) is your primary reference. It should answer 90% of questions:**
 
 - **How does AudioFlam work?** → Read relevant section above
-- **How do I implement X?** → See "How to Navigate by Task" section
-- **I'm stuck on an issue** → Check "Debugging Tips" above, then `/docs/TROUBLESHOOTING.md`
-- **Why was decision Y made?** → Check "Architecture Decision Log" above, then `/docs/archive/` for deep dives
-- **How do systems interact?** → See `/docs/ARCHITECTURE.md` for visual diagrams
+- **How do I implement X?** → See "Navigating the Codebase by Task" section
+- **I'm stuck on an issue** → Check "Debugging Tips" above, then "Known Issues" under "Current Phase Focus"
+- **Why was decision Y made?** → Check "Architecture Decision Log" above, then `/docs/archive/` for historical context
 
-**For code tracing:** Grep for log prefixes to trace execution: `[WebCodecs]`, `[VideoExport]`, `[TTS]`
+**For code tracing:** Grep for log prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`, `[Transcription]`
 
 ---
 
@@ -960,13 +855,13 @@ All CSS variables defined in `src/app.css`.
 
 ---
 
-## Further Assistance
+## When Stuck
 
-This document should answer 90% of questions. If not, check:
-1. **Architecture**: `docs/ARCHITECTURE.md`
-2. **Troubleshooting**: `docs/TROUBLESHOOTING.md`
-3. **History**: `docs/archive/` (for why decisions were made)
-4. **Code**: Grep for `[WebCodecs]`, `[VideoExport]`, `[TTS]` log prefixes to trace execution
+1. Check console for log prefixes: `[WebCodecs]`, `[VideoExport]`, `[TTS]`, `[Transcription]`
+2. Review "Debugging Tips" section above
+3. Review "Common Pitfalls for Agents" section for similar issues
+4. Check "Known Issues" under "Current Phase Focus"
+5. Search `/docs/archive/` for historical context on design decisions
 
 ---
 
@@ -1054,8 +949,8 @@ Verify these exist:
 
 ---
 
-**Last Updated:** July 2026 (MiniMax removal plan + Welsh voices + Deepgram + Story import)
-**Maintainer Notes:** Keep this document updated as new phases complete. Move old docs to archive, don't delete. Update .clinerules whenever AGENTS.md changes significantly.
+**Last Updated:** August 2026
+**Maintainer Notes:** Keep this document concise and current. Move outdated docs to archive. Update .clinerules when AGENTS.md changes significantly.
 
 ---
 
