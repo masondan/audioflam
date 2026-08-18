@@ -1,0 +1,722 @@
+Real-time speech synthesis
+Updated at: 2026-08-07 06:18:02
+
+Copy as MD
+Product
+Stream text-to-speech conversion with low first-packet latency. Real-time speech synthesis supports streaming input and output, voice cloning, voice design, and fine-grained audio controls for voice assistants, audiobooks, and intelligent customer service.
+Overview
+
+Convert text to speech in real time with low latency.
+	•	Streaming input and output with low first-packet latency
+	•	Adjustable speech rate, pitch, volume, and bitrate for fine-grained audio control
+	•	Compatible with mainstream audio formats (PCM, WAV, MP3, Opus) with up to 48 kHz sample rate output
+	•	Supports Instruction control, which lets you control speech expressiveness through natural language instructions
+	•	Supports Voice cloning and Voice Design for custom voice creation
+	•	Supports Emotion and rich language tags, which lets you embed emotion or sound effect tags within text
+For batch scenarios such as audiobooks and courseware voiceover, use Non-real-time speech synthesis. For model selection guidance, see Speech synthesis.
+Prerequisites
+
+	•	Configure an API key and set it as an environment variable.
+	•	If you call the API through the DashScope SDK, install the latest SDK.
+	•	To use the AOQ protocol with CosyVoice models, download and integrate the AOQ client SDK. For details, see SDK overview.
+Quick start
+
+The following examples demonstrate speech synthesis for each model. For more examples and parameter details, see the API reference.
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+The following example synthesizes speech using a system voice.
+To use the Instruction control feature, set instructions through the instruction parameter.
+PythonJava
+
+
+
+ 
+# coding=utf-8
+
+import os
+import dashscope
+from dashscope.audio.tts_v2 import *
+
+# The API Key differs between the Singapore and Beijing regions. Get your API Key: https://www.alibabacloud.com/help/zh/model-studio/get-api-key
+# If you have not configured the environment variable, replace the next line with your Chinese Model Studio API Key: dashscope.api_key = "sk-xxx"
+dashscope.api_key = os.environ.get('DASHSCOPE_API_KEY')
+
+# The following is the configuration for the Singapore region. Replace "{WorkspaceId}" with your actual workspace ID. The configuration varies by region.
+dashscope.base_websocket_api_url='wss://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference'
+
+# Model
+# qwen-audio-3.0-tts-flash/qwen-audio-3.0-tts-plus: Use voices such as longanhuan_v3.6.
+# Each voice supports different languages. To synthesize non-Chinese languages such as Japanese or Korean, select a voice that supports the target language. See the voice list for details.
+model = "qwen-audio-3.0-tts-flash"
+# Voice
+voice = "longanhuan_v3.6"
+
+# Instantiate SpeechSynthesizer and pass request parameters such as model and voice in the constructor
+synthesizer = SpeechSynthesizer(model=model, voice=voice)
+# Send the text to be synthesized and get the binary audio
+audio = synthesizer.call("How is the weather today?")
+# The first text submission requires establishing a WebSocket connection, so the first-packet latency includes connection setup time
+print('[Metric] requestId: {}, first-packet latency: {} ms'.format(
+    synthesizer.get_last_request_id(),
+    synthesizer.get_first_package_delay()))
+
+# Save the audio to a local file
+with open('output.mp3', 'wb') as f:
+    f.write(audio)
+Session configuration
+
+Qwen-TTS interaction modes
+
+Qwen-TTS Realtime API provides two interaction modes:
+	•	server_commit mode: The server handles text segmentation and synthesis timing automatically. Suited for continuous synthesis of large text blocks. The client appends text without managing segmentation or submission.
+	•	commit mode: The client explicitly submits the text buffer to trigger synthesis. Suited for scenarios that require precise control over synthesis timing, such as per-turn synthesis in conversational AI.
+Switch interaction modes:
+	•	WebSocket: Set the session.update event's mode field.    {
+	•	    "type": "session.update",
+	•	    "session": {
+	•	        "mode": "server_commit"
+	•	    }
+	•	} 
+	•	Python SDK: Set the mode parameter in the update_session method.    qwen_tts_realtime.update_session(
+	•	    voice='Cherry',
+	•	    response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+	•	    mode='server_commit'
+	•	) 
+	•	Java SDK: Set the mode parameter through QwenTtsRealtimeConfig.builder().    QwenTtsRealtimeConfig config = QwenTtsRealtimeConfig.builder()
+	•	        .voice("Cherry")
+	•	        .responseFormat(ttsFormat)
+	•	        .mode("server_commit")
+	•	        .build();
+	•	qwenTtsRealtime.updateSession(config); 
+For complete SDK code examples, see Python SDK and Java SDK. For WebSocket event lifecycle and connection reuse details, see WebSocket API reference.
+Advanced features
+
+Instruction control
+
+Instruction control uses natural language descriptions to adjust speech tone, speed, emotion, and timbre characteristics without configuring complex audio parameters.
+Instruction specifications by model:
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+Supported models: qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash
+System voices and voice cloning voices: accept any instruction.
+Use cases:
+	•	Audiobook and radio drama voiceover
+	•	Advertising and promotional video voiceover
+	•	Game character and animation voiceover
+	•	Emotionally expressive voice assistants
+	•	Documentary and news broadcast narration
+Writing effective voice descriptions:
+	•	Core principles:
+	1	Be specific, not vague: Use words that depict vocal qualities, such as "deep", "crisp", or "slightly fast pace". Avoid subjective or vague terms like "nice" or "normal".
+	2	Be multi-dimensional, not one-dimensional: A good description typically covers multiple dimensions (such as gender, age, and emotion). Writing only "female voice" is too broad to generate a distinctive timbre.
+	3	Be objective, not subjective: Focus on the physical and perceptual characteristics of the voice. For example, use "higher pitch with an energetic tone" instead of "my favorite voice".
+	4	Be original, not imitative: Describe the vocal qualities rather than requesting imitation of specific individuals (such as celebrities or actors). The model doesn't support imitation, and it may pose copyright risks.
+	5	Be concise, not redundant: Make sure every word serves a purpose. Avoid repetitive synonyms or meaningless modifiers.
+	•	Description dimension reference: Combine the following dimensions to describe a voice. The more dimensions you include, the more accurate the output.
+	•	
+	•	
+	•	Dimension
+	•	Example descriptions
+	•	Gender
+	•	Male, female, androgynous
+	•	Age
+	•	Child (5-12), teenager (13-18), young adult (19-35), middle-aged (36-55), elderly (55+)
+	•	Pitch
+	•	High, mid-range, low, slightly high, slightly low
+	•	Speed
+	•	Fast, moderate, slow, slightly fast, slightly slow
+	•	Emotion
+	•	Cheerful, calm, gentle, serious, lively, composed, soothing
+	•	Characteristics
+	•	Magnetic, crisp, husky, mellow, sweet, rich, powerful
+	•	Use case
+	•	News broadcast, ad voiceover, audiobook, animation character, voice assistant, documentary narration
+	•	
+	•	Examples:
+	•	Standard broadcast style: clear and precise articulation with perfect pronunciation
+	•	A young, lively female voice with a faster pace and noticeable upward intonation, suited for fashion product introductions
+	•	A calm middle-aged male, slow pace, deep and magnetic voice, suited for news reading or documentary narration
+	•	A gentle, intellectual female, around 30 years old, with an even tone, suited for audiobook narration
+	•	A cute child's voice, approximately an 8-year-old girl, speaking with a slightly childish quality, suited for animation character voiceover
+Dialects
+
+This section describes how to produce speech in Chinese dialects (such as Henan dialect, Sichuan dialect, and Cantonese). Configuration methods vary by model and voice type.
+Dialect configuration by model:
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+	•	System voices: Select one of the following voice types:
+	•	A system voice with built-in dialect support, which outputs the corresponding dialect without additional configuration.
+	•	A voice that supports Instruction control and can be configured to output a specific dialect through instruction text.
+	•	Voice cloning voices: Configure through the Instruction control feature. For example, set the instruction text to 请用河南话表达.
+Supported dialects: See the "Supported languages" column for each model in Qwen-Audio-TTS.
+Emotion and rich language tags
+
+Qwen-Audio-TTS series models support embedding emotion and rich language tags directly in the text to synthesize (the text parameter). These tags control emotional expression or insert vocal effects (such as laughter and sighs) at specified positions, producing more expressive speech without configuring complex audio parameters.
+
+Important
+Supported models: qwen-audio-3.0-tts-plus and qwen-audio-3.0-tts-flash only.
+Limitation: Only unidirectional streaming mode is supported.
+Control tags
+Control tags set the emotion or style of the speech. Place a tag in the text to affect all subsequent text until the next control tag appears or the sentence is automatically segmented due to length.
+
+
+Tag
+Description
+[sad]
+Sad
+[amazed]
+Amazed
+[deep and loud shouting]
+Deep, loud shouting
+[trembling]
+Trembling
+[angry]
+Angry
+[excited]
+Excited
+[sarcastic]
+Sarcastic
+[curious]
+Curious
+[like dracula]
+Dracula style (deep, eerie)
+[bored]
+Bored
+[tired]
+Tired
+[scornful]
+Scornful
+[shouting]
+Shouting
+[asmr]
+ASMR soft whisper
+[panicked]
+Panicked
+[mischievously]
+Mischievous
+[empathetic]
+Empathetic
+[whispers]
+Whisper
+[reluctantly]
+Reluctant
+[crying]
+Crying
+[serious]
+Serious
+[very slowly]
+Very slow speech
+[very fast]
+Very fast speech
+Rich language tags
+Rich language tags insert a vocal effect at the current position in the text without affecting the emotional style of surrounding text.
+
+
+Tag
+Description
+[gasp]
+Gasp
+[sighing]
+Sigh
+[clears throat]
+Throat clearing
+[giggles]
+Giggle
+[laughing]
+Laughter
+[cough]
+Cough
+[snorts]
+Snort
+Usage examples
+The following example shows how to combine control tags and rich language tags in the text parameter:
+[excited]What a beautiful day today![laughing]Let's go out and have fun together!
+In this text, [excited] is a control tag that applies an excited emotion to all subsequent text. [laughing] is a rich language tag that inserts a laugh at that position before continuing to synthesize the remaining text.
+You can also switch between different emotions within the same text:
+[serious]Please pay attention to the safety precautions.[excited]Alright, let's get started now!
+Here, [serious] sets the first sentence to a serious tone, and [excited] switches to an excited tone starting from the second sentence.
+Cancel task
+
+If you need to interrupt the current synthesis turn during real-time speech synthesis, send a cancel command. After cancellation, the server immediately ends the current task and returns a completion event. You can start a new synthesis task on the same WebSocket connection without reconnecting.
+Usage:
+	•	Python SDK: 1.26.4 or later, call SpeechSynthesizer.streaming_cancel().
+	•	Java SDK: 2.22.26 or later, call SpeechSynthesizer.streamingCancel().
+	•	WebSocket raw protocol: Send a finish-task event and set directive=cancel in input.
+
+Important
+Model limitations:
+	•	China (Beijing): All Qwen-Audio-TTS models support this feature. CosyVoice models require v2 or later.
+	•	Singapore: All Qwen-Audio-TTS models support this feature. CosyVoice models do not support this feature.
+WebSocket raw protocol calls
+
+The following examples demonstrate how to connect directly to the server through the WebSocket raw protocol, suited for scenarios without the DashScope SDK. These are minimal runnable implementations. For WebSocket protocol details, see the API reference for each model.
+View WebSocket raw protocol call examples
+
+Apply in production
+
+Connection reuse (WebSocket)
+
+WebSocket connections are reusable: after a synthesis task completes, you can start the next task on the same connection without re-establishing it.
+Reuse process:
+	•	Qwen-Audio-TTS / Qwen-Audio-TTS/CosyVoice: The client sends finish-task, and after the server returns task-finished, the client can send run-task to start a new task.
+	•	Qwen-TTS: The client sends session.finish, and after the server returns session.finished, the client can create a new session to start the next task.
+Reuse after cancellation: For Qwen-Audio-TTS / Qwen-Audio-TTS/CosyVoice, if you cancel the current task using the cancel directive, you can also send a new run-task on the same connection after the server returns task-finished. For details, see Cancel task.
+
+Important
+	1	Wait for the server to return the completion event (task-finished or session.finished) before starting a new task.
+	2	Qwen-Audio-TTS, Qwen-Audio-TTS/CosyVoice require a different task_id for each task on a reused connection.
+	3	If a task fails, the server returns an error event and closes the connection. The connection can't be reused.
+	4	If no new task is started within 60 seconds after the previous task ends, the connection is automatically closed.
+For the event details of each model, see the corresponding API reference.
+Rate limits
+
+Model calls are subject to rate limits. When a limit is exceeded, the server returns the error Requests rate limit exceeded, please try again later. Reduce your request rate or concurrency and retry.
+For the rate limits of each model, see Rate limiting.
+High-concurrency best practices
+
+The DashScope SDK has built-in pooling that reuses WebSocket connections and synthesizer objects, eliminating the overhead of repeatedly creating and destroying them.
+View high-concurrency best practices
+
+Supported models and regions
+
+SingaporeChina (Beijing)
+
+
+To call the following models, select an API Key from the Singapore region:
+	•	Qwen-Audio-TTS: qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash
+	•	Qwen-Audio-TTS/CosyVoice: cosyvoice-v3-plus, cosyvoice-v3-flash
+	•	Qwen-TTS:
+	•	Qwen3-TTS-Instruct-Flash-Realtime: qwen3-tts-instruct-flash-realtime (stable, currently equivalent to qwen3-tts-instruct-flash-realtime-2026-01-22), qwen3-tts-instruct-flash-realtime-2026-01-22 (latest snapshot)
+	•	Qwen3-TTS-VD-Realtime: qwen3-tts-vd-realtime-2026-01-15 (latest snapshot), qwen3-tts-vd-realtime-2025-12-16 (snapshot)
+	•	Qwen3-TTS-VC-Realtime: qwen3-tts-vc-realtime-2026-01-15 (latest snapshot), qwen3-tts-vc-realtime-2025-11-27 (snapshot)
+	•	Qwen3-TTS-Flash-Realtime: qwen3-tts-flash-realtime (stable, currently equivalent to qwen3-tts-flash-realtime-2025-11-27), qwen3-tts-flash-realtime-2025-11-27 (latest snapshot), qwen3-tts-flash-realtime-2025-09-18 (snapshot)
+Supported voices
+
+Different models support different voices. Set the voice request parameter to the value in the voice parameter column of the corresponding voice list.
+	•	Qwen-Audio-TTS voice list
+	•	CosyVoice Voice list
+	•	Qwen-TTS voice list
+API reference
+
+	•	Real-time speech synthesis - Qwen-Audio-TTS/CosyVoice API reference
+	•	Real-time speech synthesis - Qwen-TTS API reference
+	•	AOQ Client SDK (for CosyVoice models)
+FAQ
+
+Q: How do I fix incorrect pronunciation in speech synthesis? How do I control the pronunciation of polyphonic characters?
+
+	•	Replace the polyphonic character with a homophone to quickly fix the pronunciation issue.
+	•	Use SSML markup to control pronunciation .
+Q: How do I troubleshoot silent audio when using a cloned voice?
+
+	1	Verify the voice status Call the Voice cloning/design API interface and confirm that the voice status is OK.
+	2	Check model version consistency Make sure the target_model parameter used during voice cloning matches the model parameter used for speech synthesis. For example:
+	•	Cloning used cosyvoice-v3-plus
+	•	Synthesis must also use cosyvoice-v3-plus
+	3	Verify the source audio quality Check whether the source audio used for voice cloning meets the requirements in Voice cloning/design API:
+	•	Audio duration: 10-20 seconds
+	•	Clear audio quality
+	•	No background noise
+	4	Check the request parameters Confirm that the voice parameter in the speech synthesis request is set to the cloned voice ID.
+Q: What should I do if the synthesized audio from a cloned voice is unstable or incomplete?
+
+If the synthesized audio from a cloned voice has any of the following issues:
+	•	Audio playback is incomplete, with only part of the text spoken
+	•	Synthesis quality is inconsistent
+	•	Audio contains abnormal pauses or silent segments
+Possible cause: The source audio doesn't meet the quality requirements.
+Solution: Check whether the source audio meets the requirements in Recording guide for voice cloning. Re-record the audio following the recording guidelines.
+Q: Why does the actual duration of synthesized audio differ from the duration shown in the WAV file?
+
+Speech synthesis uses a streaming mechanism that returns data as it's generated. The duration in the saved WAV file header is an estimate and may be inaccurate. For precise duration, set the format to pcm, wait for the full synthesis result, and then add the WAV file header manually.
+Q: Why can't the audio file play?
+
+Troubleshoot based on your scenario:
+	1	Audio saved as a complete file (such as xx.mp3)
+	1	Audio format consistency: The audio format in the request parameters must match the file extension (for example, if the parameter is wav, the file must be .wav).
+	2	Player compatibility: Confirm that the player supports the audio format and sample rate.
+	2	Streaming audio playback
+	1	Save the audio stream as a complete file and try playing it with a media player. If the file doesn't play, refer to scenario 1 above.
+	2	If the file plays correctly, the issue is in the streaming playback implementation. Confirm that the player supports streaming playback (such as ffmpeg, pyaudio, AudioFormat, or MediaSource).
+Q: Why is audio playback stuttering?
+
+Troubleshoot with the following steps:
+	1	Check the text sending rate: Make sure the sending interval is reasonable to avoid the previous audio segment finishing before the next text arrives.
+	2	Check callback function performance:
+	•	Confirm that no blocking logic exists in the callback function.
+	•	Callbacks run on the WebSocket thread. Blocking operations affect data reception. Write audio data to a separate buffer and process it in another thread.
+	3	Check network stability: Network fluctuations can cause audio transmission interruptions or delays.
+Q: Why is speech synthesis taking a long time?Real-time speech synthesis
+Updated at: 2026-08-07 06:18:02
+
+Copy as MD
+Product
+Stream text-to-speech conversion with low first-packet latency. Real-time speech synthesis supports streaming input and output, voice cloning, voice design, and fine-grained audio controls for voice assistants, audiobooks, and intelligent customer service.
+Overview
+
+Convert text to speech in real time with low latency.
+	•	Streaming input and output with low first-packet latency
+	•	Adjustable speech rate, pitch, volume, and bitrate for fine-grained audio control
+	•	Compatible with mainstream audio formats (PCM, WAV, MP3, Opus) with up to 48 kHz sample rate output
+	•	Supports Instruction control, which lets you control speech expressiveness through natural language instructions
+	•	Supports Voice cloning and Voice Design for custom voice creation
+	•	Supports Emotion and rich language tags, which lets you embed emotion or sound effect tags within text
+For batch scenarios such as audiobooks and courseware voiceover, use Non-real-time speech synthesis. For model selection guidance, see Speech synthesis.
+Prerequisites
+
+	•	Configure an API key and set it as an environment variable.
+	•	If you call the API through the DashScope SDK, install the latest SDK.
+	•	To use the AOQ protocol with CosyVoice models, download and integrate the AOQ client SDK. For details, see SDK overview.
+Quick start
+
+The following examples demonstrate speech synthesis for each model. For more examples and parameter details, see the API reference.
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+The following example synthesizes speech using a system voice.
+To use the Instruction control feature, set instructions through the instruction parameter.
+PythonJava
+
+
+
+ 
+# coding=utf-8
+
+import os
+import dashscope
+from dashscope.audio.tts_v2 import *
+
+# The API Key differs between the Singapore and Beijing regions. Get your API Key: https://www.alibabacloud.com/help/zh/model-studio/get-api-key
+# If you have not configured the environment variable, replace the next line with your Chinese Model Studio API Key: dashscope.api_key = "sk-xxx"
+dashscope.api_key = os.environ.get('DASHSCOPE_API_KEY')
+
+# The following is the configuration for the Singapore region. Replace "{WorkspaceId}" with your actual workspace ID. The configuration varies by region.
+dashscope.base_websocket_api_url='wss://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference'
+
+# Model
+# qwen-audio-3.0-tts-flash/qwen-audio-3.0-tts-plus: Use voices such as longanhuan_v3.6.
+# Each voice supports different languages. To synthesize non-Chinese languages such as Japanese or Korean, select a voice that supports the target language. See the voice list for details.
+model = "qwen-audio-3.0-tts-flash"
+# Voice
+voice = "longanhuan_v3.6"
+
+# Instantiate SpeechSynthesizer and pass request parameters such as model and voice in the constructor
+synthesizer = SpeechSynthesizer(model=model, voice=voice)
+# Send the text to be synthesized and get the binary audio
+audio = synthesizer.call("How is the weather today?")
+# The first text submission requires establishing a WebSocket connection, so the first-packet latency includes connection setup time
+print('[Metric] requestId: {}, first-packet latency: {} ms'.format(
+    synthesizer.get_last_request_id(),
+    synthesizer.get_first_package_delay()))
+
+# Save the audio to a local file
+with open('output.mp3', 'wb') as f:
+    f.write(audio)
+Session configuration
+
+Qwen-TTS interaction modes
+
+Qwen-TTS Realtime API provides two interaction modes:
+	•	server_commit mode: The server handles text segmentation and synthesis timing automatically. Suited for continuous synthesis of large text blocks. The client appends text without managing segmentation or submission.
+	•	commit mode: The client explicitly submits the text buffer to trigger synthesis. Suited for scenarios that require precise control over synthesis timing, such as per-turn synthesis in conversational AI.
+Switch interaction modes:
+	•	WebSocket: Set the session.update event's mode field.    {
+	•	    "type": "session.update",
+	•	    "session": {
+	•	        "mode": "server_commit"
+	•	    }
+	•	} 
+	•	Python SDK: Set the mode parameter in the update_session method.    qwen_tts_realtime.update_session(
+	•	    voice='Cherry',
+	•	    response_format=AudioFormat.PCM_24000HZ_MONO_16BIT,
+	•	    mode='server_commit'
+	•	) 
+	•	Java SDK: Set the mode parameter through QwenTtsRealtimeConfig.builder().    QwenTtsRealtimeConfig config = QwenTtsRealtimeConfig.builder()
+	•	        .voice("Cherry")
+	•	        .responseFormat(ttsFormat)
+	•	        .mode("server_commit")
+	•	        .build();
+	•	qwenTtsRealtime.updateSession(config); 
+For complete SDK code examples, see Python SDK and Java SDK. For WebSocket event lifecycle and connection reuse details, see WebSocket API reference.
+Advanced features
+
+Instruction control
+
+Instruction control uses natural language descriptions to adjust speech tone, speed, emotion, and timbre characteristics without configuring complex audio parameters.
+Instruction specifications by model:
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+Supported models: qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash
+System voices and voice cloning voices: accept any instruction.
+Use cases:
+	•	Audiobook and radio drama voiceover
+	•	Advertising and promotional video voiceover
+	•	Game character and animation voiceover
+	•	Emotionally expressive voice assistants
+	•	Documentary and news broadcast narration
+Writing effective voice descriptions:
+	•	Core principles:
+	1	Be specific, not vague: Use words that depict vocal qualities, such as "deep", "crisp", or "slightly fast pace". Avoid subjective or vague terms like "nice" or "normal".
+	2	Be multi-dimensional, not one-dimensional: A good description typically covers multiple dimensions (such as gender, age, and emotion). Writing only "female voice" is too broad to generate a distinctive timbre.
+	3	Be objective, not subjective: Focus on the physical and perceptual characteristics of the voice. For example, use "higher pitch with an energetic tone" instead of "my favorite voice".
+	4	Be original, not imitative: Describe the vocal qualities rather than requesting imitation of specific individuals (such as celebrities or actors). The model doesn't support imitation, and it may pose copyright risks.
+	5	Be concise, not redundant: Make sure every word serves a purpose. Avoid repetitive synonyms or meaningless modifiers.
+	•	Description dimension reference: Combine the following dimensions to describe a voice. The more dimensions you include, the more accurate the output.
+	•	
+	•	
+	•	Dimension
+	•	Example descriptions
+	•	Gender
+	•	Male, female, androgynous
+	•	Age
+	•	Child (5-12), teenager (13-18), young adult (19-35), middle-aged (36-55), elderly (55+)
+	•	Pitch
+	•	High, mid-range, low, slightly high, slightly low
+	•	Speed
+	•	Fast, moderate, slow, slightly fast, slightly slow
+	•	Emotion
+	•	Cheerful, calm, gentle, serious, lively, composed, soothing
+	•	Characteristics
+	•	Magnetic, crisp, husky, mellow, sweet, rich, powerful
+	•	Use case
+	•	News broadcast, ad voiceover, audiobook, animation character, voice assistant, documentary narration
+	•	
+	•	Examples:
+	•	Standard broadcast style: clear and precise articulation with perfect pronunciation
+	•	A young, lively female voice with a faster pace and noticeable upward intonation, suited for fashion product introductions
+	•	A calm middle-aged male, slow pace, deep and magnetic voice, suited for news reading or documentary narration
+	•	A gentle, intellectual female, around 30 years old, with an even tone, suited for audiobook narration
+	•	A cute child's voice, approximately an 8-year-old girl, speaking with a slightly childish quality, suited for animation character voiceover
+Dialects
+
+This section describes how to produce speech in Chinese dialects (such as Henan dialect, Sichuan dialect, and Cantonese). Configuration methods vary by model and voice type.
+Dialect configuration by model:
+Qwen-Audio-TTSCosyVoiceQwen-TTS
+
+
+	•	System voices: Select one of the following voice types:
+	•	A system voice with built-in dialect support, which outputs the corresponding dialect without additional configuration.
+	•	A voice that supports Instruction control and can be configured to output a specific dialect through instruction text.
+	•	Voice cloning voices: Configure through the Instruction control feature. For example, set the instruction text to 请用河南话表达.
+Supported dialects: See the "Supported languages" column for each model in Qwen-Audio-TTS.
+Emotion and rich language tags
+
+Qwen-Audio-TTS series models support embedding emotion and rich language tags directly in the text to synthesize (the text parameter). These tags control emotional expression or insert vocal effects (such as laughter and sighs) at specified positions, producing more expressive speech without configuring complex audio parameters.
+
+Important
+Supported models: qwen-audio-3.0-tts-plus and qwen-audio-3.0-tts-flash only.
+Limitation: Only unidirectional streaming mode is supported.
+Control tags
+Control tags set the emotion or style of the speech. Place a tag in the text to affect all subsequent text until the next control tag appears or the sentence is automatically segmented due to length.
+
+
+Tag
+Description
+[sad]
+Sad
+[amazed]
+Amazed
+[deep and loud shouting]
+Deep, loud shouting
+[trembling]
+Trembling
+[angry]
+Angry
+[excited]
+Excited
+[sarcastic]
+Sarcastic
+[curious]
+Curious
+[like dracula]
+Dracula style (deep, eerie)
+[bored]
+Bored
+[tired]
+Tired
+[scornful]
+Scornful
+[shouting]
+Shouting
+[asmr]
+ASMR soft whisper
+[panicked]
+Panicked
+[mischievously]
+Mischievous
+[empathetic]
+Empathetic
+[whispers]
+Whisper
+[reluctantly]
+Reluctant
+[crying]
+Crying
+[serious]
+Serious
+[very slowly]
+Very slow speech
+[very fast]
+Very fast speech
+Rich language tags
+Rich language tags insert a vocal effect at the current position in the text without affecting the emotional style of surrounding text.
+
+
+Tag
+Description
+[gasp]
+Gasp
+[sighing]
+Sigh
+[clears throat]
+Throat clearing
+[giggles]
+Giggle
+[laughing]
+Laughter
+[cough]
+Cough
+[snorts]
+Snort
+Usage examples
+The following example shows how to combine control tags and rich language tags in the text parameter:
+[excited]What a beautiful day today![laughing]Let's go out and have fun together!
+In this text, [excited] is a control tag that applies an excited emotion to all subsequent text. [laughing] is a rich language tag that inserts a laugh at that position before continuing to synthesize the remaining text.
+You can also switch between different emotions within the same text:
+[serious]Please pay attention to the safety precautions.[excited]Alright, let's get started now!
+Here, [serious] sets the first sentence to a serious tone, and [excited] switches to an excited tone starting from the second sentence.
+Cancel task
+
+If you need to interrupt the current synthesis turn during real-time speech synthesis, send a cancel command. After cancellation, the server immediately ends the current task and returns a completion event. You can start a new synthesis task on the same WebSocket connection without reconnecting.
+Usage:
+	•	Python SDK: 1.26.4 or later, call SpeechSynthesizer.streaming_cancel().
+	•	Java SDK: 2.22.26 or later, call SpeechSynthesizer.streamingCancel().
+	•	WebSocket raw protocol: Send a finish-task event and set directive=cancel in input.
+
+Important
+Model limitations:
+	•	China (Beijing): All Qwen-Audio-TTS models support this feature. CosyVoice models require v2 or later.
+	•	Singapore: All Qwen-Audio-TTS models support this feature. CosyVoice models do not support this feature.
+WebSocket raw protocol calls
+
+The following examples demonstrate how to connect directly to the server through the WebSocket raw protocol, suited for scenarios without the DashScope SDK. These are minimal runnable implementations. For WebSocket protocol details, see the API reference for each model.
+View WebSocket raw protocol call examples
+
+Apply in production
+
+Connection reuse (WebSocket)
+
+WebSocket connections are reusable: after a synthesis task completes, you can start the next task on the same connection without re-establishing it.
+Reuse process:
+	•	Qwen-Audio-TTS / Qwen-Audio-TTS/CosyVoice: The client sends finish-task, and after the server returns task-finished, the client can send run-task to start a new task.
+	•	Qwen-TTS: The client sends session.finish, and after the server returns session.finished, the client can create a new session to start the next task.
+Reuse after cancellation: For Qwen-Audio-TTS / Qwen-Audio-TTS/CosyVoice, if you cancel the current task using the cancel directive, you can also send a new run-task on the same connection after the server returns task-finished. For details, see Cancel task.
+
+Important
+	1	Wait for the server to return the completion event (task-finished or session.finished) before starting a new task.
+	2	Qwen-Audio-TTS, Qwen-Audio-TTS/CosyVoice require a different task_id for each task on a reused connection.
+	3	If a task fails, the server returns an error event and closes the connection. The connection can't be reused.
+	4	If no new task is started within 60 seconds after the previous task ends, the connection is automatically closed.
+For the event details of each model, see the corresponding API reference.
+Rate limits
+
+Model calls are subject to rate limits. When a limit is exceeded, the server returns the error Requests rate limit exceeded, please try again later. Reduce your request rate or concurrency and retry.
+For the rate limits of each model, see Rate limiting.
+High-concurrency best practices
+
+The DashScope SDK has built-in pooling that reuses WebSocket connections and synthesizer objects, eliminating the overhead of repeatedly creating and destroying them.
+View high-concurrency best practices
+
+Supported models and regions
+
+SingaporeChina (Beijing)
+
+
+To call the following models, select an API Key from the Singapore region:
+	•	Qwen-Audio-TTS: qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash
+	•	Qwen-Audio-TTS/CosyVoice: cosyvoice-v3-plus, cosyvoice-v3-flash
+	•	Qwen-TTS:
+	•	Qwen3-TTS-Instruct-Flash-Realtime: qwen3-tts-instruct-flash-realtime (stable, currently equivalent to qwen3-tts-instruct-flash-realtime-2026-01-22), qwen3-tts-instruct-flash-realtime-2026-01-22 (latest snapshot)
+	•	Qwen3-TTS-VD-Realtime: qwen3-tts-vd-realtime-2026-01-15 (latest snapshot), qwen3-tts-vd-realtime-2025-12-16 (snapshot)
+	•	Qwen3-TTS-VC-Realtime: qwen3-tts-vc-realtime-2026-01-15 (latest snapshot), qwen3-tts-vc-realtime-2025-11-27 (snapshot)
+	•	Qwen3-TTS-Flash-Realtime: qwen3-tts-flash-realtime (stable, currently equivalent to qwen3-tts-flash-realtime-2025-11-27), qwen3-tts-flash-realtime-2025-11-27 (latest snapshot), qwen3-tts-flash-realtime-2025-09-18 (snapshot)
+Supported voices
+
+Different models support different voices. Set the voice request parameter to the value in the voice parameter column of the corresponding voice list.
+	•	Qwen-Audio-TTS voice list
+	•	CosyVoice Voice list
+	•	Qwen-TTS voice list
+API reference
+
+	•	Real-time speech synthesis - Qwen-Audio-TTS/CosyVoice API reference
+	•	Real-time speech synthesis - Qwen-TTS API reference
+	•	AOQ Client SDK (for CosyVoice models)
+FAQ
+
+Q: How do I fix incorrect pronunciation in speech synthesis? How do I control the pronunciation of polyphonic characters?
+
+	•	Replace the polyphonic character with a homophone to quickly fix the pronunciation issue.
+	•	Use SSML markup to control pronunciation .
+Q: How do I troubleshoot silent audio when using a cloned voice?
+
+	1	Verify the voice status Call the Voice cloning/design API interface and confirm that the voice status is OK.
+	2	Check model version consistency Make sure the target_model parameter used during voice cloning matches the model parameter used for speech synthesis. For example:
+	•	Cloning used cosyvoice-v3-plus
+	•	Synthesis must also use cosyvoice-v3-plus
+	3	Verify the source audio quality Check whether the source audio used for voice cloning meets the requirements in Voice cloning/design API:
+	•	Audio duration: 10-20 seconds
+	•	Clear audio quality
+	•	No background noise
+	4	Check the request parameters Confirm that the voice parameter in the speech synthesis request is set to the cloned voice ID.
+Q: What should I do if the synthesized audio from a cloned voice is unstable or incomplete?
+
+If the synthesized audio from a cloned voice has any of the following issues:
+	•	Audio playback is incomplete, with only part of the text spoken
+	•	Synthesis quality is inconsistent
+	•	Audio contains abnormal pauses or silent segments
+Possible cause: The source audio doesn't meet the quality requirements.
+Solution: Check whether the source audio meets the requirements in Recording guide for voice cloning. Re-record the audio following the recording guidelines.
+Q: Why does the actual duration of synthesized audio differ from the duration shown in the WAV file?
+
+Speech synthesis uses a streaming mechanism that returns data as it's generated. The duration in the saved WAV file header is an estimate and may be inaccurate. For precise duration, set the format to pcm, wait for the full synthesis result, and then add the WAV file header manually.
+Q: Why can't the audio file play?
+
+Troubleshoot based on your scenario:
+	1	Audio saved as a complete file (such as xx.mp3)
+	1	Audio format consistency: The audio format in the request parameters must match the file extension (for example, if the parameter is wav, the file must be .wav).
+	2	Player compatibility: Confirm that the player supports the audio format and sample rate.
+	2	Streaming audio playback
+	1	Save the audio stream as a complete file and try playing it with a media player. If the file doesn't play, refer to scenario 1 above.
+	2	If the file plays correctly, the issue is in the streaming playback implementation. Confirm that the player supports streaming playback (such as ffmpeg, pyaudio, AudioFormat, or MediaSource).
+Q: Why is audio playback stuttering?
+
+Troubleshoot with the following steps:
+	1	Check the text sending rate: Make sure the sending interval is reasonable to avoid the previous audio segment finishing before the next text arrives.
+	2	Check callback function performance:
+	•	Confirm that no blocking logic exists in the callback function.
+	•	Callbacks run on the WebSocket thread. Blocking operations affect data reception. Write audio data to a separate buffer and process it in another thread.
+	3	Check network stability: Network fluctuations can cause audio transmission interruptions or delays.
+Q: Why is speech synthesis taking a long time?
+
+Troubleshoot with the following steps:
+	1	Check input intervals For streaming synthesis, check whether the text sending interval is too long. Long intervals increase the total synthesis time.
+	2	Analyze performance metrics
+	•	First-packet latency: normally around 500 ms.
+	•	RTF (Real-Time Factor = total synthesis time / audio duration): should be less than 1.0.
+Q: How do I restrict an API key to only the speech synthesis service (permission isolation)?
+
+Create a new workspace and grant access to specific models only. This limits the scope of the API key. For details, see Manage workspaces.
+
+
+Troubleshoot with the following steps:
+	1	Check input intervals For streaming synthesis, check whether the text sending interval is too long. Long intervals increase the total synthesis time.
+	2	Analyze performance metrics
+	•	First-packet latency: normally around 500 ms.
+	•	RTF (Real-Time Factor = total synthesis time / audio duration): should be less than 1.0.
+Q: How do I restrict an API key to only the speech synthesis service (permission isolation)?
+
+Create a new workspace and grant access to specific models only. This limits the scope of the API key. For details, see Manage workspaces.

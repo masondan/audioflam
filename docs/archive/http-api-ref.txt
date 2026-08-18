@@ -1,0 +1,773 @@
+Voice cloning HTTP API reference
+Updated at: 2026-08-12 12:45:30
+Copy as MD
+Product
+Use the HTTP API to create, list, query, update, and delete cloned voices.
+
+User guide: Voice cloning.
+
+Service endpoint
+SingaporeChina (Beijing)
+POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Important
+Alibaba Cloud Model Studio has released workspace-specific domains for the China (Beijing) and Singapore regions. The new dedicated domains deliver superior performance and higher stability for inference requests. We recommend migrating to the new domains:
+
+China (Beijing): from dashscope.aliyuncs.com to {WorkspaceId}.cn-beijing.maas.aliyuncs.com
+
+Singapore: from dashscope-intl.aliyuncs.com to {WorkspaceId}.ap-southeast-1.maas.aliyuncs.com
+
+Replace {WorkspaceId} with your actual Workspace ID. The existing domains remain fully functional.
+
+Request headers
+
+
+
+
+Parameter
+
+Type
+
+Required
+
+Description
+
+Authorization
+
+string
+
+Yes
+
+Authentication token in the format Bearer <your_api_key>. Replace <your_api_key> with your actual API key.
+
+Content-Type
+
+string
+
+Yes
+
+Media type of the request body. Set to application/json for Qwen-Audio-TTS/CosyVoice/Qwen-TTS, or application/json; charset=utf-8 for MiniMax.
+
+Create a voice
+Request body
+This example uses the Singapore region endpoint. For the Beijing region, use: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/customization.
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Qwen-Audio-TTS/CosyVoice voice cloningQwen-TTS voice cloning
+ 
+curl -X POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "voice-enrollment",
+    "input": {
+        "action": "create_voice",
+        "target_model": "qwen-audio-3.0-tts-flash",
+        "prefix": "myvoice",
+        "url": "https://your-audio-url.wav",
+        "language_hints": ["en"],
+        "enable_volume_normalization": "false"
+    }
+}'
+model string (required)
+
+The voice cloning model. Valid values:
+
+voice-enrollment: Qwen-Audio-TTS/CosyVoice voice cloning.
+
+qwen-voice-enrollment: Qwen-TTS voice cloning.
+
+input object (required)
+
+The input parameters.
+
+Properties
+
+action string (required)
+
+The action type.
+
+Qwen-Audio-TTS/CosyVoice (voice-enrollment): Set to create_voice.
+
+Qwen (qwen-voice-enrollment): Set to create.
+
+target_model string (required)
+
+The text-to-speech (TTS) model that drives the cloned voice. It must match the model you specify when calling the TTS API; otherwise, synthesis fails.
+
+url string (conditionally required)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning (when model is voice-enrollment).
+
+The URL of the audio file for voice cloning. The URL must be publicly accessible.
+
+audio object (conditionally required)
+
+Important
+Applies only to Qwen-TTS voice cloning (when model is qwen-voice-enrollment).
+
+The audio data. Two submission methods are supported:
+
+Data URL (Base64-encoded): Format is {"data": "data:{mime_type};base64,{base64_encoded_data}"}. Supported MIME types: audio/wav, audio/mpeg, and audio/mp4.
+
+Audio URL: Format is {"data": "https://your-audio-url.wav"}. The URL must be publicly accessible without authentication.
+
+text string (optional)
+
+Important
+Applies only to Qwen-TTS voice cloning (when model is qwen-voice-enrollment).
+
+The transcript of the audio, used to improve cloning quality.
+
+prefix string (conditionally required)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice (when model is voice-enrollment).
+
+A prefix for the voice name. Only alphanumeric characters are allowed, with a maximum length of 10 characters. The resulting voice name follows this format: {target_model}-{prefix}-{unique_id}.
+
+preferred_name string (conditionally required)
+
+Important
+Applies only to Qwen-TTS voice cloning (when model is qwen-voice-enrollment).
+
+A prefix for the voice name. Only alphanumeric characters and underscores are allowed, with a maximum length of 16 characters.
+
+language_hints array[string] (optional)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning (when model is voice-enrollment). Supported only by qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash, cosyvoice-v3.5-plus, v3.5-flash, v3-plus, and v3-flash.
+
+Helps the model identify the language of the sample audio to extract voice features more accurately and improve cloning quality. If the specified language doesn't match the actual audio language (for example, setting en when the audio is in Chinese), the system ignores this value and detects the language automatically.
+
+This parameter is an array, but the current version processes only the first element.
+
+Valid values vary by model:
+
+qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash:
+
+zh: Chinese
+
+en: English
+
+fr: French
+
+de: German
+
+ja: Japanese
+
+ko: Korean
+
+ru: Russian
+
+pt: Portuguese
+
+th: Thai
+
+id: Indonesian
+
+vi: Vietnamese
+
+it: Italian
+
+es: Spanish
+
+ms: Malaysian
+
+fil: Filipino
+
+ar: Arabic
+
+cosyvoice-v3-plus:
+
+zh: Chinese
+
+en: English
+
+fr: French
+
+de: German
+
+ja: Japanese
+
+ko: Korean
+
+ru: Russian
+
+cosyvoice-v3.5-plus, cosyvoice-v3.5-flash, cosyvoice-v3-flash:
+
+zh: Chinese
+
+en: English
+
+fr: French
+
+de: German
+
+ja: Japanese
+
+ko: Korean
+
+ru: Russian
+
+pt: Portuguese
+
+th: Thai
+
+id: Indonesian
+
+vi: Vietnamese
+
+Default: ["zh"].
+
+language string (optional)
+
+Important
+Applies only to Qwen-TTS voice cloning (when model is qwen-voice-enrollment).
+
+The language of the audio provided in audio.data. If you use this parameter, make sure the specified language matches the actual language of the audio used for cloning.
+
+Valid values:
+
+zh: Chinese
+
+en: English
+
+de: German
+
+it: Italian
+
+pt: Portuguese
+
+es: Spanish
+
+ja: Japanese
+
+ko: Korean
+
+fr: French
+
+ru: Russian
+
+Default: zh.
+
+max_prompt_audio_length float (optional)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning (when model is voice-enrollment). Supported only by qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash, cosyvoice-v3.5-plus, v3.5-flash, and v3-flash.
+
+The maximum duration (in seconds) of the reference audio after preprocessing. Valid values: [3.0, 30.0].
+
+Default: 10.0.
+
+enable_preprocess boolean (optional)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning (when model is voice-enrollment). Supported only by qwen-audio-3.0-tts-plus, qwen-audio-3.0-tts-flash, cosyvoice-v3.5-plus, v3.5-flash, and v3-flash.
+
+Whether to enable audio preprocessing (noise reduction, audio enhancement, and volume normalization). Enable this for recordings with background noise. Disable it for recordings in quiet environments to preserve the original voice characteristics.
+
+Default: false.
+
+enable_volume_normalization string (optional)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning when model is set to voice-enrollment.
+
+Whether to normalize the volume of the sample audio used for voice cloning. Valid values:
+
+"true": Enable volume normalization.
+
+"false": Disable volume normalization.
+
+When enabled, audio synthesized with the created voice may have a different volume than audio synthesized with a voice created with this parameter disabled.
+
+Default: "false".
+
+Response body
+Qwen-Audio-TTS/CosyVoice voice cloningQwen-TTS voice cloning
+ 
+{
+    "output": {
+        "voice_id": "qwen-audio-3.0-tts-flash-myvoice-xxxxxx"
+    },
+    "usage": {
+        "count": 1
+    },
+    "request_id": "xxxx-xxxx-xxxx"
+}
+Important
+Qwen-Audio-TTS/CosyVoice returns the voice_id field, while Qwen returns the voice field. Qwen-TTS voice cloning may also return the fallback_mode and fallback_reason fields.
+
+request_id string
+
+The unique identifier of this request.
+
+output object
+
+The data returned by the model.
+
+Properties
+
+voice_id / voice string
+
+The voice ID. Qwen-Audio-TTS/CosyVoice returns voice_id, while Qwen returns voice. Use this value directly in the voice parameter of the TTS API.
+
+target_model string
+
+Important
+Returned only by Qwen.
+
+The TTS model that drives the cloned voice.
+
+fallback_mode boolean
+
+Important
+Applies only to Qwen-TTS voice cloning (when model is qwen-voice-enrollment).
+
+Whether the voice was created in fallback mode. A value of true indicates that the audio quality was poor or didn't match the provided text, and the cloning quality may be reduced.
+
+fallback_reason string
+
+Important
+Returned only when fallback_mode is true.
+
+The reason for the fallback. Possible values include no_merged_segments (unable to merge audio segments) and no_valid_asr_segments (severe mismatch between audio and text).
+
+usage object
+
+Usage information for this request.
+
+Properties
+
+count integer
+
+The number of voices created. Always 1.
+
+Query voice list
+Request body
+This example uses the Singapore region endpoint. For the Beijing region, use: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/customization.
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Qwen-Audio-TTS/CosyVoiceQwen-TTS voice cloning
+ 
+curl -X POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "voice-enrollment",
+    "input": {
+        "action": "list_voice",
+        "prefix": "myvoice",
+        "page_size": 10,
+        "page_index": 0
+    }
+}'
+model string (required)
+
+The voice cloning model. Valid values:
+
+voice-enrollment: Qwen-Audio-TTS/CosyVoice voice cloning.
+
+qwen-voice-enrollment: Qwen-TTS voice cloning.
+
+input object (required)
+
+The input parameters.
+
+Properties
+
+action string (required)
+
+The action type. Qwen-Audio-TTS/CosyVoice: list_voice. Qwen: list.
+
+prefix string (optional)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice.
+
+Filters voices by name prefix.
+
+page_index integer (optional)
+
+The page index.
+
+page_size integer (optional)
+
+The number of entries per page.
+
+Response body
+Qwen-Audio-TTS/CosyVoiceQwen
+ 
+{
+    "output": {
+        "voice_list": [
+            {
+                "voice_id": "qwen-audio-3.0-tts-flash-myvoice-xxxxxx",
+                "gmt_create": "2024-12-11 13:38:02",
+                "gmt_modified": "2024-12-11 13:38:02",
+                "status": "OK"
+            }
+        ]
+    },
+    "usage": {
+        "count": 1
+    },
+    "request_id": "xxxx-xxxx-xxxx"
+}
+Important
+Qwen-Audio-TTS/CosyVoice returns a voice_list array where each entry contains the voice_id field. Qwen also returns a voice_list array, but each entry contains the voice field instead. The Qwen output additionally includes the page_index, page_size, and total_count pagination fields.
+
+request_id string
+
+The unique identifier of this request.
+
+output object
+
+The data returned by the model.
+
+Properties
+
+page_index integer
+
+Important
+Returned only by Qwen.
+
+The current page index.
+
+page_size integer
+
+Important
+Returned only by Qwen.
+
+The number of entries per page.
+
+total_count integer
+
+Important
+Returned only by Qwen.
+
+The total number of voices.
+
+voice_list array[object]
+
+The list of queried voices. Both Qwen-Audio-TTS/CosyVoice and Qwen use the voice_list field name.
+
+Properties
+
+voice_id / voice string
+
+The voice ID. Qwen-Audio-TTS/CosyVoice uses voice_id, while Qwen uses voice.
+
+gmt_create string
+
+The creation time.
+
+gmt_modified string
+
+The last modification time.
+
+status string
+
+Important
+Returned only by Qwen-Audio-TTS/CosyVoice.
+
+The voice status. For valid values, see "Voice status descriptions".
+
+target_model string
+
+Important
+Returned only by Qwen.
+
+The TTS model that drives the cloned voice.
+
+usage object
+
+Usage information for this request.
+
+Properties
+
+count integer
+
+Always 1 for Qwen-Audio-TTS/CosyVoice. Always 0 for Qwen.
+
+Query voice details
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice (when model is voice-enrollment). Qwen models don't support the query voice details operation.
+
+Request body
+This example uses the Singapore region endpoint. For the Beijing region, use: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/customization.
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Qwen-Audio-TTS/CosyVoice
+ 
+curl -X POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "voice-enrollment",
+    "input": {
+        "action": "query_voice",
+        "voice_id": "yourVoiceId"
+    }
+}'
+model string (required)
+
+Set to voice-enrollment (Qwen-Audio-TTS/CosyVoice).
+
+input object (required)
+
+The input parameters.
+
+Properties
+
+action string (required)
+
+Set to query_voice.
+
+voice_id string (required)
+
+The voice ID to query.
+
+Response body
+ 
+{
+    "output": {
+        "gmt_create": "2024-12-11 13:38:02",
+        "resource_link": "https://yourAudioFileUrl",
+        "target_model": "qwen-audio-3.0-tts-flash",
+        "gmt_modified": "2024-12-11 13:38:02",
+        "status": "OK"
+    },
+    "usage": {
+        "count": 1
+    },
+    "request_id": "xxxx-xxxx-xxxx"
+}
+request_id string
+
+The unique identifier of this request.
+
+output object
+
+The data returned by the model.
+
+Properties
+
+resource_link string
+
+The URL of the audio file.
+
+gmt_create string
+
+The creation time.
+
+gmt_modified string
+
+The last modification time.
+
+status string
+
+The voice status. For valid values, see "Voice status descriptions".
+
+target_model string
+
+The TTS model that drives the cloned voice.
+
+usage object
+
+Usage information for this request.
+
+Properties
+
+count integer
+
+Always 1.
+
+Update a voice
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice voice cloning (when model is voice-enrollment). Qwen models don't support the update operation.
+
+Request body
+This example uses the Singapore region endpoint. For the Beijing region, use: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/customization.
+
+ 
+curl -X POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "voice-enrollment",
+    "input": {
+        "action": "update_voice",
+        "voice_id": "yourVoiceId",
+        "url": "https://new-audio-url.wav"
+    }
+}'
+model string (required)
+
+Set to voice-enrollment.
+
+input object (required)
+
+The input parameters.
+
+Properties
+
+action string (required)
+
+Set to update_voice.
+
+voice_id string (required)
+
+The voice ID to update.
+
+url string (required)
+
+The URL of the new audio file. The URL must be publicly accessible.
+
+Response body
+ 
+{
+    "output": {
+        "preview_audio": {}
+    },
+    "usage": {
+        "count": 1
+    },
+    "request_id": "xxxx-xxxx-xxxx"
+}
+request_id string
+
+The unique identifier of this request.
+
+output object
+
+The data returned by the model. The update operation returns no business data. The response may include a preview_audio field, which is an empty object that you can ignore.
+
+usage object
+
+Usage information for this request.
+
+Properties
+
+count integer
+
+Always 1.
+
+Delete a voice
+Request body
+This example uses the Singapore region endpoint. For the Beijing region, use: https://{WorkspaceId}.cn-beijing.maas.aliyuncs.com/api/v1/services/audio/tts/customization.
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Qwen-Audio-TTS/CosyVoiceQwen-TTS voice cloning
+ 
+curl -X POST https://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api/v1/services/audio/tts/customization \
+-H "Authorization: Bearer $DASHSCOPE_API_KEY" \
+-H "Content-Type: application/json" \
+-d '{
+    "model": "voice-enrollment",
+    "input": {
+        "action": "delete_voice",
+        "voice_id": "yourVoiceId"
+    }
+}'
+model string (required)
+
+The voice cloning model. Valid values:
+
+voice-enrollment: Qwen-Audio-TTS/CosyVoice voice cloning.
+
+qwen-voice-enrollment: Qwen-TTS voice cloning.
+
+input object (required)
+
+The input parameters.
+
+Properties
+
+action string (required)
+
+The action type. Qwen-Audio-TTS/CosyVoice: delete_voice. Qwen: delete.
+
+voice_id string (conditionally required)
+
+Important
+Applies only to Qwen-Audio-TTS/CosyVoice.
+
+The voice ID to delete.
+
+voice string (conditionally required)
+
+Important
+Applies only to Qwen.
+
+The voice name to delete.
+
+Response body
+Qwen-Audio-TTS/CosyVoiceQwen
+ 
+{
+    "output": {},
+    "usage": {
+        "count": 1
+    },
+    "request_id": "xxxx-xxxx-xxxx"
+}
+Important
+Qwen-Audio-TTS/CosyVoice returns an empty output object, while Qwen returns the voice field with the deleted voice name.
+
+request_id string
+
+The unique identifier of this request.
+
+output object
+
+The data returned by the model. Qwen-Audio-TTS/CosyVoice returns an empty object, while Qwen returns the name of the deleted voice.
+
+Properties
+
+voice string
+
+Important
+Returned only by Qwen.
+
+The name of the deleted voice.
+
+usage object
+
+Usage information for this request.
+
+Properties
+
+count integer
+
+Always 1 for Qwen-Audio-TTS/CosyVoice. Always 0 for Qwen.
+
+Voice status descriptions
+After a voice is created, it goes through a review process. The statuses below apply only to Qwen-Audio-TTS/CosyVoice (when model is voice-enrollment). Qwen query and list responses don't include a status field.
+
+
+
+Status
+
+Description
+
+DEPLOYING
+
+Under review or processing.
+
+OK
+
+Review passed. The voice is ready to use.
+
+UNDEPLOYED
+
+Review rejected. The voice can't be used.
+

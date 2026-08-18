@@ -1,0 +1,123 @@
+Qwen-Audio-TTS/CosyVoice speech synthesis WebSocket API
+Updated at: 2026-07-30 07:26:40
+Copy as MD
+Product
+Access the Qwen-Audio-TTS/CosyVoice real-time speech synthesis service through a WebSocket connection. Covers service endpoints, request headers, and the client-server interaction workflow.
+
+The DashScope SDK supports Java and Python only. For other languages, use a WebSocket connection.
+
+User guide: Speech synthesis covers model details and selection guidance.
+
+Rate limits: Model calls are subject to rate limits. When a limit is exceeded, the server returns the error Requests rate limit exceeded, please try again later. Reduce your request rate or concurrency and retry. For the rate limits of each model, see Rate limiting.
+
+Service endpoints
+Fixed WebSocket URL:
+
+SingaporeChina (Beijing)
+wss://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference
+
+Replace {WorkspaceId} with your actual workspace ID.
+
+Important
+Always use the wss:// protocol. The URL shown above is fixed. For authorization details, see Request headers.
+
+Important
+Alibaba Cloud Model Studio has released workspace-specific domains for the China (Beijing) and Singapore regions. The new dedicated domains deliver superior performance and higher stability for inference requests. We recommend migrating to the new domains:
+
+China (Beijing): from dashscope.aliyuncs.com to {WorkspaceId}.cn-beijing.maas.aliyuncs.com
+
+Singapore: from dashscope-intl.aliyuncs.com to {WorkspaceId}.ap-southeast-1.maas.aliyuncs.com
+
+Replace {WorkspaceId} with your actual Workspace ID. The existing domains remain fully functional.
+
+Request headers
+Include the following headers in the request:
+
+
+
+
+
+Parameter
+
+Type
+
+Required
+
+Description
+
+Authorization
+
+string
+
+Yes
+
+Format: Bearer <API key>. Replace <API key> with your API key.
+
+user-agent
+
+string
+
+No
+
+Client identifier for request tracking.
+
+X-DashScope-WorkSpace
+
+string
+
+No
+
+Alibaba Cloud Model Studio workspace ID.
+
+X-DashScope-DataInspection
+
+string
+
+No
+
+Enables data inspection. Default: enable. Leave unset unless required.
+
+Important
+Authorization is verified during the WebSocket handshake. If the API key is invalid or missing, the handshake fails with an HTTP 401/403 error.
+
+Interaction workflow
+image
+For details about client-side and server-side events, see Client events and Server-side events.
+
+Client-server interaction sequence:
+
+Establish a connection: Create a WebSocket connection to the server.
+
+Start a task: Send a run-task event.
+
+Wait for confirmation: Receive a task-started event from the server before proceeding.
+
+Send text for synthesis:
+
+Send one or more continue-task events with the text to synthesize, in sequence. The server returns a result-generated event with an audio stream after each complete sentence. For text length limits, see the text field in the continue-task event.
+
+Note
+Send multiple continue-task events with text segments in order. The server splits text into sentences:
+
+Complete sentences are synthesized and returned as audio immediately.
+
+Incomplete sentences are buffered until complete.
+
+A finish-task event forces synthesis of all buffered content.
+
+Receive audio: Read the audio stream from the binary channel.
+
+End the task:
+
+After sending all text, send a finish-task event and continue receiving audio. This step is mandatory — skipping it may produce incomplete audio.
+
+Receive task completion:
+
+A task-finished event from the server confirms the task is complete.
+
+Close the connection: Disconnect the WebSocket.
+
+Reuse the WebSocket connection across tasks instead of creating a new one for each.
+
+Important
+All events in a synthesis task (run-task, continue-task, finish-task) must share the same task_id. Generate a new task_id (such as a UUID) for each task. Mismatched values cause audio corruption or task failure.

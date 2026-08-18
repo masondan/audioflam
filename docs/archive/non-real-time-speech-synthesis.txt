@@ -1,0 +1,248 @@
+Qwen-TTS non-real-time speech synthesis API reference
+Updated at: 2026-07-27 07:17:27
+Copy as MD
+Product
+Request parameters and response fields for the non-realtime speech synthesis (Qwen-TTS) API.
+
+For usage instructions, see Non-real-time speech synthesis .
+Request body
+Non-streaming outputStreaming output
+PythonJavacurl
+The SpeechSynthesizer interface in the DashScope Python SDK is now unified under MultiModalConversation. Its usage and parameters remain fully consistent.
+ 
+# Install the latest version of the DashScope SDK
+import os
+import dashscope
+# Singapore region
+dashscope.base_http_api_url = 'https://dashscope-intl.aliyuncs.com/api/v1'
+text = "Let me recommend a T-shirt to everyone. This one is really super nice. The color is very elegant, and it's also a perfect item to match. Everyone can buy it without hesitation. It's truly beautiful and very forgiving on the figure. No matter what body type you have, it will look great. I recommend everyone to place an order."
+# SpeechSynthesizer interface usage: dashscope.audio.qwen_tts.SpeechSynthesizer.call(...)
+response = dashscope.MultiModalConversation.call(
+    # To use the instruction control feature, replace the model with qwen3-tts-instruct-flash
+    model="qwen3-tts-flash",
+    # The API keys for Singapore and Beijing regions are different. Get your API Key: https://www.alibabacloud.com/help/en/model-studio/get-api-key
+    # If the environment variable is not configured, replace the following line with your Model Studio API key: api_key="sk-xxx"
+    api_key=os.getenv("DASHSCOPE_API_KEY"),
+    text=text,
+    voice="Cherry"
+    # To use the instruction control feature, uncomment the following line and replace the model with qwen3-tts-instruct-flash
+    # instructions='Fast speech rate, with a clear rising intonation, suitable for introducing fashion products.',
+    # optimize_instructions=True
+)
+print(response)
+model string (required)
+
+The model name. For details, see Supported models.
+
+input object (required)
+
+Input parameters.
+
+Properties
+
+text string (required)
+
+The text to synthesize. Supports multilingual mixed input. Maximum input length: 512 tokens (Qwen-TTS model) or 600 characters (other models).
+
+voice string (required)
+
+The voice to use. See Supported system voices.
+
+language_type string (optional)
+
+The language of the synthesized audio. Defaults to Auto.
+
+Auto: Use when the input contains multiple languages or the language cannot be determined. The model automatically matches pronunciation for each language segment, though accuracy is not guaranteed.
+
+Specific language: Use for single-language text. Specifying the language significantly improves synthesis quality and typically produces better results than Auto. Valid values:
+
+Chinese
+
+English
+
+German
+
+Italian
+
+Portuguese
+
+Spanish
+
+Japanese
+
+Korean
+
+French
+
+Russian
+
+instructions string (optional)
+
+The instructions for speech synthesis. See Instruction control.
+
+Default: None.
+
+Maximum length: 1,600 tokens.
+
+Supported languages: Chinese and English only.
+
+Scope: This feature applies only to the Qwen3-TTS-Instruct-Flash series models.
+
+optimize_instructions boolean (optional)
+
+When enabled, semantically optimizes the instructions to improve the naturalness and expressiveness of the synthesized speech.
+
+Default: false.
+
+Behavior: When set to true, the system semantically rewrites the instructions to generate directives better suited for speech synthesis.
+
+Use this parameter when precise control over speech delivery is needed.
+
+Depends on the instructions parameter. Has no effect if instructions is empty.
+
+Scope: This feature applies only to the Qwen3-TTS-Instruct-Flash series models.
+
+Response object (streaming and non-streaming formats are identical)
+Qwen3-TTS-FlashQwen-TTS
+ 
+{
+    "status_code": 200,
+    "request_id": "5c63c65c-cad8-4bf4-959d-xxxxxxxxxxxx",
+    "code": "",
+    "message": "",
+    "output": {
+        "text": null,
+        "finish_reason": "stop",
+        "choices": null,
+        "audio": {
+            "data": "",
+            "url": "http://dashscope-result-bj.oss-cn-beijing.aliyuncs.com/1d/ab/20251218/d2033070/39b6d8f2-c0db-4daa-9073-5d27bfb66b78.wav?Expires=1766113409&OSSAccessKeyId=LTAI5xxxxxxxxxxxx&Signature=NOrqxxxxxxxxxxxx%3D",
+            "id": "audio_5c63c65c-cad8-4bf4-959d-xxxxxxxxxxxx",
+            "expires_at": 1766113409
+        }
+    },
+    "usage": {
+        "input_tokens": 0,
+        "output_tokens": 0,
+        "characters": 195
+    }
+}
+status_code integer
+
+The HTTP status code as defined in RFC 9110. Common values:
+• 200: Request succeeded.
+• 400: Invalid request parameters.
+• 401: Unauthorized.
+• 404: Resource not found.
+• 500: Internal server error.
+
+
+
+
+
+
+request_id string
+
+A unique identifier for this request. Use it for troubleshooting.
+
+code string
+
+The error code returned on failure. See Error codes.
+
+message string
+
+The error message returned on failure. See Error codes.
+
+output object
+
+The model output.
+
+Properties
+
+text string
+
+Always null. Ignore this field.
+
+choices string
+
+Always null. Ignore this field.
+
+finish_reason string
+
+The generation status:
+
+null — Generation is in progress.
+
+stop — Generation finished normally, or a stop condition was met.
+
+audio object
+
+The audio output from the model.
+
+Properties
+
+url string
+
+The URL of the complete audio file, valid for 24 hours. In non-streaming mode, returned directly in the response. In streaming mode, only returned in the last chunk of the SSE stream (intermediate chunks do not contain this field).
+
+data string
+
+Base64-encoded audio data. In non-streaming mode, this field is always an empty string (use url to get the complete audio file). In streaming mode, intermediate chunks contain Base64-encoded audio segments, while the last chunk returns an empty string (use url to get the complete audio).
+
+id string
+
+A unique identifier for the audio.
+
+expires_at integer
+
+The URL expiration time as a Unix timestamp.
+
+usage object
+
+Token or character usage for this request. Qwen-TTS returns token usage; Qwen3-TTS-Flash returns character usage.
+
+Properties
+
+input_tokens_details object
+
+Token usage details for the input text. Returned only by the Qwen-TTS model.
+
+Properties
+
+text_tokens integer
+
+The number of tokens consumed by the input text.
+
+total_tokens integer
+
+The total number of tokens consumed by this request. Returned only by the Qwen-TTS model.
+
+output_tokens integer
+
+The number of tokens consumed by the output audio. For the Qwen3-TTS-Flash model, this field is always 0.
+
+input_tokens integer
+
+The number of tokens consumed by the input text. For the Qwen3-TTS-Flash model, this field is always 0.
+
+output_tokens_details object
+
+Token usage details for the output. Returned only by the Qwen-TTS model.
+
+Properties
+
+audio_tokens integer
+
+The number of tokens consumed by the output audio.
+
+text_tokens integer
+
+The number of tokens consumed by the output text. Currently always 0.
+
+characters integer
+
+The number of characters in the input text. Returned only by the Qwen3-TTS-Flash model.
+
+request_id string
+
+A unique identifier for this request. Use it for troubleshooting.
