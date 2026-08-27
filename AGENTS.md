@@ -43,7 +43,6 @@ src/
 │   ├── bulletin/+page.svelte     # Bulletin engine page
 │   ├── +layout.svelte            # Root layout
 │   └── api/
-│       ├── tts/+server.ts        # TTS endpoint (Azure + YarnGPT + Qwen3-TTS voice cloning)
 │       ├── bulletin-script/+server.ts # Gemini script generation (summary/explainer)
 │       ├── audio/
 │       │   ├── silence-removal/+server.ts # Silence removal
@@ -125,18 +124,25 @@ static/
 - **Endpoint:** `https://yarngpt.ai/api/v1.1/tts`
 - **Format:** MP3
 
-### Qwen3-TTS Voice Cloning (Africa-First + Welsh)
+### Qwen-Audio-TTS Voice Cloning (Africa-First + Welsh) — Migrated August 2026
+- **Status:** Migrated from retiring `qwen3-tts-vc-2026-01-22` (HTTP) to `qwen-audio-3.0-tts-flash` (WebSocket). Old models retire October 10, 2026.
 - **Speed:** ~5-10 seconds
-- **Auth:** Bearer token via `QWEN_SPEECH_KEY`
-- **Model:** `qwen3-tts-vc-2026-01-22` (voice cloning synthesis)
-- **Voices:**
-  - Malawi: Chisomo (F), Mercy (M) — enrolled May 11, 2026
-  - Zimbabwe: Precious (F), Tawanda (M) — enrolled May 11, 2026
-  - Wales: Ffion (F), Owain (M) — enrolled June 27, 2026
-- **Endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation`
+- **Auth:** Bearer token via `QWEN_SPEECH_KEY` (unchanged — same key works with new models, no new credentials needed)
+- **Enrollment model:** `voice-enrollment` (HTTP) — requires a publicly fetchable audio URL, not inline base64
+- **Synthesis model:** `qwen-audio-3.0-tts-flash` (WebSocket) — HTTP synthesis is no longer supported for this model family
+- **Voices (re-enrolled August 27, 2026):**
+  - Malawi: Chisomo (F), Mercy (M)
+  - Zimbabwe: Precious (F), Tawanda (M)
+  - Wales: Ffion (F), Owain (M)
+- **Enrollment endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/audio/tts/customization` (unchanged host; `model: "voice-enrollment"`, `action: "create_voice"`, response field `output.voice_id`)
+- **Synthesis endpoint:** `wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference` (WebSocket, not HTTP)
+- **Synthesis protocol (verified empirically against live API):** `header`/`payload` envelope — client sends `run-task` → server sends `task-started` → client sends `continue-task` (with text) → server streams `result-generated` events (JSON sentence metadata) interleaved with **binary WAV audio frames** → client sends `finish-task` → server sends `task-finished`. Audio is NOT base64-embedded in JSON; it arrives as raw binary WebSocket frames that must be concatenated in order.
+- **R2 dependency:** Enrollment requires uploading the prepared WAV to a public URL first. AudioFlam uses a Cloudflare R2 bucket (`audioflam-voice-prep`) with Public Development URL enabled, accessed via S3-compatible API (`aws4fetch` package). Object is deleted immediately after successful enrollment (transient use only).
 - **Format:** WAV
-- **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing)
-- **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `cleanForTTS()` utility
+- **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing) — unchanged, still called before synthesis
+- **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `synthesizeViaWebSocket()` + `connectQwenWebSocket()` + `cleanForTTS()` utility
+- **Cloudflare Workers note:** The global `WebSocket` constructor in Workers doesn't accept custom headers (needed for Bearer auth). `connectQwenWebSocket()` detects the Workers runtime (via `WebSocketPair` presence) and uses the `fetch()` + `Upgrade: websocket` handshake pattern instead; falls back to the standard `WebSocket(url, { headers })` constructor on Node (local dev).
+- **Old voice IDs cannot be reused:** Voices enrolled under `qwen3-tts-vc-2026-01-22` do NOT work with `qwen-audio-3.0-tts-flash`. All 6 production voices were re-enrolled via `node --env-file=.env scripts/reclone_production_voices.js`.
 - **Voice Preparation:** `src/lib/utils/audioPrep.ts` prepares recorded audio for cloning (resampling to 24kHz mono, validation, WAV encoding)
 
 ### User Voice Cloning
@@ -382,8 +388,13 @@ Set in Cloudflare Pages → Settings → Environment variables:
 AZURE_SPEECH_KEY=<84-char key>
 AZURE_SPEECH_REGION=eastus
 YARNGPT_API_KEY=<API key>
-QWEN_SPEECH_KEY=<Bearer token for Qwen3-TTS>
+QWEN_SPEECH_KEY=<Bearer token for Qwen-Audio-TTS voice cloning>
 DEEPGRAM_VTT_KEY=<API key for Deepgram Nova-3 transcription>
+R2_ACCOUNT_ID=<Cloudflare account ID for R2>
+R2_ACCESS_KEY_ID=<R2 S3-compatible API access key>
+R2_SECRET_ACCESS_KEY=<R2 S3-compatible API secret key>
+R2_BUCKET_NAME=audioflam-voice-prep
+R2_PUBLIC_URL=<R2 Public Development URL, e.g. https://pub-xxxx.r2.dev>
 GEMINI_API_KEY=<API key for Gemini 2.5 Flash (bulletin story import + script generation)>
 APIVIDEO_API_KEY=<API key for cloud transcoding>
 ```
@@ -601,8 +612,7 @@ All CSS variables defined in `src/app.css`.
 - **Audio processing:** Silence removal, normalization, time-stretching
 - **Two-speaker mode:** Multi-voice TTS composition with per-speaker controls (all three providers)
 - **Subtitles (audiogram):** Whisper-generated word-level subtitles burned into audiogram canvas + export
-- **Bulletin Engine:** Full implementation with story management, Gemini script generation, per-story TTS, intro/outro, sound selection, and assembly (April 2026) ✅ All checkpoints complete
-- **Qwen3-TTS voice cloning:** Malawi (Chisomo F, Mercy M) + Zimbabwe (Tawanda M, Precious F) voices cloned and integrated (May 2026) ✅ Working with text cleaning for naturalness
+- **Qwen-Audio-TTS voice cloning:** Malawi (Chisomo F, Mercy M) + Zimbabwe (Precious F, Tawanda M) + Wales (Ffion F, Owain M) voices cloned and integrated ✅ Migrated to qwen-audio-3.0-tts-flash (WebSocket) August 2026, working with text cleaning for naturalness
 
 **Voice Naturalness Improvement (May 2026):**
 - `cleanForTTS()` function preprocesses text before Qwen synthesis

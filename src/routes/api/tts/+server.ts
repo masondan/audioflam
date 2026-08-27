@@ -258,6 +258,19 @@ console.log('[MiniMax] TTS generated successfully');
 return json({ audioContent: base64Audio, format: 'mp3' }, { status: 200 });
 }
 
+// ── Qwen (qwen-audio-3.0-tts-flash) — WebSocket-based synthesis ─────────────
+// Protocol confirmed empirically against the live API (August 2026):
+// header/payload envelope, run-task -> task-started -> continue-task ->
+// result-generated (binary audio frames interleaved with text/JSON sentence
+// metadata events) -> finish-task -> task-finished. Voice IDs enrolled under
+// the retiring qwen3-tts-vc-2026-01-22 model CANNOT be reused here — they
+// must be re-enrolled via the new voice-enrollment API (see /api/tts/clone).
+
+interface QwenWsMessage {
+	header?: { event?: string; task_id?: string };
+	payload?: unknown;
+}
+
 async function handleQwen(text: string, voiceId: string) {
 	const QWEN_API_KEY = env.QWEN_SPEECH_KEY;
 	if (!QWEN_API_KEY) {
@@ -267,94 +280,16 @@ async function handleQwen(text: string, voiceId: string) {
 
 	const trimmedText = text.slice(0, 4000);
 	const cleanedText = cleanForTTS(trimmedText);
-	const SYNTHESIS_ENDPOINT = 'https://dashscope-intl.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation';
-	const SYNTHESIS_MODEL = 'qwen3-tts-vc-2026-01-22';
+	const WS_ENDPOINT = 'wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference';
+	const SYNTHESIS_MODEL = 'qwen-audio-3.0-tts-flash';
 
 	console.log(`[Qwen] Generating TTS for voice: ${voiceId}, text length: ${cleanedText.length}`);
 
-	const requestBody = {
-		model: SYNTHESIS_MODEL,
-		input: {
-			text: cleanedText,
-			voice: voiceId,
-			language_type: 'English'
-		}
-	};
-
-	console.log('[Qwen] Request body:', JSON.stringify(requestBody));
-	console.log('[Qwen] Request body stringified:', JSON.stringify(requestBody, null, 2));
-
 	try {
-		const response = await fetch(SYNTHESIS_ENDPOINT, {
-			method: 'POST',
-			headers: {
-				'Authorization': `Bearer ${QWEN_API_KEY}`,
-				'Content-Type': 'application/json'
-			},
-			body: JSON.stringify(requestBody)
-		});
-
-		console.log(`[Qwen] Response status: ${response.status}`);
-
-		if (!response.ok) {
-			const errorText = await response.text();
-			console.error('[Qwen] API error:', response.status, errorText);
-			return json(
-				{ error: 'Qwen TTS generation failed', status: response.status, details: errorText },
-				{ status: response.status }
-			);
-		}
-
-		const contentType = response.headers.get('content-type') || '';
-		let audioUrl: string | null = null;
-		let audioData: ArrayBuffer | null = null;
-
-		if (contentType.includes('application/json')) {
-			const data = await response.json() as { code?: string; message?: string; output?: { audio?: { url?: string } } };
-
-			// Check for API error
-			if (data.code && data.code !== 'Success') {
-				console.error('[Qwen] API error code:', data.code, data.message);
-				return json(
-					{ error: 'Qwen TTS generation failed', details: data.message || data.code },
-					{ status: 500 }
-				);
-			}
-
-			// Extract audio URL
-			audioUrl = data.output?.audio?.url || null;
-		} else {
-			// Binary response (unlikely but handle it)
-			audioData = await response.arrayBuffer();
-		}
-
-		// If we got a URL, download the audio immediately
-		// CRITICAL: Qwen3-TTS returns a temporary URL that expires after 24 hours.
-		// Audio MUST be downloaded and stored immediately in this request cycle.
-		// Never store the URL itself — always store the audio bytes/file.
-		if (audioUrl) {
-			console.log(`[Qwen] Audio URL received, downloading...`);
-			const audioResponse = await fetch(audioUrl);
-
-			if (!audioResponse.ok) {
-				console.error('[Qwen] Failed to download audio from URL:', audioResponse.status);
-				return json(
-					{ error: 'Failed to download audio from Qwen', details: `HTTP ${audioResponse.status}` },
-					{ status: 500 }
-				);
-			}
-
-			audioData = await audioResponse.arrayBuffer();
-			console.log(`[Qwen] Audio downloaded: ${audioData.byteLength} bytes`);
-		}
-
-		if (!audioData) {
-			console.error('[Qwen] No audio data received');
-			return json({ error: 'No audio data from Qwen' }, { status: 500 });
-		}
+		const audioBuffer = await synthesizeViaWebSocket(WS_ENDPOINT, QWEN_API_KEY, SYNTHESIS_MODEL, voiceId, cleanedText);
 
 		// Convert to base64
-		const uint8Array = new Uint8Array(audioData);
+		const uint8Array = new Uint8Array(audioBuffer);
 		let binaryString = '';
 		const chunkSize = 8192;
 		for (let i = 0; i < uint8Array.length; i += chunkSize) {
@@ -367,9 +302,162 @@ async function handleQwen(text: string, voiceId: string) {
 
 	} catch (err) {
 		const message = err instanceof Error ? err.message : 'Unknown error';
-		console.error('[Qwen] Network error:', message);
+		console.error('[Qwen] WebSocket synthesis error:', message);
 		return json({ error: 'Qwen TTS request failed', details: message }, { status: 500 });
 	}
 }
 
+// Establish an authenticated WebSocket connection to the DashScope inference
+// endpoint. Cloudflare Workers' global WebSocket constructor does not accept
+// a headers option, so on that runtime the connection must be made via
+// fetch() with an "Upgrade: websocket" header — the resulting Response
+// carries a `webSocket` property that must be accept()-ed before use. On
+// Node (local `npm run dev`), undici's WebSocket constructor does accept a
+// headers option, so we use that path directly.
+async function connectQwenWebSocket(endpoint: string, apiKey: string): Promise<WebSocket> {
+	const isCloudflareWorker = typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair !== 'undefined';
 
+	if (isCloudflareWorker) {
+		const httpsEndpoint = endpoint.replace(/^wss:\/\//, 'https://');
+		const upgradeResponse = await fetch(httpsEndpoint, {
+			headers: {
+				'Upgrade': 'websocket',
+				'Authorization': `Bearer ${apiKey}`
+			}
+		});
+		const cfWebSocket = (upgradeResponse as unknown as { webSocket?: WebSocket }).webSocket;
+		if (!cfWebSocket) {
+			throw new Error('Cloudflare Workers WebSocket upgrade failed: no webSocket in response');
+		}
+		(cfWebSocket as unknown as { accept: () => void }).accept();
+		return cfWebSocket;
+	}
+
+	// Node / undici path — headers option supported on Node 22+.
+	const WebSocketCtor = WebSocket as unknown as new (url: string, opts?: { headers?: Record<string, string> }) => WebSocket;
+	return new WebSocketCtor(endpoint, {
+		headers: { 'Authorization': `Bearer ${apiKey}` }
+	});
+}
+
+async function synthesizeViaWebSocket(
+	endpoint: string,
+	apiKey: string,
+	model: string,
+	voiceId: string,
+	text: string
+): Promise<Uint8Array> {
+	const ws = await connectQwenWebSocket(endpoint, apiKey);
+
+	return new Promise((resolve, reject) => {
+		const taskId = crypto.randomUUID();
+		const audioChunks: Uint8Array[] = [];
+		let settled = false;
+
+		const timeoutHandle = setTimeout(() => {
+			if (settled) return;
+			settled = true;
+			try { ws.close(); } catch { /* ignore */ }
+			reject(new Error('Qwen synthesis timeout'));
+		}, 60000);
+
+		function finish(err: Error | null, result?: Uint8Array) {
+			if (settled) return;
+			settled = true;
+			clearTimeout(timeoutHandle);
+			try { ws.close(); } catch { /* ignore */ }
+			if (err) reject(err);
+			else resolve(result!);
+		}
+
+		function combineChunks(): Uint8Array {
+			const totalSize = audioChunks.reduce((sum, c) => sum + c.length, 0);
+			const combined = new Uint8Array(totalSize);
+			let offset = 0;
+			for (const chunk of audioChunks) {
+				combined.set(chunk, offset);
+				offset += chunk.length;
+			}
+			return combined;
+		}
+
+		ws.addEventListener('open', () => {
+			ws.send(JSON.stringify({
+				header: {
+					action: 'run-task',
+					task_id: taskId,
+					streaming: 'duplex'
+				},
+				payload: {
+					task_group: 'audio',
+					task: 'tts',
+					function: 'SpeechSynthesizer',
+					model,
+					parameters: {
+						text_type: 'PlainText',
+						voice: voiceId,
+						format: 'wav',
+						sample_rate: 24000
+					},
+					input: {}
+				}
+			}));
+		});
+
+		ws.addEventListener('message', (event: MessageEvent) => {
+			if (typeof event.data === 'string') {
+				let msg: QwenWsMessage;
+				try {
+					msg = JSON.parse(event.data);
+				} catch {
+					return;
+				}
+				const eventType = msg.header?.event;
+
+				if (eventType === 'task-started') {
+					ws.send(JSON.stringify({
+						header: { action: 'continue-task', task_id: taskId, streaming: 'duplex' },
+						payload: { input: { text } }
+					}));
+					// Give the server a brief moment to buffer the text, then finish.
+					setTimeout(() => {
+						ws.send(JSON.stringify({
+							header: { action: 'finish-task', task_id: taskId, streaming: 'duplex' },
+							payload: { input: {} }
+						}));
+					}, 300);
+				} else if (eventType === 'task-finished') {
+					finish(null, combineChunks());
+				} else if (eventType === 'task-failed') {
+					finish(new Error(`Qwen task-failed: ${JSON.stringify(msg.payload)}`));
+				}
+				// 'result-generated' text events carry sentence metadata only; audio arrives as binary frames.
+			} else {
+				// Binary audio frame — normalize to Uint8Array across runtimes (Blob in
+				// browser-like WS implementations, ArrayBuffer in Workers/undici).
+				const data = event.data as ArrayBuffer | Blob;
+				if (typeof Blob !== 'undefined' && data instanceof Blob) {
+					data.arrayBuffer().then((buf) => {
+						audioChunks.push(new Uint8Array(buf));
+					}).catch(() => { /* ignore individual chunk failure */ });
+				} else {
+					audioChunks.push(new Uint8Array(data as ArrayBuffer));
+				}
+			}
+		});
+
+		ws.addEventListener('error', () => {
+			finish(new Error('Qwen WebSocket connection error'));
+		});
+
+		ws.addEventListener('close', () => {
+			if (!settled) {
+				if (audioChunks.length === 0) {
+					finish(new Error('Qwen WebSocket closed with no audio data'));
+				} else {
+					finish(null, combineChunks());
+				}
+			}
+		});
+	});
+}

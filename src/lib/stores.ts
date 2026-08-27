@@ -80,26 +80,26 @@ export const MINIMAX_VOICES: VoiceOption[] = [
 	{ name: 'preciousf1', ssmlGender: 'FEMALE', displayName: 'Precious', description: 'Zimbabwe English female', provider: 'minimax' }
 ];
 
-// Qwen3-TTS Voice Clones (Malawi + Zimbabwe English)
-// Enrolled via: node --env-file=.env scripts/enroll_voices.js (May 11, 2026)
-// Voice IDs stored in .env as VOICE_MALAWI_FEMALE, VOICE_MALAWI_MALE, VOICE_ZIM_FEMALE, VOICE_ZIM_MALE
-// Note: Synthesis with cloned voices requires paid subscription (enrollment was $0.04 total)
+// Qwen-Audio-TTS Voice Clones (Malawi + Zimbabwe English)
+// Re-enrolled via: node --env-file=.env scripts/reclone_production_voices.js (August 27, 2026)
+// Migrated from retiring qwen3-tts-vc-2026-01-22 to qwen-audio-3.0-tts-flash
+// (voice-enrollment API). See docs/plans/qwen-migration-final.md.
 export const QWEN_VOICES: VoiceOption[] = [
 	// Malawi English
-	{ name: 'qwen-tts-vc-malawi-voice-20260511195848208-4632', ssmlGender: 'FEMALE', displayName: 'Chisomo (Malawi)', description: 'Malawi English female', provider: 'qwen' },
-	{ name: 'qwen-tts-vc-malawi-voice-20260511195853398-146d', ssmlGender: 'MALE', displayName: 'Mercy (Malawi)', description: 'Malawi English male', provider: 'qwen' },
+	{ name: 'qwen-audio-3.0-tts-flash-chisomo-45771b023d074d2fbe3e68ae747eb58c', ssmlGender: 'FEMALE', displayName: 'Chisomo (Malawi)', description: 'Malawi English female', provider: 'qwen' },
+	{ name: 'qwen-audio-3.0-tts-flash-mercy-f6c5f1bc09104f9e85cedf251cd94952', ssmlGender: 'MALE', displayName: 'Mercy (Malawi)', description: 'Malawi English male', provider: 'qwen' },
 	// Zimbabwe English
-	{ name: 'qwen-tts-vc-zim-voice-20260511195858837-d2b5', ssmlGender: 'FEMALE', displayName: 'Tawanda (Zimbabwe)', description: 'Zimbabwe English female', provider: 'qwen' },
-	{ name: 'qwen-tts-vc-zim-voice-20260511195904106-121a', ssmlGender: 'MALE', displayName: 'Precious (Zimbabwe)', description: 'Zimbabwe English male', provider: 'qwen' }
+	{ name: 'qwen-audio-3.0-tts-flash-tawanda-1c274d46e7f04fdba0beb3c393855b86', ssmlGender: 'FEMALE', displayName: 'Tawanda (Zimbabwe)', description: 'Zimbabwe English female', provider: 'qwen' },
+	{ name: 'qwen-audio-3.0-tts-flash-precious-6fc1a1aedef14b44a0bfb0503aa7c9ef', ssmlGender: 'MALE', displayName: 'Precious (Zimbabwe)', description: 'Zimbabwe English male', provider: 'qwen' }
 ];
 
-// Qwen3-TTS Voice Clones (Welsh English)
-// Enrolled via: node --env-file=.env scripts/enroll_welsh_voices.js (June 27, 2026)
-// Voice IDs stored in .env as VOICE_WALES_FEMALE, VOICE_WALES_MALE
+// Qwen-Audio-TTS Voice Clones (Welsh English)
+// Re-enrolled via: node --env-file=.env scripts/reclone_production_voices.js (August 27, 2026)
+// Migrated from retiring qwen3-tts-vc-2026-01-22 to qwen-audio-3.0-tts-flash
 export const QWEN_WELSH_VOICES: VoiceOption[] = [
 	// Welsh English
-	{ name: 'qwen-tts-vc-ffion-voice-20260628200429563-406e', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
-	{ name: 'qwen-tts-vc-owain-voice-20260627234209804-bd83', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
+	{ name: 'qwen-audio-3.0-tts-flash-ffion-dc272f74af2b496bab1f124c1237299d', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
+	{ name: 'qwen-audio-3.0-tts-flash-owain-20ca1a2fc3714f738054d38d9d73c149', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
 ];
 
 // Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then British, then Welsh)
