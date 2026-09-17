@@ -352,12 +352,14 @@ async function synthesizeViaWebSocket(
 	voiceId: string,
 	text: string
 ): Promise<Uint8Array> {
+	const isCloudflareWorker = typeof (globalThis as { WebSocketPair?: unknown }).WebSocketPair !== 'undefined';
 	const ws = await connectQwenWebSocket(endpoint, apiKey);
 
 	return new Promise((resolve, reject) => {
 		const taskId = crypto.randomUUID();
 		const audioChunks: Uint8Array[] = [];
 		let settled = false;
+		let taskStarted = false;
 
 		const timeoutHandle = setTimeout(() => {
 			if (settled) return;
@@ -386,8 +388,10 @@ async function synthesizeViaWebSocket(
 			return combined;
 		}
 
-		ws.addEventListener('open', () => {
-			console.log(`[Qwen] WebSocket open, sending run-task (taskId: ${taskId})`);
+		function sendRunTask() {
+			if (taskStarted) return;
+			taskStarted = true;
+			console.log(`[Qwen] Sending run-task (taskId: ${taskId})`);
 			ws.send(JSON.stringify({
 				header: {
 					action: 'run-task',
@@ -408,7 +412,18 @@ async function synthesizeViaWebSocket(
 					input: {}
 				}
 			}));
+		}
+
+		ws.addEventListener('open', () => {
+			console.log('[Qwen] WebSocket open event fired');
+			sendRunTask();
 		});
+
+		// Cloudflare Workers: open event may not fire, so send immediately
+		if (isCloudflareWorker) {
+			console.log('[Qwen] Cloudflare Workers detected, sending run-task immediately');
+			sendRunTask();
+		}
 
 		ws.addEventListener('message', (event: MessageEvent) => {
 			if (typeof event.data === 'string') {
