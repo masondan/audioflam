@@ -623,10 +623,13 @@ All CSS variables defined in `src/app.css`.
 
 **Known Issues:**
 - 🔴 Type assertion in `webcodecs-export.ts:445` without runtime guard (HIGH priority)
-- 🔴 TTS error handling gaps - generic "error" messages (HIGH priority)
 - 🟡 Audio encoding inconsistency between WebCodecs/MediaRecorder paths (MEDIUM)
 - 🟡 Missing request throttling for TTS API (MEDIUM)
 - 🟡 Canvas export validation gaps (MEDIUM)
+
+**Recently Fixed (September 2026):**
+- ✅ **Bulletin intro/outro preview failed for Qwen-cloned voices** — `BulletinIntroOutroCard.svelte` was hardcoding `provider: 'azure'` instead of resolving the actual voice provider. Added `getVoiceProvider()` helper to dynamically route to correct TTS handler. ([`BulletinIntroOutroCard.svelte:38-40`](src/lib/components/bulletin/BulletinIntroOutroCard.svelte:38))
+- ✅ **Qwen WebSocket synthesis produced garbled/truncated first word** — `message` listener was registered *after* `sendRunTask()` fired on Cloudflare Workers, creating a race window where early server frames could be dropped. Moved listener registration before the immediate-send call. ([`+server.ts:413-478`](src/routes/api/tts/+server.ts:413))
 
 **Future Development:**
 - TTS→Audiogram one-click integration (store exists, UI not wired)

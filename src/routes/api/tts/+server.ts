@@ -414,6 +414,9 @@ async function synthesizeViaWebSocket(
 			sendRunTask();
 		});
 
+		// Queue for processing binary frames sequentially to preserve order
+		let processingQueue: Promise<void> = Promise.resolve();
+	
 		ws.addEventListener('message', (event: MessageEvent) => {
 			if (typeof event.data === 'string') {
 				let msg: QwenWsMessage;
@@ -445,14 +448,21 @@ async function synthesizeViaWebSocket(
 			} else {
 				// Binary audio frame — normalize to Uint8Array across runtimes (Blob in
 				// browser-like WS implementations, ArrayBuffer in Workers/undici).
+				// Process sequentially via queue to preserve frame order (fixes race condition
+				// where async Blob.arrayBuffer() conversions could arrive out of order).
 				const data = event.data as ArrayBuffer | Blob;
-				if (typeof Blob !== 'undefined' && data instanceof Blob) {
-					data.arrayBuffer().then((buf) => {
-						audioChunks.push(new Uint8Array(buf));
-					}).catch(() => { /* ignore individual chunk failure */ });
-				} else {
-					audioChunks.push(new Uint8Array(data as ArrayBuffer));
-				}
+				processingQueue = processingQueue.then(async () => {
+					try {
+						if (typeof Blob !== 'undefined' && data instanceof Blob) {
+							const buf = await data.arrayBuffer();
+							audioChunks.push(new Uint8Array(buf));
+						} else {
+							audioChunks.push(new Uint8Array(data as ArrayBuffer));
+						}
+					} catch {
+						// Ignore individual chunk failure
+					}
+				});
 			}
 		});
 
