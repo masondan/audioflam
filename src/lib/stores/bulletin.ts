@@ -30,6 +30,7 @@ export interface BulletinState {
 	soundsEnabled: boolean;
 	selectedIntroOutroSound: string | null;  // filename or null
 	selectedTransitionSound: string | null;  // filename or null
+	soundVolume: number;  // 0.1–1.0 linear gain applied to intro/outro + transition sounds (1.0 = original/unchanged)
 	introTtsAudio: string | null;
 	outroTtsAudio: string | null;
 	bulletinAudio: string | null;
@@ -57,6 +58,7 @@ const DEFAULT_STATE: BulletinState = {
 	soundsEnabled: false,
 	selectedIntroOutroSound: null,
 	selectedTransitionSound: null,
+	soundVolume: 0.5,
 	introTtsAudio: null,
 	outroTtsAudio: null,
 	bulletinAudio: null,

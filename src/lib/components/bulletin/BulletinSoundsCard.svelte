@@ -12,10 +12,13 @@
   let soundsEnabled = $derived($bulletinStore.soundsEnabled);
   let selectedIntroOutroSound = $derived($bulletinStore.selectedIntroOutroSound);
   let selectedTransitionSound = $derived($bulletinStore.selectedTransitionSound);
+  let soundVolume = $derived($bulletinStore.soundVolume);
 
   // Audio preview state
   let playingSound = $state<string | null>(null);
   let previewAudio: HTMLAudioElement | null = null;
+  let previewGainNode: GainNode | null = null;
+  let previewAudioContext: AudioContext | null = null;
 
   function handleToggle() {
     const newEnabled = !soundsEnabled;
@@ -47,6 +50,17 @@
     onSettingsChange?.();
   }
 
+  function handleVolumeChange(e: Event) {
+    const value = parseFloat((e.target as HTMLInputElement).value);
+    bulletinStore.update(s => ({ ...s, soundVolume: value }));
+    // Live-update gain on any sound currently previewing
+    if (previewGainNode) {
+      previewGainNode.gain.value = value;
+    }
+    bulletinStore.clearBulletinAudio();
+    onSettingsChange?.();
+  }
+
   function previewSound(event: MouseEvent, filename: string) {
     event.stopPropagation();
 
@@ -58,7 +72,18 @@
     stopPreview();
     playingSound = filename;
 
+    // Route through Web Audio API so preview reflects the current volume slider
+    previewAudioContext = new AudioContext();
     previewAudio = new Audio(`/sounds/${filename}`);
+    previewAudio.crossOrigin = 'anonymous';
+
+    const source = previewAudioContext.createMediaElementSource(previewAudio);
+    previewGainNode = previewAudioContext.createGain();
+    previewGainNode.gain.value = soundVolume;
+
+    source.connect(previewGainNode);
+    previewGainNode.connect(previewAudioContext.destination);
+
     previewAudio.onended = () => { playingSound = null; };
     previewAudio.onerror = () => { playingSound = null; };
     previewAudio.play();
@@ -69,6 +94,11 @@
       previewAudio.pause();
       previewAudio = null;
     }
+    if (previewAudioContext) {
+      previewAudioContext.close();
+      previewAudioContext = null;
+    }
+    previewGainNode = null;
     playingSound = null;
   }
 </script>
@@ -210,6 +240,25 @@
               </button>
             </div>
           {/each}
+        </div>
+      </div>
+
+      <div class="section-divider"></div>
+
+      <!-- Sound Volume section -->
+      <div class="sound-section">
+        <h3 class="section-title">Sound Volume</h3>
+        <div class="volume-slider-container">
+          <input
+            type="range"
+            min="0.1"
+            max="1"
+            step="0.05"
+            value={soundVolume}
+            oninput={handleVolumeChange}
+            class="volume-slider"
+            aria-label="Sound volume"
+          />
         </div>
       </div>
 
@@ -419,5 +468,61 @@
 
   .play-btn.playing .play-icon {
     filter: invert(0.2) sepia(0.8) hue-rotate(248deg) saturate(2);
+  }
+
+  .volume-slider-container {
+    padding-top: var(--spacing-xs);
+  }
+
+  .volume-slider {
+    width: 100%;
+    height: 6px;
+    border-radius: var(--radius-round);
+    background: #dcdcdc;
+    outline: none;
+    -webkit-appearance: none;
+    appearance: none;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    -webkit-user-select: none;
+    user-select: none;
+    margin: 0;
+    padding: 0;
+  }
+
+  /* Webkit browsers (Chrome, Safari) */
+  .volume-slider::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    appearance: none;
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-round);
+    background: #5422b0;
+    cursor: pointer;
+    border: none;
+    -webkit-tap-highlight-color: transparent;
+    transform: translateY(-7px);
+  }
+
+  .volume-slider::-webkit-slider-runnable-track {
+    background: #dcdcdc;
+    height: 6px;
+    border-radius: var(--radius-round);
+  }
+
+  /* Firefox */
+  .volume-slider::-moz-range-thumb {
+    width: 20px;
+    height: 20px;
+    border-radius: var(--radius-round);
+    background: #5422b0;
+    cursor: pointer;
+    border: none;
+    transform: translateY(-7px);
+  }
+
+  .volume-slider::-moz-range-track {
+    background: transparent;
+    border: none;
   }
 </style>

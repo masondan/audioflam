@@ -6,7 +6,7 @@
   import type { BulletinStory } from '$lib/stores/bulletin';
   import { ALL_VOICES, customVoices, customVoiceToVoiceOption, preloadedTTSAudio } from '$lib/stores';
   import type { VoiceOption, TTSProvider } from '$lib/stores';
-  import { concatenateAudioSegments, removeSilence } from '$lib/audioProcessing';
+  import { concatenateAudioSegments, removeSilence, applyGainToBase64 } from '$lib/audioProcessing';
   import type { SilenceLevel } from '$lib/audioProcessing';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
@@ -233,8 +233,8 @@
     return processed;
   }
 
-  /** Fetch an MP3 from /sounds/ and return its base64 string */
-  async function loadSoundAsBase64(filename: string): Promise<string> {
+  /** Fetch an MP3 from /sounds/ and return its base64 string, with volume gain applied */
+  async function loadSoundAsBase64(filename: string, gain: number = 1.0): Promise<string> {
     const response = await fetch(`/sounds/${filename}`);
     if (!response.ok) throw new Error(`Failed to load sound: ${filename}`);
     const arrayBuffer = await response.arrayBuffer();
@@ -243,7 +243,8 @@
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    return btoa(binary);
+    const base64 = btoa(binary);
+    return applyGainToBase64(base64, gain);
   }
 
   /** Generate raw TTS for a single story via /api/tts (speed/silence applied separately at assembly time) */
@@ -307,7 +308,7 @@
       // ── 1. Intro sound ────────────────────────────────────────────────────
       if (state.soundsEnabled && state.selectedIntroOutroSound) {
         console.log('[Bulletin] Loading intro sound:', state.selectedIntroOutroSound);
-        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound);
+        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound, state.soundVolume);
         segments.push(soundBase64);
       }
 
@@ -343,7 +344,7 @@
         // Transition sound before each story (including before story 1 if intro exists)
         if (state.soundsEnabled && state.selectedTransitionSound) {
           console.log('[Bulletin] Loading transition sound for story', i + 1);
-          const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound);
+          const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound, state.soundVolume);
           segments.push(transBase64);
         }
 
@@ -363,7 +364,7 @@
 
       // ── Transition after last story ───────────────────────────────────────
       if (state.soundsEnabled && state.selectedTransitionSound) {
-        const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound);
+        const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound, state.soundVolume);
         segments.push(transBase64);
       }
 
@@ -394,7 +395,7 @@
 
       // ── Outro sound ───────────────────────────────────────────────────────
       if (state.soundsEnabled && state.selectedIntroOutroSound) {
-        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound);
+        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound, state.soundVolume);
         segments.push(soundBase64);
       }
 

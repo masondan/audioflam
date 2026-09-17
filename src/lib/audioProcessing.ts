@@ -324,6 +324,54 @@ export async function concatenateAudioSegments(base64Audios: string[]): Promise<
 }
 
 /**
+	* Apply a linear gain multiplier to a base64-encoded audio clip.
+	* Used to reduce the volume of bulletin sound effects (intro/outro/transition)
+	* relative to voice segments. Returns a base64-encoded WAV.
+	*
+	* @param base64Audio Source audio (any format decodable by the browser)
+	* @param gain Linear gain multiplier (1.0 = unchanged, 0.5 = -6dB, etc.)
+	*/
+export async function applyGainToBase64(base64Audio: string, gain: number): Promise<string> {
+	// Fast path: no adjustment needed
+	if (gain >= 0.999) {
+		return base64Audio;
+	}
+
+	const buffer = await decodeAudio(base64Audio);
+	const numChannels = buffer.numberOfChannels;
+	const sampleRate = buffer.sampleRate;
+
+	const audioContext = new OfflineAudioContext(numChannels, buffer.length, sampleRate);
+	const newBuffer = audioContext.createBuffer(numChannels, buffer.length, sampleRate);
+
+	for (let channel = 0; channel < numChannels; channel++) {
+		const input = buffer.getChannelData(channel);
+		const output = newBuffer.getChannelData(channel);
+		for (let i = 0; i < input.length; i++) {
+			output[i] = Math.max(-1, Math.min(1, input[i] * gain));
+		}
+	}
+
+	const blob = audioBufferToWav(newBuffer);
+	return blobToBase64(blob);
+}
+
+/**
+	* Convert a Blob to a base64 string (no data URL prefix)
+	*/
+function blobToBase64(blob: Blob): Promise<string> {
+	return new Promise((resolve, reject) => {
+		const reader = new FileReader();
+		reader.onloadend = () => {
+			const result = reader.result as string;
+			resolve(result.split(',')[1]);
+		};
+		reader.onerror = reject;
+		reader.readAsDataURL(blob);
+	});
+}
+
+/**
  * Mix stereo AudioBuffer to mono Float32Array
  */
 function mixToMono(buffer: AudioBuffer): Float32Array {
