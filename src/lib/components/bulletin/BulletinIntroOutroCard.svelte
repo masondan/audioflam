@@ -34,6 +34,11 @@
     voicesForDropdown.find(v => v.name === introOutroVoice) ?? null
   );
 
+  // Resolve the TTS provider for a given voice name (mirrors +page.svelte:getVoiceProvider)
+  function getVoiceProvider(voiceName: string | null): VoiceOption['provider'] {
+    return voicesForDropdown.find(v => v.name === voiceName)?.provider ?? 'azure';
+  }
+
   // Voice dropdown open state
   let voiceDropdownOpen = $state(false);
   let voiceDropdownRef = $state<HTMLDivElement | undefined>(undefined);
@@ -298,7 +303,7 @@
           body: JSON.stringify({
             text: introScript,
             voiceName: introOutroVoice,
-            provider: 'azure'
+            provider: getVoiceProvider(introOutroVoice)
           })
         });
 
@@ -324,7 +329,7 @@
           body: JSON.stringify({
             text: outroScript,
             voiceName: introOutroVoice,
-            provider: 'azure'
+            provider: getVoiceProvider(introOutroVoice)
           })
         });
 

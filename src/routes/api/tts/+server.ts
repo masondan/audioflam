@@ -414,11 +414,6 @@ async function synthesizeViaWebSocket(
 			sendRunTask();
 		});
 
-		// Cloudflare Workers: open event may not fire, so send immediately
-		if (isCloudflareWorker) {
-			sendRunTask();
-		}
-
 		ws.addEventListener('message', (event: MessageEvent) => {
 			if (typeof event.data === 'string') {
 				let msg: QwenWsMessage;
@@ -474,5 +469,12 @@ async function synthesizeViaWebSocket(
 				}
 			}
 		});
+
+		// Cloudflare Workers: the 'open' event may not fire on the fetch-upgraded
+		// socket, so send the initial run-task now. All listeners above are
+		// already attached at this point, so no early server messages are missed.
+		if (isCloudflareWorker) {
+			sendRunTask();
+		}
 	});
 }

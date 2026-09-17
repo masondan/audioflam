@@ -135,13 +135,13 @@ static/
   - Zimbabwe: Precious (F), Tawanda (M)
   - Wales: Ffion (F), Owain (M)
 - **Enrollment endpoint:** `https://dashscope-intl.aliyuncs.com/api/v1/services/audio/tts/customization` (unchanged host; `model: "voice-enrollment"`, `action: "create_voice"`, response field `output.voice_id`)
-- **Synthesis endpoint:** `wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference` (WebSocket, not HTTP)
+- **Synthesis endpoint:** `wss://{WorkspaceId}.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference` (WebSocket, not HTTP) — must use workspace-specific domain, not generic dashscope-intl endpoint
 - **Synthesis protocol (verified empirically against live API):** `header`/`payload` envelope — client sends `run-task` → server sends `task-started` → client sends `continue-task` (with text) → server streams `result-generated` events (JSON sentence metadata) interleaved with **binary WAV audio frames** → client sends `finish-task` → server sends `task-finished`. Audio is NOT base64-embedded in JSON; it arrives as raw binary WebSocket frames that must be concatenated in order.
 - **R2 dependency:** Enrollment requires uploading the prepared WAV to a public URL first. AudioFlam uses a Cloudflare R2 bucket (`audioflam-voice-prep`) with Public Development URL enabled, accessed via S3-compatible API (`aws4fetch` package). Object is deleted immediately after successful enrollment (transient use only).
 - **Format:** WAV
 - **Text Cleaning:** `cleanForTTS()` preprocesses text before synthesis (em-dashes → commas, ensures sentence punctuation, adds commas after long clauses for natural pacing) — unchanged, still called before synthesis
 - **Implementation:** `src/routes/api/tts/+server.ts:handleQwen()` + `synthesizeViaWebSocket()` + `connectQwenWebSocket()` + `cleanForTTS()` utility
-- **Cloudflare Workers note:** The global `WebSocket` constructor in Workers doesn't accept custom headers (needed for Bearer auth). `connectQwenWebSocket()` detects the Workers runtime (via `WebSocketPair` presence) and uses the `fetch()` + `Upgrade: websocket` handshake pattern instead; falls back to the standard `WebSocket(url, { headers })` constructor on Node (local dev).
+- **Cloudflare Workers note:** The global `WebSocket` constructor in Workers doesn't accept custom headers (needed for Bearer auth). `connectQwenWebSocket()` detects the Workers runtime (via `WebSocketPair` presence) and uses the `fetch()` + `Upgrade: websocket` handshake pattern instead; falls back to the standard `WebSocket(url, { headers })` constructor on Node (local dev). **WebSocket quirk:** The `open` event may not fire when using the fetch-based upgrade mechanism. Code detects Cloudflare Workers runtime and sends the initial `run-task` payload immediately after connection acceptance, rather than waiting for an event that may never fire.
 - **Old voice IDs cannot be reused:** Voices enrolled under `qwen3-tts-vc-2026-01-22` do NOT work with `qwen-audio-3.0-tts-flash`. All 6 production voices were re-enrolled via `node --env-file=.env scripts/reclone_production_voices.js`.
 - **Voice Preparation:** `src/lib/utils/audioPrep.ts` prepares recorded audio for cloning (resampling to 24kHz mono, validation, WAV encoding)
 
@@ -959,7 +959,7 @@ Verify these exist:
 
 ---
 
-**Last Updated:** August 2026
+**Last Updated:** September 2026
 **Maintainer Notes:** Keep this document concise and current. Move outdated docs to archive. Update .clinerules when AGENTS.md changes significantly.
 
 ---
