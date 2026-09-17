@@ -305,14 +305,10 @@
       const state = $bulletinStore;
       const segments: string[] = [];
 
-      // ── 1. Intro sound ────────────────────────────────────────────────────
-      if (state.soundsEnabled && state.selectedIntroOutroSound) {
-        console.log('[Bulletin] Loading intro sound:', state.selectedIntroOutroSound);
-        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound, state.soundVolume);
-        segments.push(soundBase64);
-      }
+      // ── Build voice segments (intro TTS, stories, outro TTS) ──────────────
+      const voiceSegments: string[] = [];
 
-      // ── 2. Intro TTS ──────────────────────────────────────────────────────
+      // Intro TTS
       if (state.introOutroEnabled && state.introScript.trim()) {
         let introAudio = state.introTtsAudio;
         if (!introAudio) {
@@ -329,46 +325,27 @@
           if (!response.ok) throw new Error('Intro TTS failed');
           const data = await response.json();
           introAudio = data.audioContent as string;
-          // Cache raw TTS (before speed/silence) so we can reuse it
           bulletinStore.update(s => ({ ...s, introTtsAudio: introAudio }));
         }
-        // Apply speed/silence adjustments at assembly time
         const processedIntro = await processAudioSegment(introAudio, state.introOutroSpeed, state.introOutroSilence);
-        segments.push(processedIntro);
+        voiceSegments.push(processedIntro);
       }
 
-      // ── 3–N. Stories with transition sounds between them ──────────────────
+      // Story TTS segments
       const updatedStories: BulletinStory[] = [...state.stories];
-
       for (let i = 0; i < updatedStories.length; i++) {
-        // Transition sound before each story (including before story 1 if intro exists)
-        if (state.soundsEnabled && state.selectedTransitionSound) {
-          console.log('[Bulletin] Loading transition sound for story', i + 1);
-          const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound, state.soundVolume);
-          segments.push(transBase64);
-        }
-
-        // Story TTS — generate raw audio if missing, then apply speed/silence
         let storyAudio = updatedStories[i].ttsAudio;
         if (!storyAudio) {
           console.log('[Bulletin] Generating TTS for story', i + 1);
           storyAudio = await generateStoryTTS(updatedStories[i]);
           updatedStories[i] = { ...updatedStories[i], ttsAudio: storyAudio };
-          // Persist raw TTS back to store (speed/silence applied at assembly time)
           bulletinStore.updateStory(updatedStories[i]);
         }
-        // Apply speed/silence adjustments at assembly time
         const processedStory = await processAudioSegment(storyAudio, state.mainVoiceSpeed, state.mainVoiceSilence);
-        segments.push(processedStory);
+        voiceSegments.push(processedStory);
       }
 
-      // ── Transition after last story ───────────────────────────────────────
-      if (state.soundsEnabled && state.selectedTransitionSound) {
-        const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound, state.soundVolume);
-        segments.push(transBase64);
-      }
-
-      // ── Outro TTS ─────────────────────────────────────────────────────────
+      // Outro TTS
       if (state.introOutroEnabled && state.outroScript.trim()) {
         let outroAudio = state.outroTtsAudio;
         if (!outroAudio) {
@@ -385,18 +362,36 @@
           if (!response.ok) throw new Error('Outro TTS failed');
           const data = await response.json();
           outroAudio = data.audioContent as string;
-          // Cache raw TTS (before speed/silence) so we can reuse it
           bulletinStore.update(s => ({ ...s, outroTtsAudio: outroAudio }));
         }
-        // Apply speed/silence adjustments at assembly time
         const processedOutro = await processAudioSegment(outroAudio, state.introOutroSpeed, state.introOutroSilence);
-        segments.push(processedOutro);
+        voiceSegments.push(processedOutro);
       }
 
-      // ── Outro sound ───────────────────────────────────────────────────────
+      // ── Interleave voice segments with transition sounds ──────────────────
+      // Transitions only go BETWEEN voice segments, not at start/end
+      for (let i = 0; i < voiceSegments.length; i++) {
+        segments.push(voiceSegments[i]);
+        
+        // Add transition sound AFTER each voice segment, except the last
+        if (i < voiceSegments.length - 1 && state.soundsEnabled && state.selectedTransitionSound) {
+          console.log('[Bulletin] Loading transition sound after segment', i + 1);
+          const transBase64 = await loadSoundAsBase64(state.selectedTransitionSound, state.soundVolume);
+          segments.push(transBase64);
+        }
+      }
+
+      // ── Prepend intro sound and append outro sound ──────────────────────
       if (state.soundsEnabled && state.selectedIntroOutroSound) {
+        console.log('[Bulletin] Loading intro sound:', state.selectedIntroOutroSound);
         const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound, state.soundVolume);
-        segments.push(soundBase64);
+        segments.unshift(soundBase64);  // Add to beginning
+      }
+
+      if (state.soundsEnabled && state.selectedIntroOutroSound) {
+        console.log('[Bulletin] Loading outro sound:', state.selectedIntroOutroSound);
+        const soundBase64 = await loadSoundAsBase64(state.selectedIntroOutroSound, state.soundVolume);
+        segments.push(soundBase64);  // Add to end
       }
 
       if (segments.length === 0) {
