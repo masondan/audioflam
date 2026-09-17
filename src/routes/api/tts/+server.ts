@@ -319,17 +319,22 @@ async function connectQwenWebSocket(endpoint: string, apiKey: string): Promise<W
 
 	if (isCloudflareWorker) {
 		const httpsEndpoint = endpoint.replace(/^wss:\/\//, 'https://');
+		const hostname = new URL(httpsEndpoint).hostname;
+		console.log(`[Qwen] Cloudflare Workers WebSocket upgrade to ${httpsEndpoint}`);
 		const upgradeResponse = await fetch(httpsEndpoint, {
 			headers: {
 				'Upgrade': 'websocket',
-				'Authorization': `Bearer ${apiKey}`
+				'Authorization': `Bearer ${apiKey}`,
+				'Host': hostname
 			}
 		});
+		console.log(`[Qwen] Upgrade response status: ${upgradeResponse.status}`);
 		const cfWebSocket = (upgradeResponse as unknown as { webSocket?: WebSocket }).webSocket;
 		if (!cfWebSocket) {
 			throw new Error('Cloudflare Workers WebSocket upgrade failed: no webSocket in response');
 		}
 		(cfWebSocket as unknown as { accept: () => void }).accept();
+		console.log('[Qwen] WebSocket accepted, connection established');
 		return cfWebSocket;
 	}
 
@@ -382,6 +387,7 @@ async function synthesizeViaWebSocket(
 		}
 
 		ws.addEventListener('open', () => {
+			console.log(`[Qwen] WebSocket open, sending run-task (taskId: ${taskId})`);
 			ws.send(JSON.stringify({
 				header: {
 					action: 'run-task',
@@ -413,28 +419,34 @@ async function synthesizeViaWebSocket(
 					return;
 				}
 				const eventType = msg.header?.event;
-
+				console.log(`[Qwen] Received event: ${eventType}`);
+	
 				if (eventType === 'task-started') {
+					console.log('[Qwen] Task started, sending continue-task');
 					ws.send(JSON.stringify({
 						header: { action: 'continue-task', task_id: taskId, streaming: 'duplex' },
 						payload: { input: { text } }
 					}));
 					// Give the server a brief moment to buffer the text, then finish.
 					setTimeout(() => {
+						console.log('[Qwen] Sending finish-task');
 						ws.send(JSON.stringify({
 							header: { action: 'finish-task', task_id: taskId, streaming: 'duplex' },
 							payload: { input: {} }
 						}));
 					}, 300);
 				} else if (eventType === 'task-finished') {
+					console.log('[Qwen] Task finished, combining audio chunks');
 					finish(null, combineChunks());
 				} else if (eventType === 'task-failed') {
+					console.log('[Qwen] Task failed:', msg.payload);
 					finish(new Error(`Qwen task-failed: ${JSON.stringify(msg.payload)}`));
 				}
 				// 'result-generated' text events carry sentence metadata only; audio arrives as binary frames.
 			} else {
 				// Binary audio frame — normalize to Uint8Array across runtimes (Blob in
 				// browser-like WS implementations, ArrayBuffer in Workers/undici).
+				console.log('[Qwen] Received binary audio frame');
 				const data = event.data as ArrayBuffer | Blob;
 				if (typeof Blob !== 'undefined' && data instanceof Blob) {
 					data.arrayBuffer().then((buf) => {
