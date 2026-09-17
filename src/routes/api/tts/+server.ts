@@ -280,7 +280,7 @@ async function handleQwen(text: string, voiceId: string) {
 
 	const trimmedText = text.slice(0, 4000);
 	const cleanedText = cleanForTTS(trimmedText);
-	const WS_ENDPOINT = 'wss://dashscope-intl.aliyuncs.com/api-ws/v1/inference';
+	const WS_ENDPOINT = 'wss://llm-vg2wh1r1rw2th4cy.ap-southeast-1.maas.aliyuncs.com/api-ws/v1/inference';
 	const SYNTHESIS_MODEL = 'qwen-audio-3.0-tts-flash';
 
 	console.log(`[Qwen] Generating TTS for voice: ${voiceId}, text length: ${cleanedText.length}`);
