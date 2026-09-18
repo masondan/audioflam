@@ -415,8 +415,10 @@ async function synthesizeViaWebSocket(
 		});
 
 		// Queue for processing binary frames sequentially to preserve order
+		// (fixes a race where async Blob.arrayBuffer() conversions could
+		// otherwise resolve out of order relative to each other).
 		let processingQueue: Promise<void> = Promise.resolve();
-	
+
 		ws.addEventListener('message', (event: MessageEvent) => {
 			if (typeof event.data === 'string') {
 				let msg: QwenWsMessage;
@@ -426,7 +428,7 @@ async function synthesizeViaWebSocket(
 					return;
 				}
 				const eventType = msg.header?.event;
-	
+
 				if (eventType === 'task-started') {
 					ws.send(JSON.stringify({
 						header: { action: 'continue-task', task_id: taskId, streaming: 'duplex' },
@@ -440,7 +442,23 @@ async function synthesizeViaWebSocket(
 						}));
 					}, 300);
 				} else if (eventType === 'task-finished') {
-					finish(null, combineChunks());
+					// CONFIRMED via diagnostic logging (September 2026): Aliyun's
+					// 'task-finished' text event does not reliably arrive AFTER all
+					// binary audio frames — in ~40% of test runs, one or more
+					// trailing audio frames arrived on the WebSocket immediately
+					// after task-finished was already processed. Finalizing
+					// synchronously here caused the last word/syllable to be
+					// dropped intermittently. Fix: wait a short grace period for
+					// any straggler frames already in flight, then await the
+					// frame-processing queue (frames are processed asynchronously
+					// via Blob.arrayBuffer()) before combining. Waiting for the
+					// 'close' event instead is not viable — observed close delay
+					// after task-finished was ~128 SECONDS in testing.
+					setTimeout(() => {
+						processingQueue.then(() => {
+							finish(null, combineChunks());
+						});
+					}, 400);
 				} else if (eventType === 'task-failed') {
 					finish(new Error(`Qwen task-failed: ${JSON.stringify(msg.payload)}`));
 				}
@@ -448,8 +466,7 @@ async function synthesizeViaWebSocket(
 			} else {
 				// Binary audio frame — normalize to Uint8Array across runtimes (Blob in
 				// browser-like WS implementations, ArrayBuffer in Workers/undici).
-				// Process sequentially via queue to preserve frame order (fixes race condition
-				// where async Blob.arrayBuffer() conversions could arrive out of order).
+				// Process sequentially via queue to preserve frame order.
 				const data = event.data as ArrayBuffer | Blob;
 				processingQueue = processingQueue.then(async () => {
 					try {

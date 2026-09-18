@@ -94,11 +94,18 @@ export const QWEN_VOICES: VoiceOption[] = [
 ];
 
 // Qwen-Audio-TTS Voice Clones (Welsh English)
-// Re-enrolled via: node --env-file=.env scripts/reclone_production_voices.js (August 27, 2026)
+// Owain re-enrolled via: node --env-file=.env scripts/reclone_production_voices.js (August 27, 2026)
 // Migrated from retiring qwen3-tts-vc-2026-01-22 to qwen-audio-3.0-tts-flash
+// Carys re-enrolled via: node --env-file=.env scripts/enroll_carys_test.js (September 2026)
+// — replaces the retired "Ffion" enrollment, which suffered from an intermittent
+// reference-audio leak (fragments of its own ~20s enrollment sample bleeding into
+// synthesis output — confirmed root cause, see AGENTS.md "Recently Fixed"). Carys
+// uses a short (<=10s) clean reference clip plus enable_preprocess: true, which
+// resolved the leak across 20+ test generations. Ffion's old voice_id is retired
+// and no longer used anywhere in the app.
 export const QWEN_WELSH_VOICES: VoiceOption[] = [
 	// Welsh English
-	{ name: 'qwen-audio-3.0-tts-flash-ffion-dc272f74af2b496bab1f124c1237299d', ssmlGender: 'FEMALE', displayName: 'Ffion (Wales)', description: 'Wales English female', provider: 'qwen' },
+	{ name: 'qwen-audio-3.0-tts-flash-carys-835aeeced1df40648d6b529323a66def', ssmlGender: 'FEMALE', displayName: 'Carys (Wales)', description: 'Wales English female', provider: 'qwen' },
 	{ name: 'qwen-audio-3.0-tts-flash-owain-20ca1a2fc3714f738054d38d9d73c149', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
 ];
 
