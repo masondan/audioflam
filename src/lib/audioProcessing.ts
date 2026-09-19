@@ -399,13 +399,16 @@ function mixToMono(buffer: AudioBuffer): Float32Array {
  * removal" feature — it must never be applied to voice/TTS audio.
  *
  * @param base64Audio Source audio (any format decodable by the browser)
- * @param amplitudeThreshold RMS threshold below which audio is considered silent (default ≈ -40dB)
+ * @param amplitudeThreshold RMS threshold below which audio is considered silent
+ *   (default 0.02 ≈ -34dB, matching the voice-clip 'trim' level — sound effect
+ *   tails often fade to a quiet-but-nonzero noise floor rather than true digital
+ *   silence, so this needs to be as permissive as the voice silence detection)
  * @param keepMs Milliseconds of trailing audio to retain after the last non-silent point (default 100ms)
  */
 export async function trimTrailingSilence(
-	base64Audio: string,
-	amplitudeThreshold: number = 0.01,
-	keepMs: number = 100
+ base64Audio: string,
+ amplitudeThreshold: number = 0.02,
+ keepMs: number = 100
 ): Promise<string> {
 	const buffer = await decodeAudio(base64Audio);
 	const sampleRate = buffer.sampleRate;
