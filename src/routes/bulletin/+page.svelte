@@ -6,7 +6,7 @@
   import type { BulletinStory } from '$lib/stores/bulletin';
   import { ALL_VOICES, customVoices, customVoiceToVoiceOption, preloadedTTSAudio } from '$lib/stores';
   import type { VoiceOption, TTSProvider } from '$lib/stores';
-  import { concatenateAudioSegments, removeSilence, applyGainToBase64 } from '$lib/audioProcessing';
+  import { concatenateAudioSegments, removeSilence, applyGainToBase64, trimTrailingSilence } from '$lib/audioProcessing';
   import type { SilenceLevel } from '$lib/audioProcessing';
   import { timeStretch, audioBufferToWav } from '$lib/utils/timestretch';
   import VoiceDropdown from '$lib/components/VoiceDropdown.svelte';
@@ -233,7 +233,15 @@
     return processed;
   }
 
-  /** Fetch an MP3 from /sounds/ and return its base64 string, with volume gain applied */
+  /**
+   * Fetch an MP3 from /sounds/ and return its base64 string, with volume gain applied.
+   *
+   * Also trims any trailing decay/reverb tail from the sound file so it doesn't
+   * introduce an audible gap before the segment that follows it (e.g. intro sound
+   * → intro TTS). This is a fixed audio-hygiene step for sound effects only —
+   * distinct from removeSilence(), which is a user-configurable feature applied
+   * only to voice/TTS clips.
+   */
   async function loadSoundAsBase64(filename: string, gain: number = 1.0): Promise<string> {
     const response = await fetch(`/sounds/${filename}`);
     if (!response.ok) throw new Error(`Failed to load sound: ${filename}`);
@@ -243,8 +251,14 @@
     for (let i = 0; i < bytes.byteLength; i++) {
       binary += String.fromCharCode(bytes[i]);
     }
-    const base64 = btoa(binary);
-    return applyGainToBase64(base64, gain);
+    let base64 = btoa(binary);
+    base64 = await applyGainToBase64(base64, gain);
+    try {
+      base64 = await trimTrailingSilence(base64);
+    } catch (e) {
+      console.warn('[Bulletin] Trailing silence trim failed for sound, using untrimmed:', filename, e);
+    }
+    return base64;
   }
 
   /** Generate raw TTS for a single story via /api/tts (speed/silence applied separately at assembly time) */

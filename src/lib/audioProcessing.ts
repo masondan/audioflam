@@ -387,6 +387,75 @@ function mixToMono(buffer: AudioBuffer): Float32Array {
 }
 
 /**
+ * Trim trailing near-silent audio from the end of a clip.
+ *
+ * Unlike removeSilence() (which is only ever applied to TTS voice clips to
+ * control speech pacing), this is a separate, unconditional operation used
+ * for bulletin sound effect files (intro/outro/transition MP3s). Some sound
+ * assets contain a long decay/reverb tail after their main "stinger" hit;
+ * when such a sound is followed immediately by a voice segment, that tail
+ * is perceived as an awkward silent gap. Trimming it here is a fixed
+ * audio-hygiene step for sound effects, not a user-configurable "silence
+ * removal" feature — it must never be applied to voice/TTS audio.
+ *
+ * @param base64Audio Source audio (any format decodable by the browser)
+ * @param amplitudeThreshold RMS threshold below which audio is considered silent (default ≈ -40dB)
+ * @param keepMs Milliseconds of trailing audio to retain after the last non-silent point (default 100ms)
+ */
+export async function trimTrailingSilence(
+	base64Audio: string,
+	amplitudeThreshold: number = 0.01,
+	keepMs: number = 100
+): Promise<string> {
+	const buffer = await decodeAudio(base64Audio);
+	const sampleRate = buffer.sampleRate;
+	const numChannels = buffer.numberOfChannels;
+	const windowSize = Math.max(1, Math.floor(sampleRate * 0.01)); // 10ms window
+
+	// Detect the last window (across all channels) whose RMS is above threshold
+	let lastNonSilentEnd = 0;
+	for (let i = 0; i < buffer.length; i += windowSize) {
+		const windowEnd = Math.min(i + windowSize, buffer.length);
+		let windowIsSilent = true;
+
+		for (let ch = 0; ch < numChannels; ch++) {
+			const channelData = buffer.getChannelData(ch);
+			let sumSquares = 0;
+			for (let j = i; j < windowEnd; j++) {
+				sumSquares += channelData[j] * channelData[j];
+			}
+			const rms = Math.sqrt(sumSquares / (windowEnd - i));
+			if (rms >= amplitudeThreshold) {
+				windowIsSilent = false;
+				break;
+			}
+		}
+
+		if (!windowIsSilent) {
+			lastNonSilentEnd = windowEnd;
+		}
+	}
+
+	const keepSamples = Math.floor((keepMs / 1000) * sampleRate);
+	const newLength = Math.min(buffer.length, lastNonSilentEnd + keepSamples);
+
+	// Safety guards: skip trimming if there's nothing meaningful to trim,
+	// or if detection failed to find any non-silent audio (avoid destroying the clip)
+	if (newLength >= buffer.length || lastNonSilentEnd === 0) {
+		return base64Audio;
+	}
+
+	const audioContext = new OfflineAudioContext(numChannels, newLength, sampleRate);
+	const newBuffer = audioContext.createBuffer(numChannels, newLength, sampleRate);
+	for (let ch = 0; ch < numChannels; ch++) {
+		newBuffer.getChannelData(ch).set(buffer.getChannelData(ch).subarray(0, newLength));
+	}
+
+	const blob = audioBufferToWav(newBuffer);
+	return blobToBase64(blob);
+}
+
+/**
  * Main function: process audio and remove silence
  */
 export async function removeSilence(
