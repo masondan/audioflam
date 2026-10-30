@@ -742,6 +742,11 @@
   }
 
   function handleTimeUpdate() {
+    // Fallback sync only — native 'timeupdate' fires ~4x/sec, too coarse for
+    // smooth subtitle rendering. The RAF loop below (synced to isPlaying)
+    // handles the primary per-frame currentTime updates during playback;
+    // this listener remains as a safety net for when RAF is throttled
+    // (e.g. backgrounded tab) and for the trim-end boundary check.
     if (!audioElement || !audioData) return;
     currentTime = audioElement.currentTime;
     
@@ -753,6 +758,45 @@
       audioElement.currentTime = currentTime;
     }
   }
+
+  // --- RAF-driven time sync for smooth subtitle rendering ---
+  // The native 'timeupdate' event fires too infrequently (commonly ~4x/sec)
+  // for frame-accurate subtitle word timing — this was the root cause of
+  // both the perceived lag and the choppy (non-smooth) word reveal/highlight.
+  // This loop re-reads audioElement.currentTime every animation frame while
+  // playing, giving the canvas a fresh currentTime ~60x/sec instead.
+  $effect(() => {
+    if (!isPlaying || !audioElement) return;
+
+    let animId: number;
+    let active = true;
+
+    function tick() {
+      if (!active || !audioElement || !audioData) return;
+
+      const t = audioElement.currentTime;
+      currentTime = t;
+
+      if (t >= audioData.duration * trimEnd) {
+        audioElement.pause();
+        isPlaying = false;
+        stopWaveformAnimation();
+        const resetTime = audioData.duration * trimStart;
+        audioElement.currentTime = resetTime;
+        currentTime = resetTime;
+        return;
+      }
+
+      animId = requestAnimationFrame(tick);
+    }
+
+    animId = requestAnimationFrame(tick);
+
+    return () => {
+      active = false;
+      cancelAnimationFrame(animId);
+    };
+  });
 
   function handleWaveformClick(e: MouseEvent) {
     if (!audioData || !waveformContainer || !audioElement || isExporting) return;

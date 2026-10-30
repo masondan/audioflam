@@ -84,6 +84,33 @@ const FONT_SIZE_RATIOS: Record<FontSize, number> = {
 	large: 0.07,
 };
 
+// --- Timing and animation tuning ---
+
+/**
+ * Lead time (seconds) by which word highlighting/reveal is shown ahead of its
+ * transcribed start timestamp. Transcription timestamps mark the acoustic
+ * onset of a word, but the highlight/reveal perceptually feels "late" if it
+ * waits for that exact instant — nudging it earlier tightens perceived sync.
+ * Applies to both Focus (active word highlighting) and Flow (word reveal) modes.
+ * Increase to shift words earlier, decrease (toward 0) to shift them later/off.
+ */
+const WORD_LEAD_TIME = 0.05; // 50ms
+
+/**
+ * Duration (seconds) of the spotlight colour crossfade in Focus mode, from
+ * textColor to spotlightColor, as a word becomes active. Smooths out what was
+ * previously an instant colour switch. Set to a very small value (e.g. 0.01)
+ * for a near-instant switch, or raise it for a slower, more visible fade.
+ */
+const FOCUS_FADE_DURATION = 0.12; // 120ms
+
+/**
+ * Duration (seconds) of the fade-in as each word appears in Flow mode.
+ * Was previously a hardcoded 0.15 inside drawFlowSubtitle(); pulled out here
+ * so both the text fade and the label fade in drawFlowLabel() share one knob.
+ */
+const FLOW_FADE_DURATION = 0.20; // 200ms (was 0.15 — slightly slower for a smoother reveal)
+
 // --- Core engine functions ---
 
 /**
@@ -294,14 +321,17 @@ export function drawSubtitle(
 	const charsPerLine = calculateCharsPerLine(canvasWidth, canvasHeight, style.fontSize, style.uppercaseEnabled);
 
 	// Find active word index (needed for sliding window calculation)
+	// WORD_LEAD_TIME shifts selection slightly earlier so the active word
+	// switches ahead of its exact transcribed start, tightening perceived sync.
 	let activeWordIndex = -1;
 	for (let i = 0; i < segment.words.length; i++) {
 		const w = segment.words[i];
-		if (currentTime >= w.start && currentTime < w.end) {
+		const effectiveTime = currentTime + WORD_LEAD_TIME;
+		if (effectiveTime >= w.start && effectiveTime < w.end) {
 			activeWordIndex = i;
 			break;
 		}
-		if (currentTime >= w.end) {
+		if (effectiveTime >= w.end) {
 			activeWordIndex = i;
 		}
 	}
@@ -416,7 +446,16 @@ function drawFocusSubtitle(
 
 			const displayWord = displayWords[wi];
 			const isActive = wordIdx === activeWordIndex;
-			const wordColor = (isActive && style.spotlightEnabled) ? style.spotlightColor : style.textColor;
+
+			// Crossfade from textColor to spotlightColor over FOCUS_FADE_DURATION
+			// as the word becomes active, instead of an instant colour switch.
+			let wordColor = style.textColor;
+			if (isActive && style.spotlightEnabled) {
+				const timing = allWords[wordIdx];
+				const elapsed = timing ? (currentTime + WORD_LEAD_TIME - timing.start) : FOCUS_FADE_DURATION;
+				const progress = Math.max(0, Math.min(1, elapsed / FOCUS_FADE_DURATION));
+				wordColor = blendHexColors(style.textColor, style.spotlightColor, progress);
+			}
 
 			applyTextEffects(ctx, style, fontPx);
 			ctx.fillStyle = wordColor;
@@ -451,7 +490,9 @@ function drawFocusSubtitle(
 	currentTime: number,
 	wordOffset: number
 ): void {
-	const FADE_DURATION = 0.15; // seconds
+	// Apply the shared lead-time offset so words reveal slightly ahead of
+	// their transcribed start, matching the Focus-mode active word timing.
+	const effectiveTime = currentTime + WORD_LEAD_TIME;
 
 	const allWords = segment.words;
 	let wordIdx = wordOffset;
@@ -477,7 +518,7 @@ function drawFocusSubtitle(
 			const displayWord = displayWords[wi];
 			const timing = allWords[wordIdx];
 
-			if (!timing || currentTime < timing.start) {
+			if (!timing || effectiveTime < timing.start) {
 				// Word hasn't started yet — invisible
 				const wordWidth = ctx.measureText(displayWord + ' ').width;
 				wordX += wordWidth;
@@ -485,9 +526,9 @@ function drawFocusSubtitle(
 				continue;
 			}
 
-			const elapsed = currentTime - timing.start;
-			const isFading = elapsed < FADE_DURATION;
-			const alpha = isFading ? elapsed / FADE_DURATION : 1;
+			const elapsed = effectiveTime - timing.start;
+			const isFading = elapsed < FLOW_FADE_DURATION;
+			const alpha = isFading ? elapsed / FLOW_FADE_DURATION : 1;
 
 			const wordColor = (isFading && style.spotlightEnabled)
 				? style.spotlightColor
@@ -578,6 +619,8 @@ function drawFlowLabel(
 	const canvasWidth = centerX * 2;
 	const pad = style.labelPadding;
 	const fadeDurationSec = style.labelFadeDuration / 1000;
+	// Keep the label in sync with the word-reveal lead time applied in drawFlowSubtitle().
+	const effectiveTime = currentTime + WORD_LEAD_TIME;
 
 	let wordIdx = wordOffset;
 
@@ -602,15 +645,15 @@ function drawFlowLabel(
 			const displayWord = displayWords[wi];
 			const timing = allWords[wordIdx];
 
-			if (!timing || currentTime < timing.start) {
+			if (!timing || effectiveTime < timing.start) {
 				wordX += ctx.measureText(displayWord + ' ').width;
 				wordIdx++;
 				continue;
 			}
 
 			// Only draw label for the currently active word
-			if (currentTime >= timing.start && currentTime < timing.end) {
-				const opacity = calculateLabelOpacity(currentTime, timing.start, timing.end, fadeDurationSec);
+			if (effectiveTime >= timing.start && effectiveTime < timing.end) {
+				const opacity = calculateLabelOpacity(effectiveTime, timing.start, timing.end, fadeDurationSec);
 				if (opacity >= 0.01) {
 					const wordWidth = ctx.measureText(displayWord).width;
 					// textBaseline = 'top': text renders downward from lineY.
@@ -715,6 +758,21 @@ function hexToRgb(hex: string): { r: number; g: number; b: number } {
 		g: parseInt(result[2], 16),
 		b: parseInt(result[3], 16),
 	};
+}
+
+/**
+ * Linearly interpolates between two hex colours and returns an rgb() string.
+ * Used by drawFocusSubtitle() to crossfade a word from textColor to
+ * spotlightColor over FOCUS_FADE_DURATION instead of an instant switch.
+ * @param progress - 0 = fromHex, 1 = toHex
+ */
+function blendHexColors(fromHex: string, toHex: string, progress: number): string {
+	const from = hexToRgb(fromHex);
+	const to = hexToRgb(toHex);
+	const r = Math.round(from.r + (to.r - from.r) * progress);
+	const g = Math.round(from.g + (to.g - from.g) * progress);
+	const b = Math.round(from.b + (to.b - from.b) * progress);
+	return `rgb(${r}, ${g}, ${b})`;
 }
 
 // --- Segment editing functions ---
