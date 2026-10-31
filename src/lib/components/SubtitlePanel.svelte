@@ -260,7 +260,7 @@
       // This ensures the rendering engine uses the correct edited words, not the original ones
       const withRebuiltWords = rebuildAllWords(localSegments);
       const reflowed = reflow(withRebuiltWords, style, canvasWidth, canvasHeight);
-      console.log('[SubtitlePanel] closeEditDrawer: rebuilt words and reflowed segments');
+
       onSegmentsChange(reflowed);
     }
   }
@@ -270,7 +270,6 @@
       i === idx ? { ...seg, text: newText } : seg
     );
     localSegments = updated;
-    console.log('[SubtitlePanel] handleSegmentTextEdit:', { idx, newText, updatedText: updated[idx]?.text });
   }
 
   function handleMerge(idxA: number) {
