@@ -164,7 +164,14 @@
 
     generating = true;
     generateError = null;
-    generateStage = 'Generating…';
+    // Azerbaijani runs through Deepgram's hosted Whisper (whisper-large), which
+    // is noticeably slower than the Nova models and capped at 5 concurrent
+    // requests on pay-as-you-go — warn the user up front so a long wait isn't
+    // mistaken for a hang. See /api/transcribe-deepgram for the server-side
+    // model/timeout handling.
+    generateStage = selectedLanguage === 'az'
+      ? 'Transcribing Azerbaijani… this can take a minute or more.'
+      : 'Generating…';
 
     try {
       const formData = new FormData();
@@ -181,6 +188,11 @@
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}));
+        // 429 (rate limited) and 504 (timeout) already carry a friendly,
+        // language-specific message from the server — use it directly.
+        if (response.status === 429 || response.status === 504) {
+          throw new Error(data.error || 'Transcription service is busy right now. Please wait a moment and try again.');
+        }
         throw new Error(data.error || `Transcription failed (${response.status})`);
       }
 
