@@ -114,7 +114,24 @@ const FLOW_FADE_DURATION = 0.20; // 200ms (was 0.15 — slightly slower for a sm
 // --- Core engine functions ---
 
 /**
+ * Maximum distance (seconds) outside a segment's [start, end) window that
+ * getActiveSegment() will still snap to it as a fallback. Needed because
+ * Bulletin-assembled audio (intro/outro sounds + voice clips concatenated)
+ * introduces timing drift between transcribed segment timestamps and actual
+ * playback currentTime — e.g. intro/outro voice segments whose timestamps
+ * were generated against the isolated clip, not the final assembled track
+ * with leading/trailing silence or music.
+ */
+const SEGMENT_SNAP_THRESHOLD = 0.5; // 500ms
+
+/**
  * Returns the segment whose start/end window contains currentTime, or null.
+ *
+ * Falls back to the nearest segment (by distance to its start/end boundary)
+ * if no segment's window contains currentTime exactly, as long as that
+ * nearest segment is within SEGMENT_SNAP_THRESHOLD seconds. This keeps
+ * subtitles visible across small timing drifts (e.g. Bulletin intro/outro
+ * segments) without affecting normal, well-aligned playback.
  */
 export function getActiveSegment(
 	segments: SubtitleSegment[],
@@ -125,6 +142,27 @@ export function getActiveSegment(
 			return seg;
 		}
 	}
+
+	// No exact match — fall back to the nearest segment within threshold.
+	let nearest: SubtitleSegment | null = null;
+	let nearestDistance = Infinity;
+
+	for (const seg of segments) {
+		const distance =
+			currentTime < seg.start
+				? seg.start - currentTime
+				: currentTime - seg.end;
+
+		if (distance < nearestDistance) {
+			nearestDistance = distance;
+			nearest = seg;
+		}
+	}
+
+	if (nearest && nearestDistance <= SEGMENT_SNAP_THRESHOLD) {
+		return nearest;
+	}
+
 	return null;
 }
 

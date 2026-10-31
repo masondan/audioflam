@@ -35,15 +35,36 @@ export const POST: RequestHandler = async ({ request }) => {
 		const mimeType = audioFile.type || 'audio/mpeg';
 		console.log(`[Deepgram] File MIME type: ${mimeType}, File name: ${audioFile.name}`);
 
-		// Build URL params: include language if not 'auto'
+		// Deepgram model/language resolution.
+		//
+		// BEFORE this fix, both 'auto' (no language param sent at all — Deepgram
+		// defaults nova-3 to English) and 'en' resolved to plain `model=nova-3`
+		// (or `model=nova-3&language=en`, same result). That combination was
+		// proven (via direct curl testing, bypassing this app entirely) to drop
+		// words from bulletin audio containing jingles/transitions — specifically
+		// the intro/outro TTS segments went missing from the transcript, while
+		// `model=nova-3&language=multi` (146 words) and `model=nova-2` (147 words)
+		// both transcribed correctly. See handoff notes (Oct 2026) for details.
+		//
+		// Fix: route English requests (both 'auto' and explicit 'en') to
+		// `model=nova-3&language=multi` instead. All other languages are
+		// untouched — they still send `model=nova-3&language=<code>` exactly as
+		// before. This table is intentionally small/flat so it's easy to revert
+		// (just change ENGLISH_DEEPGRAM_PARAMS back to { language: 'en' } or drop
+		// the language key to restore the pre-fix 'auto' behavior).
+		const isEnglishRequest = language === 'auto' || language === 'en';
+		const ENGLISH_DEEPGRAM_PARAMS = { model: 'nova-3', language: 'multi' };
+
 		const urlParams: Record<string, string> = {
-			model: 'nova-3',
+			model: ENGLISH_DEEPGRAM_PARAMS.model,
 			smart_format: 'true',
 			punctuate: 'true',
 			utterances: 'false',
 			words: 'true',
 		};
-		if (language !== 'auto') {
+		if (isEnglishRequest) {
+			urlParams.language = ENGLISH_DEEPGRAM_PARAMS.language;
+		} else {
 			urlParams.language = language;
 		}
 

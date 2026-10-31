@@ -297,8 +297,37 @@ export async function concatenateAudioSegments(base64Audios: string[]): Promise<
 		audioBuffers.push(buffer);
 	}
 
+	// ── DIAGNOSTIC (temporary) ─────────────────────────────────────────────
+	// Log each segment's decoded sample rate/duration/channels to check for
+	// a sample-rate mismatch between sound-effect jingles and TTS voice clips.
+	// concatenateAudioSegments() uses buffer[0]'s sample rate for the WHOLE
+	// output and copies every other buffer's raw samples in verbatim with NO
+	// resampling (see outputData.set() below). If buffer[0] (e.g. an intro
+	// jingle unshifted to the front) has a different native sample rate than
+	// a later TTS buffer, that TTS buffer's samples get copied in unchanged
+	// but will played back/interpreted at the wrong rate — pitch-shifting and
+	// time-distorting that segment's audio without necessarily being obvious
+	// to a casual listen, but potentially destroying it for ASR transcription.
+	audioBuffers.forEach((buf, i) => {
+		console.log(
+			`[Bulletin][Diagnostic] Segment ${i}: sampleRate=${buf.sampleRate}Hz, ` +
+			`duration=${buf.duration.toFixed(3)}s, channels=${buf.numberOfChannels}, ` +
+			`length=${buf.length} samples`
+		);
+	});
+
 	// Use the sample rate from the first buffer (should all be the same)
 	const sampleRate = audioBuffers[0].sampleRate;
+
+	const mismatched = audioBuffers.filter(b => b.sampleRate !== sampleRate);
+	if (mismatched.length > 0) {
+		console.warn(
+			`[Bulletin][Diagnostic] SAMPLE RATE MISMATCH DETECTED! ` +
+			`Using ${sampleRate}Hz from segment 0, but ${mismatched.length} segment(s) ` +
+			`have a different native rate: ${mismatched.map(b => b.sampleRate + 'Hz').join(', ')}. ` +
+			`These segments will be copied in WITHOUT resampling, corrupting their playback speed/pitch.`
+		);
+	}
 
 	// Calculate total length
 	const totalLength = audioBuffers.reduce((sum, buf) => sum + buf.length, 0);
