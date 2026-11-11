@@ -109,14 +109,14 @@ export const QWEN_WELSH_VOICES: VoiceOption[] = [
 	{ name: 'qwen-audio-3.0-tts-flash-owain-20ca1a2fc3714f738054d38d9d73c149', ssmlGender: 'MALE', displayName: 'Owain (Wales)', description: 'Wales English male', provider: 'qwen' }
 ];
 
-// Combined voices for the UI (Nigerian first, then YarnGPT, then Qwen Malawi/Zim, then British, then Welsh)
+// Combined voices for the UI (UK first, then Welsh, then Nigerian, then YarnGPT, then Qwen Malawi/Zim)
 // Note: MINIMAX_VOICES hidden from dropdown (API currently non-functional)
 export const ALL_VOICES: VoiceOption[] = [
+	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
+	...QWEN_WELSH_VOICES,
 	...AZURE_VOICES.filter(v => v.name.startsWith('en-NG')),
 	...YARNGPT_VOICES,
 	...QWEN_VOICES,
-	...AZURE_VOICES.filter(v => v.name.startsWith('en-GB')),
-	...QWEN_WELSH_VOICES,
 ];
 
 export const selectedVoice = writable<VoiceOption | null>(null);
